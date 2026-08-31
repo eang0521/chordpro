@@ -1,0 +1,74 @@
+import type { Block, SyllableToken } from '../types';
+
+export type BlockMap = Record<string, Block>;
+
+/**
+ * Expands the arrangement (an ordered list of block ids, which may repeat) into the flat
+ * syllable sequence used for tapping pace, placing chords, and exporting. Repeated blocks
+ * are "linked": each occurrence renders the SAME underlying tokens (so edits made through
+ * `updateBlockToken` show up at every occurrence), only the React key is made unique per
+ * occurrence. A section heading is attached to the first token of every occurrence, not just
+ * the first time the block appears.
+ */
+export function deriveFlatSyllables(blocks: BlockMap, arrangement: string[]): SyllableToken[] {
+  const flat: SyllableToken[] = [];
+  arrangement.forEach((blockId, occurrence) => {
+    const block = blocks[blockId];
+    if (!block) return;
+    block.syllables.forEach((tok, i) => {
+      flat.push({
+        ...tok,
+        id: `${occurrence}-${tok.id}`,
+        section: i === 0 ? { type: block.type, label: block.label } : undefined,
+      });
+    });
+  });
+  return flat;
+}
+
+/** Applies an update to one token, identified by its canonical block + local index, wherever it lives. */
+export function updateBlockToken(
+  blocks: BlockMap,
+  blockId: string,
+  localIndex: number,
+  updater: (tok: SyllableToken) => SyllableToken,
+): BlockMap {
+  const block = blocks[blockId];
+  if (!block) return blocks;
+  const syllables = block.syllables.map((tok, i) => (i === localIndex ? updater(tok) : tok));
+  return { ...blocks, [blockId]: { ...block, syllables } };
+}
+
+export function moveArrangementItem(arrangement: string[], from: number, to: number): string[] {
+  if (from === to || from < 0 || to < 0 || from >= arrangement.length || to >= arrangement.length) {
+    return arrangement;
+  }
+  const next = [...arrangement];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
+/** Inserts another reference to the same (linked) block right after the given position. */
+export function duplicateArrangementItem(arrangement: string[], at: number): string[] {
+  const blockId = arrangement[at];
+  if (blockId == null) return arrangement;
+  const next = [...arrangement];
+  next.splice(at + 1, 0, blockId);
+  return next;
+}
+
+/** Removes one occurrence from the arrangement; deletes the block itself if that was its last occurrence. */
+export function removeArrangementItem(
+  blocks: BlockMap,
+  arrangement: string[],
+  at: number,
+): { blocks: BlockMap; arrangement: string[] } {
+  const blockId = arrangement[at];
+  if (blockId == null) return { blocks, arrangement };
+  const nextArrangement = arrangement.filter((_, i) => i !== at);
+  const stillUsed = nextArrangement.includes(blockId);
+  if (stillUsed) return { blocks, arrangement: nextArrangement };
+  const { [blockId]: _removed, ...rest } = blocks;
+  return { blocks: rest, arrangement: nextArrangement };
+}

@@ -7,12 +7,12 @@ import { LyricFlow } from './LyricFlow';
 interface Props {
   syllables: SyllableToken[];
   songKey: KeyName;
+  onUpdateToken: (blockId: string, localIndex: number, updater: (tok: SyllableToken) => SyllableToken) => void;
   onBack: () => void;
-  onSubmit: (finished: SyllableToken[]) => void;
+  onSubmit: () => void;
 }
 
-export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Props) {
-  const [current, setCurrent] = useState<SyllableToken[]>(syllables);
+export function PlaybackChordEditor({ syllables, songKey, onUpdateToken, onBack, onSubmit }: Props) {
   const [index, setIndex] = useState(-1);
   const [playing, setPlaying] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
@@ -27,24 +27,24 @@ export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Pr
   }
 
   function scheduleFrom(startIndex: number) {
-    if (startIndex >= current.length) {
+    if (startIndex >= syllables.length) {
       setPlaying(false);
       return;
     }
     setIndex(startIndex);
     const next = startIndex + 1;
-    if (next >= current.length) {
+    if (next >= syllables.length) {
       setPlaying(false);
       return;
     }
-    const delay = Math.max(0, (current[next].offsetMs ?? 0) - (current[startIndex].offsetMs ?? 0));
+    const delay = Math.max(0, (syllables[next].offsetMs ?? 0) - (syllables[startIndex].offsetMs ?? 0));
     timerRef.current = window.setTimeout(() => {
       scheduleFrom(next);
     }, delay);
   }
 
   function play() {
-    if (playing || current.length === 0) return;
+    if (playing || syllables.length === 0) return;
     setPlaying(true);
     scheduleFrom(index <= 0 ? 0 : index);
   }
@@ -68,6 +68,14 @@ export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Pr
     warningTimerRef.current = window.setTimeout(() => setWarning(null), 1500);
   }
 
+  // If pace-recording was skipped, every syllable's offsetMs is still null — fall back to a
+  // manual walkthrough (Space advances one syllable at a time) instead of timed playback.
+  const hasTiming = syllables.length > 0 && syllables.every((s) => s.offsetMs !== null);
+
+  function manualAdvance() {
+    setIndex((i) => Math.min(i + 1, syllables.length - 1));
+  }
+
   function assignChord(degrees: ScaleDegree[]) {
     if (index < 0) return;
     const label = resolveChordLabel(songKey, degrees);
@@ -75,7 +83,8 @@ export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Pr
       flashWarning(`No chord defined for keys ${degrees.join(' + ')}`);
       return;
     }
-    setCurrent((prev) => prev.map((s, i) => (i === index ? { ...s, chordDegrees: degrees } : s)));
+    const syl = syllables[index];
+    onUpdateToken(syl.blockId, syl.localIndex, (tok) => ({ ...tok, chordDegrees: degrees }));
     // In manual (no-timing) mode, placing a chord doubles as "move on" — no separate Space needed.
     if (!hasTiming) manualAdvance();
   }
@@ -87,25 +96,19 @@ export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Pr
       const isClearKey = e.code === 'Backspace' || e.code === 'Delete' || e.key === 'Backspace' || e.key === 'Delete';
       if (isClearKey && index >= 0) {
         e.preventDefault();
-        setCurrent((prev) => prev.map((s, i) => (i === index ? { ...s, chordDegrees: [] } : s)));
+        const syl = syllables[index];
+        onUpdateToken(syl.blockId, syl.localIndex, (tok) => ({ ...tok, chordDegrees: [] }));
       }
     }
     window.addEventListener('keydown', handleClear);
     return () => window.removeEventListener('keydown', handleClear);
-  }, [index]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, syllables]);
 
   function jumpTo(i: number) {
     if (playing) return;
     clearTimer();
     setIndex(i);
-  }
-
-  // If pace-recording was skipped, every syllable's offsetMs is still null — fall back to a
-  // manual walkthrough (Space advances one syllable at a time) instead of timed playback.
-  const hasTiming = current.length > 0 && current.every((s) => s.offsetMs !== null);
-
-  function manualAdvance() {
-    setIndex((i) => Math.min(i + 1, current.length - 1));
   }
 
   useEffect(() => {
@@ -119,9 +122,9 @@ export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Pr
     window.addEventListener('keydown', handleSpace);
     return () => window.removeEventListener('keydown', handleSpace);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasTiming, current.length]);
+  }, [hasTiming, syllables.length]);
 
-  const finished = index >= current.length - 1 && current.length > 0;
+  const finished = index >= syllables.length - 1 && syllables.length > 0;
 
   return (
     <div className="panel">
@@ -148,7 +151,7 @@ export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Pr
         {index === -1 && <span>{hasTiming ? 'Press Play to begin.' : 'Press Space to begin.'}</span>}
         {index >= 0 && (
           <span>
-            Syllable {index + 1} / {current.length}
+            Syllable {index + 1} / {syllables.length}
             {hasTiming ? (playing ? ' (playing)' : ' (paused)') : ''}
           </span>
         )}
@@ -156,7 +159,7 @@ export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Pr
       </div>
       <div className="lyric-display">
         <LyricFlow
-          syllables={current}
+          syllables={syllables}
           currentIndex={index}
           songKey={songKey}
           showChords
@@ -181,7 +184,7 @@ export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Pr
             Next syllable &#9654;
           </button>
         )}
-        <button disabled={!finished} onClick={() => onSubmit(current)}>
+        <button disabled={!finished} onClick={onSubmit}>
           Continue to export &rarr;
         </button>
       </div>

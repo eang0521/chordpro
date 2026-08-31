@@ -1,4 +1,4 @@
-import type { SectionType, SyllableToken } from '../types';
+import type { Block, SectionType } from '../types';
 import { makeId } from './id';
 import { syllabifyCore } from './syllabify';
 
@@ -102,34 +102,55 @@ export function parseLyricsToWordGroups(text: string): { groups: WordGroup[]; se
   return { groups, sections };
 }
 
-/** Flattens editable word groups (plus section headings) into the sequential syllable list used for recording/playback/export. */
-export function wordGroupsToSyllables(groups: WordGroup[], sections: Section[] = []): SyllableToken[] {
+/**
+ * Splits editable word groups (plus detected section headings) into one Block per section —
+ * each block owns its own syllable tokens, ready to be reordered/duplicated in the arrangement.
+ * Lyrics before the first heading (or a song with no headings at all) become a single
+ * unlabeled "other" block, so every syllable always belongs to exactly one block.
+ */
+export function wordGroupsToBlocks(groups: WordGroup[], sections: Section[] = []): Block[] {
   const sectionByLine = new Map<number, Section>();
   sections.forEach((s) => sectionByLine.set(s.beforeLineIndex, s));
 
-  const tokens: SyllableToken[] = [];
+  const blocks: Block[] = [];
+  let currentBlock: Block | null = null;
   let prevLineIndex: number | null = null;
+
+  function startBlock(type: SectionType, label: string) {
+    currentBlock = { id: makeId(), type, label, syllables: [] };
+    blocks.push(currentBlock);
+  }
+
   groups.forEach((group) => {
     const isNewLine = group.lineIndex !== prevLineIndex;
     prevLineIndex = group.lineIndex;
+
+    const section = isNewLine ? sectionByLine.get(group.lineIndex) : undefined;
+    if (section) {
+      startBlock(section.type, section.label);
+    } else if (!currentBlock) {
+      startBlock('other', '');
+    }
+    const block = currentBlock!;
+
     group.syllables
       .filter((s) => s.length > 0)
       .forEach((text, i) => {
         const isFirstOfWord = i === 0;
-        const isLineStart = isFirstOfWord && isNewLine;
-        const section = isLineStart ? sectionByLine.get(group.lineIndex) : undefined;
-        tokens.push({
+        block.syllables.push({
           id: makeId(),
           text,
           isWordStart: isFirstOfWord,
-          isLineStart,
+          isLineStart: isFirstOfWord && isNewLine,
           offsetMs: null,
           chordDegrees: [],
-          section: section ? { type: section.type, label: section.label } : undefined,
+          blockId: block.id,
+          localIndex: block.syllables.length,
         });
       });
   });
-  return tokens;
+
+  return blocks;
 }
 
 /** Splits a manually-edited "syl·la·ble" string back into an array of syllable strings. */

@@ -1,16 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { KeyName, Step, SyllableToken } from './types';
 import type { Section, WordGroup } from './lib/syllables';
-import { parseLyricsToWordGroups, wordGroupsToSyllables } from './lib/syllables';
+import { parseLyricsToWordGroups, wordGroupsToBlocks } from './lib/syllables';
+import type { BlockMap } from './lib/arrangement';
+import { deriveFlatSyllables, updateBlockToken } from './lib/arrangement';
 import { LyricsInput } from './components/LyricsInput';
 import { SyllableEditor } from './components/SyllableEditor';
 import { PaceRecorder } from './components/PaceRecorder';
 import { PlaybackChordEditor } from './components/PlaybackChordEditor';
 import { ExportView } from './components/ExportView';
 import { Metronome } from './components/Metronome';
+import { ArrangementEditor } from './components/ArrangementEditor';
 import './App.css';
 
-const STORAGE_KEY = 'chordpro-draft-v1';
+const STORAGE_KEY = 'chordpro-draft-v2';
 
 interface StoredDraft {
   step: Step;
@@ -19,14 +22,17 @@ interface StoredDraft {
   lyrics: string;
   wordGroups: WordGroup[];
   sections: Section[];
-  syllables: SyllableToken[];
+  blocks: BlockMap;
+  arrangement: string[];
 }
 
 function loadDraft(): StoredDraft | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as StoredDraft;
+    const parsed = JSON.parse(raw) as StoredDraft;
+    if (!parsed || typeof parsed.blocks !== 'object' || !Array.isArray(parsed.arrangement)) return null;
+    return parsed;
   } catch {
     return null;
   }
@@ -41,12 +47,20 @@ function App() {
   const [lyrics, setLyrics] = useState(initialDraft?.lyrics ?? '');
   const [wordGroups, setWordGroups] = useState<WordGroup[]>(initialDraft?.wordGroups ?? []);
   const [sections, setSections] = useState<Section[]>(initialDraft?.sections ?? []);
-  const [syllables, setSyllables] = useState<SyllableToken[]>(initialDraft?.syllables ?? []);
+  const [blocks, setBlocks] = useState<BlockMap>(initialDraft?.blocks ?? {});
+  const [arrangement, setArrangement] = useState<string[]>(initialDraft?.arrangement ?? []);
+  const [showArrangement, setShowArrangement] = useState(false);
 
   useEffect(() => {
-    const draft: StoredDraft = { step, title, key, lyrics, wordGroups, sections, syllables };
+    const draft: StoredDraft = { step, title, key, lyrics, wordGroups, sections, blocks, arrangement };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-  }, [step, title, key, lyrics, wordGroups, sections, syllables]);
+  }, [step, title, key, lyrics, wordGroups, sections, blocks, arrangement]);
+
+  const flatSyllables = useMemo(() => deriveFlatSyllables(blocks, arrangement), [blocks, arrangement]);
+
+  function updateToken(blockId: string, localIndex: number, updater: (tok: SyllableToken) => SyllableToken) {
+    setBlocks((prev) => updateBlockToken(prev, blockId, localIndex, updater));
+  }
 
   function startOver() {
     setStep('input');
@@ -55,7 +69,8 @@ function App() {
     setLyrics('');
     setWordGroups([]);
     setSections([]);
-    setSyllables([]);
+    setBlocks({});
+    setArrangement([]);
     localStorage.removeItem(STORAGE_KEY);
   }
 
@@ -74,7 +89,18 @@ function App() {
 
       <div className="toolbar">
         <Metronome />
+        <button
+          className="secondary"
+          disabled={arrangement.length === 0}
+          onClick={() => setShowArrangement(true)}
+        >
+          Arrange sections
+        </button>
       </div>
+
+      {showArrangement && (
+        <ArrangementEditor blocks={blocks} arrangement={arrangement} onChange={(b, a) => { setBlocks(b); setArrangement(a); }} onClose={() => setShowArrangement(false)} />
+      )}
 
       {step === 'input' && (
         <LyricsInput
@@ -100,7 +126,9 @@ function App() {
           onBack={() => setStep('input')}
           onSubmit={(groups) => {
             setWordGroups(groups);
-            setSyllables(wordGroupsToSyllables(groups, sections));
+            const newBlocks = wordGroupsToBlocks(groups, sections);
+            setBlocks(Object.fromEntries(newBlocks.map((b) => [b.id, b])));
+            setArrangement(newBlocks.map((b) => b.id));
             setStep('record');
           }}
         />
@@ -108,30 +136,30 @@ function App() {
 
       {step === 'record' && (
         <PaceRecorder
-          syllables={syllables}
+          syllables={flatSyllables}
+          onUpdateToken={updateToken}
           onBack={() => setStep('edit-syllables')}
-          onSubmit={(recorded) => {
-            setSyllables(recorded);
-            setStep('playback');
-          }}
+          onSubmit={() => setStep('playback')}
           onSkip={() => setStep('playback')}
         />
       )}
 
       {step === 'playback' && (
         <PlaybackChordEditor
-          syllables={syllables}
+          syllables={flatSyllables}
           songKey={key}
+          onUpdateToken={updateToken}
           onBack={() => setStep('record')}
-          onSubmit={(finished) => {
-            setSyllables(finished);
-            setStep('export');
-          }}
+          onSubmit={() => setStep('export')}
         />
       )}
 
       {step === 'export' && (
-        <ExportView song={{ title, key, syllables }} onBack={() => setStep('playback')} onStartOver={startOver} />
+        <ExportView
+          song={{ title, key, syllables: flatSyllables }}
+          onBack={() => setStep('playback')}
+          onStartOver={startOver}
+        />
       )}
     </div>
   );

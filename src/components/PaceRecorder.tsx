@@ -4,36 +4,37 @@ import { LyricFlow } from './LyricFlow';
 
 interface Props {
   syllables: SyllableToken[];
+  onUpdateToken: (blockId: string, localIndex: number, updater: (tok: SyllableToken) => SyllableToken) => void;
   onBack: () => void;
-  onSubmit: (recorded: SyllableToken[]) => void;
+  onSubmit: () => void;
   onSkip: () => void;
 }
 
-export function PaceRecorder({ syllables, onBack, onSubmit, onSkip }: Props) {
-  const [recorded, setRecorded] = useState<SyllableToken[]>(syllables);
+export function PaceRecorder({ syllables, onUpdateToken, onBack, onSubmit, onSkip }: Props) {
   const [index, setIndex] = useState(-1);
   const startRef = useRef<number | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const finished = index >= recorded.length - 1 && index !== -1;
+  const finished = index >= syllables.length - 1 && index !== -1;
 
   function tap() {
     if (finished) return;
     const now = performance.now();
     if (index === -1) {
       startRef.current = now;
-      setRecorded((prev) => prev.map((s, i) => (i === 0 ? { ...s, offsetMs: 0 } : s)));
+      const first = syllables[0];
+      onUpdateToken(first.blockId, first.localIndex, (tok) => ({ ...tok, offsetMs: 0 }));
       setIndex(0);
       return;
     }
     const nextIndex = index + 1;
     const offsetMs = startRef.current == null ? 0 : now - startRef.current;
-    setRecorded((prev) => prev.map((s, i) => (i === nextIndex ? { ...s, offsetMs } : s)));
+    const next = syllables[nextIndex];
+    onUpdateToken(next.blockId, next.localIndex, (tok) => ({ ...tok, offsetMs }));
     setIndex(nextIndex);
   }
 
   function restart() {
-    setRecorded(syllables.map((s) => ({ ...s, offsetMs: null })));
+    syllables.forEach((s) => onUpdateToken(s.blockId, s.localIndex, (tok) => ({ ...tok, offsetMs: null })));
     setIndex(-1);
     startRef.current = null;
   }
@@ -48,7 +49,7 @@ export function PaceRecorder({ syllables, onBack, onSubmit, onSkip }: Props) {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, finished, recorded]);
+  }, [index, finished, syllables]);
 
   return (
     <div className="panel">
@@ -65,13 +66,13 @@ export function PaceRecorder({ syllables, onBack, onSubmit, onSkip }: Props) {
         {index === -1 && <span>Ready &mdash; first tap starts the clock.</span>}
         {index >= 0 && !finished && (
           <span>
-            Syllable {index + 1} / {recorded.length}
+            Syllable {index + 1} / {syllables.length}
           </span>
         )}
-        {finished && <span>Done &mdash; all {recorded.length} syllables timed.</span>}
+        {finished && <span>Done &mdash; all {syllables.length} syllables timed.</span>}
       </div>
-      <div className="tap-zone" ref={containerRef} onClick={tap}>
-        <LyricFlow syllables={recorded} currentIndex={index} />
+      <div className="tap-zone" onClick={tap}>
+        <LyricFlow syllables={syllables} currentIndex={index} />
       </div>
       <div className="actions">
         <button className="secondary" onClick={onBack}>
@@ -80,7 +81,7 @@ export function PaceRecorder({ syllables, onBack, onSubmit, onSkip }: Props) {
         <button className="secondary" onClick={restart}>
           Restart recording
         </button>
-        <button disabled={!finished} onClick={() => onSubmit(recorded)}>
+        <button disabled={!finished} onClick={onSubmit}>
           Continue to chords &rarr;
         </button>
       </div>

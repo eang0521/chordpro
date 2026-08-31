@@ -344,6 +344,162 @@ button.link-button {
   color: var(--text-dim);
 }
 
+/* Arrangement editor */
+.toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.toolbar .metronome {
+  flex: 1 1 auto;
+}
+
+.arrangement-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 8, 12, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 50;
+}
+
+.arrangement-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 720px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.arrangement-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.arrangement-panel-header h2 {
+  margin: 0;
+}
+
+.arrangement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.arrangement-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #12141a;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: grab;
+}
+
+.arrangement-card.dragging {
+  opacity: 0.4;
+}
+
+.arrangement-card-handle {
+  color: var(--text-dim);
+  font-size: 1rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.arrangement-card-move {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.arrangement-card-step {
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.arrangement-card-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.arrangement-card-fields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.section-select {
+  background: #1e222c;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.arrangement-label-input {
+  flex: 1 1 160px;
+  min-width: 100px;
+  background: #1e222c;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 5px 8px;
+  font-size: 0.9rem;
+}
+
+.arrangement-linked-badge {
+  font-size: 0.7rem;
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  background: var(--accent-dim);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.arrangement-card-preview {
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrangement-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.arrangement-card-actions button {
+  white-space: nowrap;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+}
+
 /* Export */
 .chordpro-output {
   background: #12141a;

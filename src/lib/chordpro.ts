@@ -17,7 +17,7 @@ export function songToChordPro(song: Song): string {
   }
 
   song.syllables.forEach((syl, i) => {
-    if (syl.section) {
+    if (syl.section && syl.section.label) {
       if (currentLine.length > 0) {
         lines.push(currentLine);
         currentLine = '';

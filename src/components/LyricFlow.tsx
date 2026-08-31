@@ -41,7 +41,7 @@ function buildRows(syllables: SyllableToken[]): Row[] {
   const rows: Row[] = [];
   syllables.forEach((syl, i) => {
     if (syl.section) {
-      rows.push({ kind: 'section', key: `section-${syl.id}`, section: syl.section });
+      if (syl.section.label) rows.push({ kind: 'section', key: `section-${syl.id}`, section: syl.section });
       rows.push({ kind: 'line', key: `line-${syl.id}`, indexes: [i] });
     } else if (syl.isLineStart) {
       rows.push({ kind: 'line', key: `line-${syl.id}`, indexes: [i] });
