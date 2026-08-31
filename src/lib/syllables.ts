@@ -54,6 +54,13 @@ function detectSectionHeader(line: string): { type: SectionType; label: string }
   return { type: classifySectionType(match[1]), label: stripped };
 }
 
+// Lyrics pasted from lots of places (Genius, word processors with "smart quotes", hymnals)
+// use a curly apostrophe instead of a plain one — normalize to a plain ' so "Father's"-style
+// words match the word-boundary regex below instead of silently failing to split at all.
+function normalizeApostrophes(text: string): string {
+  return text.replace(/[‘’ʼ`]/g, "'");
+}
+
 /** Splits one word into syllables, keeping any leading/trailing punctuation attached to its edge syllable. */
 function hyphenateWord(word: string): string[] {
   const match = word.match(/^([^A-Za-z0-9]*)([A-Za-z0-9'-]*)([^A-Za-z0-9]*)$/);
@@ -80,24 +87,26 @@ export function parseLyricsToWordGroups(text: string): { groups: WordGroup[]; se
   const sections: Section[] = [];
   let lineIndex = 0;
 
-  text.split('\n').forEach((rawLine) => {
-    const trimmed = rawLine.trim();
-    if (trimmed.length === 0) return;
+  normalizeApostrophes(text)
+    .split('\n')
+    .forEach((rawLine) => {
+      const trimmed = rawLine.trim();
+      if (trimmed.length === 0) return;
 
-    const header = detectSectionHeader(trimmed);
-    if (header) {
-      sections.push({ ...header, beforeLineIndex: lineIndex });
-      return;
-    }
+      const header = detectSectionHeader(trimmed);
+      if (header) {
+        sections.push({ ...header, beforeLineIndex: lineIndex });
+        return;
+      }
 
-    trimmed
-      .split(/\s+/)
-      .filter(Boolean)
-      .forEach((word) => {
-        groups.push({ id: makeId(), lineIndex, syllables: hyphenateWord(word) });
-      });
-    lineIndex += 1;
-  });
+      trimmed
+        .split(/\s+/)
+        .filter(Boolean)
+        .forEach((word) => {
+          groups.push({ id: makeId(), lineIndex, syllables: hyphenateWord(word) });
+        });
+      lineIndex += 1;
+    });
 
   return { groups, sections };
 }
