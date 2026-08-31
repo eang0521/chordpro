@@ -505,6 +505,17 @@ button.link-button {
   max-width: 820px;
 }
 
+.chart-panel-wide {
+  max-width: none;
+  width: fit-content;
+}
+
+.chart-toggle-active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .chart-panel-header,
 .arrangement-panel-header {
   gap: 12px;
@@ -567,6 +578,79 @@ button.link-button {
 
 .chart-syllable {
   color: var(--text);
+}
+
+/* Hidden measurement pass — same content width as a page, used only to measure row heights. */
+.chart-measure {
+  position: absolute;
+  visibility: hidden;
+  top: 0;
+  left: -9999px;
+  pointer-events: none;
+}
+
+.chart-measure .chart-line-row,
+.chart-page-content .chart-line-row {
+  white-space: normal;
+}
+
+/* Page layout preview — simulates US Letter pages with real margins, matching the .docx export. */
+.chart-pages {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+
+.chart-page {
+  position: relative;
+  flex-shrink: 0;
+  background: #fdfdfa;
+  border-radius: 2px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.chart-page-content {
+  box-sizing: border-box;
+  height: 100%;
+  color: #1a1a1a;
+  overflow: hidden;
+}
+
+.chart-page-content .chart-syllable {
+  color: #1a1a1a;
+}
+
+.chart-page-content .chart-chord-label {
+  color: #2563eb;
+}
+
+.chart-page-content .section-heading.section-verse {
+  color: #2563eb;
+}
+
+.chart-page-content .section-heading.section-chorus {
+  color: #b45309;
+}
+
+.chart-page-content .section-heading.section-bridge {
+  color: #7e22ce;
+}
+
+.chart-page-content .section-heading.section-other {
+  color: #6b7280;
+}
+
+.chart-page-footer {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.7rem;
+  color: #9aa0ae;
 }
 
 /* Export */

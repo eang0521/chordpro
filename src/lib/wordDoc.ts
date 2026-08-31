@@ -4,9 +4,9 @@ import type { BlockMap } from './arrangement';
 import type { ChartToken } from './chordChart';
 import { buildChartRows } from './chordChart';
 import { getChordFontOption } from './chordFonts';
+import { FONT_SIZE_PT, MARGIN_TWIPS, PAGE_HEIGHT_TWIPS, PAGE_WIDTH_TWIPS } from './pageLayout';
 
 const CHORD_COLOR = '2563EB';
-const FONT_SIZE_PT = 11;
 const FONT_SIZE_HALF_PT = FONT_SIZE_PT * 2; // docx sizes are in half-points
 const MIN_GAP_TWIPS = 90; // guards against two chords landing on/behind the same tab stop
 
@@ -159,6 +159,18 @@ export async function generateWordDoc(
     );
   });
 
-  const doc = new Document({ sections: [{ children }] });
+  const doc = new Document({
+    sections: [
+      {
+        properties: {
+          page: {
+            size: { width: PAGE_WIDTH_TWIPS, height: PAGE_HEIGHT_TWIPS },
+            margin: { top: MARGIN_TWIPS, right: MARGIN_TWIPS, bottom: MARGIN_TWIPS, left: MARGIN_TWIPS },
+          },
+        },
+        children,
+      },
+    ],
+  });
   return Packer.toBlob(doc);
 }
