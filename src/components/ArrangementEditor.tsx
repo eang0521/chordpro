@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import type { Block, SectionType } from '../types';
 import type { BlockMap } from '../lib/arrangement';
-import { duplicateArrangementItem, moveArrangementItem, removeArrangementItem } from '../lib/arrangement';
+import {
+  duplicateArrangementItem,
+  moveArrangementItem,
+  removeArrangementItem,
+  unlinkArrangementItem,
+} from '../lib/arrangement';
 
 interface Props {
   blocks: BlockMap;
@@ -43,6 +48,11 @@ export function ArrangementEditor({ blocks, arrangement, onChange, onClose }: Pr
     onChange(result.blocks, result.arrangement);
   }
 
+  function unlink(at: number) {
+    const result = unlinkArrangementItem(blocks, arrangement, at);
+    onChange(result.blocks, result.arrangement);
+  }
+
   function renameBlock(blockId: string, label: string) {
     onChange({ ...blocks, [blockId]: { ...blocks[blockId], label } }, arrangement);
   }
@@ -67,7 +77,8 @@ export function ArrangementEditor({ blocks, arrangement, onChange, onClose }: Pr
         <p className="hint">
           Drag a card (or use the arrows) to reorder the song. Duplicate a section to reuse it elsewhere
           &mdash; every copy stays linked, so editing its lyrics, timing, or chords anywhere updates all
-          of its occurrences.
+          of its occurrences. Need one copy to differ (e.g. a final chorus with a small change)? Click{' '}
+          <strong>Unlink</strong> on it to give it its own independent content first.
         </p>
         <div className="arrangement-list">
           {arrangement.map((blockId, i) => {
@@ -135,6 +146,11 @@ export function ArrangementEditor({ blocks, arrangement, onChange, onClose }: Pr
                   <button className="secondary" onClick={() => duplicate(i)}>
                     Duplicate
                   </button>
+                  {linked && (
+                    <button className="secondary" onClick={() => unlink(i)}>
+                      Unlink
+                    </button>
+                  )}
                   <button className="secondary" onClick={() => remove(i)} disabled={arrangement.length <= 1}>
                     Remove
                   </button>

@@ -1,4 +1,5 @@
 import type { Block, SyllableToken } from '../types';
+import { makeId } from './id';
 
 export type BlockMap = Record<string, Block>;
 
@@ -56,6 +57,34 @@ export function duplicateArrangementItem(arrangement: string[], at: number): str
   const next = [...arrangement];
   next.splice(at + 1, 0, blockId);
   return next;
+}
+
+/**
+ * Splits one occurrence off into its own independent block (a full copy of the current
+ * lyrics/timing/chords), so it can be edited without affecting the other linked occurrences —
+ * e.g. a final chorus that needs a small lyric change. No-op if this occurrence is already
+ * the only one referencing its block.
+ */
+export function unlinkArrangementItem(blocks: BlockMap, arrangement: string[], at: number): {
+  blocks: BlockMap;
+  arrangement: string[];
+} {
+  const blockId = arrangement[at];
+  const block = blockId != null ? blocks[blockId] : undefined;
+  if (!block) return { blocks, arrangement };
+
+  const otherOccurrences = arrangement.some((id, i) => id === blockId && i !== at);
+  if (!otherOccurrences) return { blocks, arrangement };
+
+  const newId = makeId();
+  const copy: Block = {
+    id: newId,
+    type: block.type,
+    label: block.label,
+    syllables: block.syllables.map((tok) => ({ ...tok, id: makeId(), blockId: newId })),
+  };
+  const nextArrangement = arrangement.map((id, i) => (i === at ? newId : id));
+  return { blocks: { ...blocks, [newId]: copy }, arrangement: nextArrangement };
 }
 
 /** Removes one occurrence from the arrangement; deletes the block itself if that was its last occurrence. */
