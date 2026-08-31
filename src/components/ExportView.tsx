@@ -4,6 +4,7 @@ import { songToChordPro } from '../lib/chordpro';
 import type { BlockMap } from '../lib/arrangement';
 import { generateWordDoc } from '../lib/wordDoc';
 import { downloadBlob, slugifyFilename } from '../lib/download';
+import { CHORD_FONT_OPTIONS, DEFAULT_CHORD_FONT_ID } from '../lib/chordFonts';
 
 interface Props {
   song: Song;
@@ -16,6 +17,7 @@ interface Props {
 export function ExportView({ song, blocks, arrangement, onBack, onStartOver }: Props) {
   const [copied, setCopied] = useState(false);
   const [generatingDocx, setGeneratingDocx] = useState(false);
+  const [fontId, setFontId] = useState<string>(DEFAULT_CHORD_FONT_ID);
   const text = songToChordPro(song);
 
   async function copy() {
@@ -36,7 +38,7 @@ export function ExportView({ song, blocks, arrangement, onBack, onStartOver }: P
   async function downloadDocx() {
     setGeneratingDocx(true);
     try {
-      const blob = await generateWordDoc(song.title, song.key, blocks, arrangement);
+      const blob = await generateWordDoc(song.title, song.key, blocks, arrangement, fontId);
       downloadBlob(blob, `${slugifyFilename(song.title)}.docx`);
     } finally {
       setGeneratingDocx(false);
@@ -56,6 +58,13 @@ export function ExportView({ song, blocks, arrangement, onBack, onStartOver }: P
           {copied ? 'Copied!' : 'Copy to clipboard'}
         </button>
         <button onClick={download}>Download .cho</button>
+        <select className="chart-font-select" value={fontId} onChange={(e) => setFontId(e.target.value)}>
+          {CHORD_FONT_OPTIONS.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
         <button className="secondary" disabled={generatingDocx} onClick={downloadDocx}>
           {generatingDocx ? 'Generating…' : 'Download .docx'}
         </button>

@@ -1,12 +1,14 @@
-import type { KeyName, SectionType, SyllableToken } from '../types';
+import type { KeyName, SectionType } from '../types';
 import { resolveChordLabel } from './musicTheory';
 import { buildRows } from './lyricRows';
 import type { BlockMap } from './arrangement';
 import { deriveFlatSyllables } from './arrangement';
 
-export interface ChartLine {
-  chordLine: string;
-  lyricLine: string;
+export interface ChartToken {
+  key: string;
+  text: string;
+  isWordStart: boolean;
+  chordLabel: string | null;
 }
 
 export interface ChartHeadingRow {
@@ -17,37 +19,18 @@ export interface ChartHeadingRow {
 
 export interface ChartLineRow {
   kind: 'line';
-  line: ChartLine;
+  key: string;
+  tokens: ChartToken[];
 }
 
 export type ChartRow = ChartHeadingRow | ChartLineRow;
 
 /**
- * Lays out one lyric line as a pair of monospace strings — a chord line with each chord
- * symbol placed at the character column of the syllable it belongs to, and the lyric line
- * itself. This is the classic plain-text chord-chart convention (chords float directly above
- * the word they go with), and it's what both the on-screen preview and the Word export render.
+ * Builds the chart as raw per-syllable tokens (text, word-boundary, resolved chord), with no
+ * baked-in layout — each renderer (the on-screen preview, the Word export) lays these out in
+ * whatever way suits its medium (CSS positioning for the browser, measured tab stops or
+ * monospace padding for Word).
  */
-export function buildChartLine(tokens: SyllableToken[], key: KeyName): ChartLine {
-  let lyricLine = '';
-  let chordLine = '';
-  tokens.forEach((syl, i) => {
-    if (syl.isWordStart && i !== 0) lyricLine += ' ';
-    const startCol = lyricLine.length;
-    lyricLine += syl.text;
-
-    const chordLabel = syl.chordDegrees.length > 0 ? resolveChordLabel(key, syl.chordDegrees) : null;
-    if (chordLabel) {
-      // Never overlap the previous chord — if this syllable is too close, place it right
-      // after instead of exactly above.
-      const writePos = Math.max(chordLine.length, startCol);
-      chordLine = chordLine.padEnd(writePos, ' ') + chordLabel;
-    }
-  });
-  return { chordLine, lyricLine };
-}
-
-/** Builds the full chart (section headings + chord/lyric line pairs) for the current arrangement. */
 export function buildChartRows(blocks: BlockMap, arrangement: string[], key: KeyName): ChartRow[] {
   const flat = deriveFlatSyllables(blocks, arrangement);
   const rows = buildRows(flat);
@@ -55,7 +38,15 @@ export function buildChartRows(blocks: BlockMap, arrangement: string[], key: Key
     if (row.kind === 'section') {
       return { kind: 'heading', type: row.section.type, label: row.section.label };
     }
-    const tokens = row.indexes.map((i) => flat[i]);
-    return { kind: 'line', line: buildChartLine(tokens, key) };
+    const tokens = row.indexes.map((i) => {
+      const syl = flat[i];
+      return {
+        key: syl.id,
+        text: syl.text,
+        isWordStart: syl.isWordStart,
+        chordLabel: syl.chordDegrees.length > 0 ? resolveChordLabel(key, syl.chordDegrees) : null,
+      };
+    });
+    return { kind: 'line', key: row.key, tokens };
   });
 }

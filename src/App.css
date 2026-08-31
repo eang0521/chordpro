@@ -518,8 +518,19 @@ button.link-button {
 
 .chart-panel-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.chart-font-select {
+  background: #1e222c;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 0.9rem;
 }
 
 .chord-chart {
@@ -528,27 +539,33 @@ button.link-button {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 20px;
-}
-
-.chart-line {
-  margin-bottom: 14px;
-}
-
-.chart-line-chords,
-.chart-line-lyrics {
-  display: block;
-  white-space: pre;
-  font-family: 'Cascadia Code', Consolas, monospace;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   overflow-x: auto;
 }
 
-.chart-line-chords {
-  color: var(--accent);
-  font-weight: 700;
+.chart-line-row {
+  line-height: 2.6;
+  white-space: nowrap;
+  margin-bottom: 4px;
 }
 
-.chart-line-lyrics {
+.chart-syl-wrap {
+  position: relative;
+  display: inline-block;
+  padding: 2px 1px;
+}
+
+.chart-chord-label {
+  position: absolute;
+  top: -1.3em;
+  left: 0;
+  font-size: 0.75em;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.chart-syllable {
   color: var(--text);
 }
 
