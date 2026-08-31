@@ -18,6 +18,11 @@ interface Props {
   onClose: () => void;
 }
 
+/** Sets the --line-spacing CSS custom property (not a typed React.CSSProperties key). */
+function lineSpacingVar(value: number): Record<string, string> {
+  return { '--line-spacing': String(value) };
+}
+
 function renderChartRow(row: ChartRow, key: number | string): ReactNode {
   if (row.kind === 'heading') {
     return (
@@ -47,6 +52,7 @@ function renderChartRow(row: ChartRow, key: number | string): ReactNode {
 
 export function ChordChartView({ title, songKey, blocks, arrangement, onClose }: Props) {
   const [fontId, setFontId] = useState<string>(DEFAULT_CHORD_FONT_ID);
+  const [lineSpacing, setLineSpacing] = useState(1);
   const [generating, setGenerating] = useState(false);
   const [pageMode, setPageMode] = useState(false);
   const rows = useMemo(() => buildChartRows(blocks, arrangement, songKey), [blocks, arrangement, songKey]);
@@ -67,12 +73,12 @@ export function ChordChartView({ title, songKey, blocks, arrangement, onClose }:
       return rowRefs.current[i]?.getBoundingClientRect().height ?? 0;
     });
     setPages(paginateByHeight(heights, CONTENT_HEIGHT_PX));
-  }, [rows, font.cssFont]);
+  }, [rows, font.cssFont, lineSpacing]);
 
   async function downloadDocx() {
     setGenerating(true);
     try {
-      const blob = await generateWordDoc(title, songKey, blocks, arrangement, fontId);
+      const blob = await generateWordDoc(title, songKey, blocks, arrangement, fontId, lineSpacing);
       downloadBlob(blob, `${slugifyFilename(title)}.docx`);
     } finally {
       setGenerating(false);
@@ -94,6 +100,20 @@ export function ChordChartView({ title, songKey, blocks, arrangement, onClose }:
                 </option>
               ))}
             </select>
+            <label className="chart-line-spacing">
+              <span>Line spacing</span>
+              <input
+                type="number"
+                min={0.8}
+                max={1.2}
+                step={0.05}
+                value={lineSpacing}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (!Number.isNaN(v)) setLineSpacing(Math.min(1.2, Math.max(0.8, v)));
+                }}
+              />
+            </label>
             <button className={`secondary ${pageMode ? 'chart-toggle-active' : ''}`} onClick={() => setPageMode((v) => !v)}>
               {pageMode ? 'Compact view' : 'Show page layout'}
             </button>
@@ -110,7 +130,10 @@ export function ChordChartView({ title, songKey, blocks, arrangement, onClose }:
 
         {/* Hidden measurement pass: same width as a page's printable area, so wrapping (and
             therefore each row's true height) matches what page mode will actually show. */}
-        <div className="chart-measure" style={{ fontFamily: font.cssFont, fontSize: FONT_SIZE_PT, width: CONTENT_WIDTH_PX }}>
+        <div
+          className="chart-measure"
+          style={{ fontFamily: font.cssFont, fontSize: FONT_SIZE_PT, width: CONTENT_WIDTH_PX, ...lineSpacingVar(lineSpacing) }}
+        >
           {rows.map((row, i) => (
             <div key={i} ref={(el) => { rowRefs.current[i] = el; }}>
               {renderChartRow(row, i)}
@@ -124,7 +147,7 @@ export function ChordChartView({ title, songKey, blocks, arrangement, onClose }:
               <div className="chart-page" style={{ width: PAGE_WIDTH_PX, height: PAGE_HEIGHT_PX }} key={pageIndex}>
                 <div
                   className="chart-page-content"
-                  style={{ fontFamily: font.cssFont, fontSize: FONT_SIZE_PT, padding: MARGIN_PX }}
+                  style={{ fontFamily: font.cssFont, fontSize: FONT_SIZE_PT, padding: MARGIN_PX, ...lineSpacingVar(lineSpacing) }}
                 >
                   {indices.map((i) => renderChartRow(rows[i], i))}
                 </div>
@@ -135,7 +158,7 @@ export function ChordChartView({ title, songKey, blocks, arrangement, onClose }:
             ))}
           </div>
         ) : (
-          <div className="chord-chart" style={{ fontFamily: font.cssFont }}>
+          <div className="chord-chart" style={{ fontFamily: font.cssFont, ...lineSpacingVar(lineSpacing) }}>
             {rows.map((row, i) => renderChartRow(row, i))}
           </div>
         )}

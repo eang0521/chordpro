@@ -18,6 +18,7 @@ export function ExportView({ song, blocks, arrangement, onBack, onStartOver }: P
   const [copied, setCopied] = useState(false);
   const [generatingDocx, setGeneratingDocx] = useState(false);
   const [fontId, setFontId] = useState<string>(DEFAULT_CHORD_FONT_ID);
+  const [lineSpacing, setLineSpacing] = useState(1);
   const text = songToChordPro(song);
 
   async function copy() {
@@ -38,7 +39,7 @@ export function ExportView({ song, blocks, arrangement, onBack, onStartOver }: P
   async function downloadDocx() {
     setGeneratingDocx(true);
     try {
-      const blob = await generateWordDoc(song.title, song.key, blocks, arrangement, fontId);
+      const blob = await generateWordDoc(song.title, song.key, blocks, arrangement, fontId, lineSpacing);
       downloadBlob(blob, `${slugifyFilename(song.title)}.docx`);
     } finally {
       setGeneratingDocx(false);
@@ -65,6 +66,20 @@ export function ExportView({ song, blocks, arrangement, onBack, onStartOver }: P
             </option>
           ))}
         </select>
+        <label className="chart-line-spacing">
+          <span>Line spacing</span>
+          <input
+            type="number"
+            min={0.8}
+            max={1.2}
+            step={0.05}
+            value={lineSpacing}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (!Number.isNaN(v)) setLineSpacing(Math.min(1.2, Math.max(0.8, v)));
+            }}
+          />
+        </label>
         <button className="secondary" disabled={generatingDocx} onClick={downloadDocx}>
           {generatingDocx ? 'Generating…' : 'Download .docx'}
         </button>

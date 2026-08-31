@@ -544,6 +544,25 @@ button.link-button {
   font-size: 0.9rem;
 }
 
+.chart-line-spacing {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.chart-line-spacing input {
+  width: 4.5ch;
+  background: #1e222c;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 6px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
 .chord-chart {
   margin-top: 16px;
   background: #12141a;
@@ -555,29 +574,39 @@ button.link-button {
 }
 
 .chart-line-row {
-  line-height: 2.6;
+  line-height: 1.15;
   white-space: nowrap;
-  margin-bottom: 4px;
+  margin-bottom: calc(10px * var(--line-spacing, 1));
 }
 
+.chord-chart .section-heading,
+.chart-page-content .section-heading,
+.chart-measure .section-heading {
+  margin: calc(18px * var(--line-spacing, 1)) 0 calc(4px * var(--line-spacing, 1));
+}
+
+/* Each syllable stacks its chord above its lyric text in a column, and — since neither is
+   given an explicit width — the wrapper naturally sizes to whichever of the two is WIDER.
+   A syllable with no chord (or a short chord) takes only as much room as its own letters need;
+   a syllable under a wide chord (e.g. "F#dim" over "a") gets pushed just wide enough for the
+   chord to fit without colliding with the next syllable. No JS measurement required. */
 .chart-syl-wrap {
-  position: relative;
-  display: inline-block;
-  padding: 2px 1px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .chart-chord-label {
-  position: absolute;
-  top: -1.3em;
-  left: 0;
   font-size: 0.75em;
   font-weight: 700;
+  line-height: 1.4;
   color: var(--accent);
   white-space: nowrap;
 }
 
 .chart-syllable {
   color: var(--text);
+  white-space: nowrap;
 }
 
 /* Hidden measurement pass — same content width as a page, used only to measure row heights. */

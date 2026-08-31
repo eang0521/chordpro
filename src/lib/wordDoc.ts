@@ -1,7 +1,7 @@
 import type { Paragraph, TabStopDefinition } from 'docx';
 import type { KeyName, SectionType } from '../types';
 import type { BlockMap } from './arrangement';
-import type { ChartToken } from './chordChart';
+import type { ChartLineRow, ChartRow, ChartToken } from './chordChart';
 import { buildChartRows } from './chordChart';
 import { getChordFontOption } from './chordFonts';
 import { FONT_SIZE_PT, MARGIN_TWIPS, PAGE_HEIGHT_TWIPS, PAGE_WIDTH_TWIPS } from './pageLayout';
@@ -9,6 +9,14 @@ import { FONT_SIZE_PT, MARGIN_TWIPS, PAGE_HEIGHT_TWIPS, PAGE_WIDTH_TWIPS } from 
 const CHORD_COLOR = '2563EB';
 const FONT_SIZE_HALF_PT = FONT_SIZE_PT * 2; // docx sizes are in half-points
 const MIN_GAP_TWIPS = 90; // guards against two chords landing on/behind the same tab stop
+
+const LABEL_COLUMN_TWIPS = 1800; // ~1.25in, enough for "Pre-Chorus 2" without wrapping
+const CONTENT_WIDTH_TWIPS = PAGE_WIDTH_TWIPS - 2 * MARGIN_TWIPS;
+const LYRIC_COLUMN_TWIPS = CONTENT_WIDTH_TWIPS - LABEL_COLUMN_TWIPS;
+
+// Base vertical spacing (twips) at a 1.0x line-spacing multiplier.
+const BASE_LINE_GAP_TWIPS = 120;
+const BASE_SECTION_GAP_TWIPS = 280;
 
 const SECTION_COLORS: Record<SectionType, string> = {
   verse: '2563EB',
@@ -74,46 +82,63 @@ function buildProportionalChords(
   return { lyricLine, chords };
 }
 
+interface DocSection {
+  label: string;
+  type: SectionType;
+  lineRows: ChartLineRow[];
+}
+
+/** Groups the flat chart rows back into one entry per section, since the Word layout puts each
+ * section's label and its lyrics/chords side by side as a table row. Lines before the first
+ * heading (or a song with none at all) become a single section with a blank label. */
+function groupIntoSections(rows: ChartRow[]): DocSection[] {
+  const sections: DocSection[] = [];
+  let current: DocSection | null = null;
+  rows.forEach((row) => {
+    if (row.kind === 'heading') {
+      current = { label: row.label, type: row.type, lineRows: [] };
+      sections.push(current);
+    } else {
+      if (!current) {
+        current = { label: '', type: 'other', lineRows: [] };
+        sections.push(current);
+      }
+      current.lineRows.push(row);
+    }
+  });
+  return sections;
+}
+
 /** Builds a downloadable .docx chord chart: title, key, and every section with its chords
- * placed directly above the lyrics they belong to, in the chosen font. */
+ * placed directly above the lyrics they belong to. Section names sit in a narrow left column
+ * so the lyrics/chords column doesn't have to give up its own line to the heading, and every
+ * text run honors the chosen font. `lineSpacing` scales the vertical gap between lines (1.0 =
+ * normal; 0.8–1.2 covers "more compact" to "a bit more room"). */
 export async function generateWordDoc(
   title: string,
   key: KeyName,
   blocks: BlockMap,
   arrangement: string[],
   fontId: string,
+  lineSpacing = 1,
 ): Promise<Blob> {
   // Loaded on demand — the docx package is sizable and most sessions never export a Word doc.
-  const { Document, HeadingLevel, Packer, Paragraph, Tab, TabStopType, TextRun } = await import('docx');
+  const { Document, HeadingLevel, Packer, Paragraph, Table, TableBorders, TableCell, TableRow, Tab, TabStopType, TextRun, VerticalAlign, WidthType } =
+    await import('docx');
   const font = getChordFontOption(fontId);
-  const rows = buildChartRows(blocks, arrangement, key);
+  const sections = groupIntoSections(buildChartRows(blocks, arrangement, key));
 
-  const children: Paragraph[] = [
-    new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: title || 'Untitled' })],
-    }),
-    new Paragraph({
-      spacing: { after: 240 },
-      children: [new TextRun({ text: `Key: ${key}`, italics: true, color: '6B7280' })],
-    }),
-  ];
+  const lineGapTwips = Math.round(BASE_LINE_GAP_TWIPS * lineSpacing);
+  const sectionGapTwips = Math.round(BASE_SECTION_GAP_TWIPS * lineSpacing);
 
-  rows.forEach((row) => {
-    if (row.kind === 'heading') {
-      children.push(
-        new Paragraph({
-          spacing: { before: 280, after: 80 },
-          children: [new TextRun({ text: row.label, bold: true, color: SECTION_COLORS[row.type] })],
-        }),
-      );
-      return;
-    }
+  function buildLinePairParagraphs(row: ChartLineRow, isLast: boolean): Paragraph[] {
+    const trailingGap = isLast ? sectionGapTwips : lineGapTwips;
+    const paragraphs: Paragraph[] = [];
 
     if (font.id === 'mono') {
       const { chordLine, lyricLine } = buildMonospacePair(row.tokens);
       if (chordLine.trim()) {
-        children.push(
+        paragraphs.push(
           new Paragraph({
             spacing: { after: 0 },
             children: [
@@ -122,19 +147,19 @@ export async function generateWordDoc(
           }),
         );
       }
-      children.push(
+      paragraphs.push(
         new Paragraph({
-          spacing: { after: 120 },
+          spacing: { after: trailingGap },
           children: [new TextRun({ text: lyricLine || ' ', font: font.wordFont, size: FONT_SIZE_HALF_PT })],
         }),
       );
-      return;
+      return paragraphs;
     }
 
     const { lyricLine, chords } = buildProportionalChords(row.tokens, font.wordFont);
     if (chords.length > 0) {
       const tabStops: TabStopDefinition[] = chords.map((c) => ({ type: TabStopType.LEFT, position: c.twips }));
-      children.push(
+      paragraphs.push(
         new Paragraph({
           spacing: { after: 0 },
           tabStops,
@@ -151,12 +176,45 @@ export async function generateWordDoc(
         }),
       );
     }
-    children.push(
+    paragraphs.push(
       new Paragraph({
-        spacing: { after: 120 },
+        spacing: { after: trailingGap },
         children: [new TextRun({ text: lyricLine || ' ', font: font.wordFont, size: FONT_SIZE_HALF_PT })],
       }),
     );
+    return paragraphs;
+  }
+
+  const tableRows = sections.map((section) => {
+    const labelCell = new TableCell({
+      width: { type: WidthType.DXA, size: LABEL_COLUMN_TWIPS },
+      verticalAlign: VerticalAlign.TOP,
+      children: [
+        new Paragraph({
+          children: section.label
+            ? [new TextRun({ text: section.label, bold: true, color: SECTION_COLORS[section.type], font: font.wordFont, size: FONT_SIZE_HALF_PT })]
+            : [],
+        }),
+      ],
+    });
+
+    const lyricParagraphs = section.lineRows.flatMap((row, i) =>
+      buildLinePairParagraphs(row, i === section.lineRows.length - 1),
+    );
+    const contentCell = new TableCell({
+      width: { type: WidthType.DXA, size: LYRIC_COLUMN_TWIPS },
+      verticalAlign: VerticalAlign.TOP,
+      children: lyricParagraphs.length > 0 ? lyricParagraphs : [new Paragraph({})],
+    });
+
+    return new TableRow({ children: [labelCell, contentCell] });
+  });
+
+  const table = new Table({
+    width: { type: WidthType.DXA, size: CONTENT_WIDTH_TWIPS },
+    columnWidths: [LABEL_COLUMN_TWIPS, LYRIC_COLUMN_TWIPS],
+    borders: TableBorders.NONE,
+    rows: tableRows,
   });
 
   const doc = new Document({
@@ -168,7 +226,17 @@ export async function generateWordDoc(
             margin: { top: MARGIN_TWIPS, right: MARGIN_TWIPS, bottom: MARGIN_TWIPS, left: MARGIN_TWIPS },
           },
         },
-        children,
+        children: [
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: title || 'Untitled' })],
+          }),
+          new Paragraph({
+            spacing: { after: 240 },
+            children: [new TextRun({ text: `Key: ${key}`, italics: true, color: '6B7280' })],
+          }),
+          table,
+        ],
       },
     ],
   });
