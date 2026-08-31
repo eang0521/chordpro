@@ -136,9 +136,10 @@ export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Pr
           </>
         )}
         While a syllable is highlighted, press <kbd>1</kbd>&ndash;<kbd>7</kbd> for a chord (2, 3, 6 are
-        minor, 7 is diminished). Hold <kbd>1</kbd>+<kbd>3</kbd>, <kbd>1</kbd>+<kbd>5</kbd>, or{' '}
-        <kbd>4</kbd>+<kbd>6</kbd> together for a slash-chord inversion. <kbd>Backspace</kbd> clears the
-        current syllable's chord. Click any past syllable to jump back to it{hasTiming ? ' while paused' : ''}.
+        minor, 7 is diminished). Hold <kbd>1</kbd>+<kbd>3</kbd>, <kbd>1</kbd>+<kbd>5</kbd>,{' '}
+        <kbd>4</kbd>+<kbd>6</kbd>, <kbd>5</kbd>+<kbd>7</kbd>, or <kbd>5</kbd>+<kbd>2</kbd> together for a
+        slash-chord inversion. <kbd>Backspace</kbd> clears the current syllable's chord. Click any past
+        syllable to jump back to it{hasTiming ? ' while paused' : ''}.
       </p>
       <div className="recorder-status">
         {index === -1 && <span>{hasTiming ? 'Press Play to begin.' : 'Press Space to begin.'}</span>}

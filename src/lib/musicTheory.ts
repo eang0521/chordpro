@@ -31,6 +31,8 @@ const COMBO_MAP: Record<string, { primary: ScaleDegree; bass: ScaleDegree }> = {
   '1,3': { primary: 1, bass: 3 },
   '1,5': { primary: 1, bass: 5 },
   '4,6': { primary: 4, bass: 6 },
+  '5,7': { primary: 5, bass: 7 },
+  '2,5': { primary: 5, bass: 2 },
 };
 
 export function getDegreeNote(key: KeyName, degree: ScaleDegree): string {

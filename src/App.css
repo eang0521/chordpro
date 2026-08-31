@@ -259,6 +259,8 @@ button.link-button {
   padding: 24px;
   cursor: pointer;
   user-select: none;
+  max-height: 50vh;
+  overflow-y: auto;
 }
 
 .lyric-display {
