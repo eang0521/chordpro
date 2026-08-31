@@ -47,7 +47,10 @@ export function useChordKeys(onDegrees: (degrees: ScaleDegree[]) => void, enable
   const bufferRef = useRef<ScaleDegree[]>([]);
   const timerRef = useRef<number | null>(null);
   const onDegreesRef = useRef(onDegrees);
-  onDegreesRef.current = onDegrees;
+
+  useEffect(() => {
+    onDegreesRef.current = onDegrees;
+  }, [onDegrees]);
 
   useEffect(() => {
     if (!enabled) return;

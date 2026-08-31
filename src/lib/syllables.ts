@@ -1,6 +1,6 @@
 import Hypher from 'hypher';
 import englishPatterns from 'hyphenation.en-us';
-import type { SyllableToken } from '../types';
+import type { SectionType, SyllableToken } from '../types';
 import { makeId } from './id';
 
 const hypher = new Hypher(englishPatterns);
@@ -10,6 +10,51 @@ export interface WordGroup {
   id: string;
   lineIndex: number;
   syllables: string[];
+}
+
+/** A detected section heading (e.g. "Verse 1", "BRIDGE"), anchored to the lyric line it precedes. */
+export interface Section {
+  type: SectionType;
+  label: string;
+  beforeLineIndex: number;
+}
+
+const SECTION_KEYWORDS = [
+  'pre-?chorus',
+  'post-?chorus',
+  'verse',
+  'chorus',
+  'bridge',
+  'intro',
+  'outro',
+  'tag',
+  'interlude',
+  'instrumental',
+  'refrain',
+  'ending',
+  'vamp',
+  'hook',
+  'breakdown',
+];
+
+// Matches a line that is ONLY a section keyword plus trailing numbering/punctuation
+// (e.g. "Verse 1", "BRIDGE", "Pre-Chorus 2:", "[Tag]" once brackets are stripped) —
+// never a normal lyric line, since any other trailing word fails the charset.
+const SECTION_HEADER_RE = new RegExp(`^(${SECTION_KEYWORDS.join('|')})[\\s0-9ivxIVX.\\-:]*$`, 'i');
+
+function classifySectionType(keyword: string): SectionType {
+  const normalized = keyword.toLowerCase().replace(/[\s-]/g, '');
+  if (normalized === 'verse') return 'verse';
+  if (normalized === 'chorus') return 'chorus';
+  if (normalized === 'bridge') return 'bridge';
+  return 'other';
+}
+
+function detectSectionHeader(line: string): { type: SectionType; label: string } | null {
+  const stripped = line.replace(/^[[(]\s*/, '').replace(/\s*[\])]$/, '').trim();
+  const match = stripped.match(SECTION_HEADER_RE);
+  if (!match) return null;
+  return { type: classifySectionType(match[1]), label: stripped };
 }
 
 /** Splits one word into syllables, keeping any leading/trailing punctuation attached to its edge syllable. */
@@ -28,21 +73,43 @@ function hyphenateWord(word: string): string[] {
   return result;
 }
 
-/** Parses raw multi-line lyrics text into editable word groups, one per whitespace-separated word. */
-export function parseLyricsToWordGroups(text: string): WordGroup[] {
+/**
+ * Parses raw multi-line lyrics text into editable word groups plus any detected section
+ * headings (Verse/Chorus/Bridge/etc.). Header lines are excluded from the word groups —
+ * they're structural labels, not lyrics to be tapped or charted.
+ */
+export function parseLyricsToWordGroups(text: string): { groups: WordGroup[]; sections: Section[] } {
   const groups: WordGroup[] = [];
-  const lines = text.split('\n');
-  lines.forEach((line, lineIndex) => {
-    const words = line.trim().split(/\s+/).filter(Boolean);
-    words.forEach((word) => {
-      groups.push({ id: makeId(), lineIndex, syllables: hyphenateWord(word) });
-    });
+  const sections: Section[] = [];
+  let lineIndex = 0;
+
+  text.split('\n').forEach((rawLine) => {
+    const trimmed = rawLine.trim();
+    if (trimmed.length === 0) return;
+
+    const header = detectSectionHeader(trimmed);
+    if (header) {
+      sections.push({ ...header, beforeLineIndex: lineIndex });
+      return;
+    }
+
+    trimmed
+      .split(/\s+/)
+      .filter(Boolean)
+      .forEach((word) => {
+        groups.push({ id: makeId(), lineIndex, syllables: hyphenateWord(word) });
+      });
+    lineIndex += 1;
   });
-  return groups;
+
+  return { groups, sections };
 }
 
-/** Flattens editable word groups into the sequential syllable list used for recording/playback/export. */
-export function wordGroupsToSyllables(groups: WordGroup[]): SyllableToken[] {
+/** Flattens editable word groups (plus section headings) into the sequential syllable list used for recording/playback/export. */
+export function wordGroupsToSyllables(groups: WordGroup[], sections: Section[] = []): SyllableToken[] {
+  const sectionByLine = new Map<number, Section>();
+  sections.forEach((s) => sectionByLine.set(s.beforeLineIndex, s));
+
   const tokens: SyllableToken[] = [];
   let prevLineIndex: number | null = null;
   groups.forEach((group) => {
@@ -51,33 +118,21 @@ export function wordGroupsToSyllables(groups: WordGroup[]): SyllableToken[] {
     group.syllables
       .filter((s) => s.length > 0)
       .forEach((text, i) => {
+        const isFirstOfWord = i === 0;
+        const isLineStart = isFirstOfWord && isNewLine;
+        const section = isLineStart ? sectionByLine.get(group.lineIndex) : undefined;
         tokens.push({
           id: makeId(),
           text,
-          isWordStart: i === 0,
-          isLineStart: i === 0 && isNewLine,
+          isWordStart: isFirstOfWord,
+          isLineStart,
           offsetMs: null,
           chordDegrees: [],
+          section: section ? { type: section.type, label: section.label } : undefined,
         });
       });
   });
   return tokens;
-}
-
-/** Reconstructs editable word groups from a flat syllable list (e.g. when navigating back to edit). */
-export function syllablesToWordGroups(syllables: SyllableToken[]): WordGroup[] {
-  const groups: WordGroup[] = [];
-  let lineIndex = -1;
-  let current: WordGroup | null = null;
-  syllables.forEach((syl) => {
-    if (syl.isLineStart) lineIndex += 1;
-    if (syl.isWordStart || !current) {
-      current = { id: makeId(), lineIndex: Math.max(lineIndex, 0), syllables: [] };
-      groups.push(current);
-    }
-    current.syllables.push(syl.text);
-  });
-  return groups;
 }
 
 /** Splits a manually-edited "syl·la·ble" string back into an array of syllable strings. */

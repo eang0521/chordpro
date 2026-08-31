@@ -42,6 +42,80 @@
   background: var(--accent-dim);
 }
 
+/* Metronome toolbar */
+.toolbar {
+  margin-bottom: 20px;
+}
+
+.metronome {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 16px;
+}
+
+.metronome-toggle {
+  white-space: nowrap;
+}
+
+.metronome-bpm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metronome-step {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+.metronome-bpm input {
+  width: 4.5ch;
+  background: #12141a;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 4px 6px;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.metronome-bpm-label {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.metronome-beats {
+  display: flex;
+  gap: 6px;
+}
+
+.metronome-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.05s, transform 0.05s;
+}
+
+.metronome-dot.accent {
+  box-shadow: inset 0 0 0 1.5px var(--text-dim);
+}
+
+.metronome-dot.active {
+  background: var(--accent);
+  transform: scale(1.25);
+}
+
 .panel {
   background: var(--panel-bg);
   border: 1px solid var(--border);
@@ -223,6 +297,37 @@ button.secondary {
 .chord-label-empty::before {
   content: '\00b7';
   color: var(--border);
+}
+
+/* Section headings (Verse/Chorus/Bridge/etc.) */
+.section-heading {
+  display: block;
+  margin: 18px 0 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.syllable-editor .section-heading:first-child,
+.lyric-flow .section-heading:first-child {
+  margin-top: 0;
+}
+
+.section-heading.section-verse {
+  color: var(--accent);
+}
+
+.section-heading.section-chorus {
+  color: #f5a623;
+}
+
+.section-heading.section-bridge {
+  color: #c77dff;
+}
+
+.section-heading.section-other {
+  color: var(--text-dim);
 }
 
 /* Export */

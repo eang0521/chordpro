@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { KeyName, Step, SyllableToken } from './types';
-import type { WordGroup } from './lib/syllables';
+import type { Section, WordGroup } from './lib/syllables';
 import { parseLyricsToWordGroups, wordGroupsToSyllables } from './lib/syllables';
 import { LyricsInput } from './components/LyricsInput';
 import { SyllableEditor } from './components/SyllableEditor';
 import { PaceRecorder } from './components/PaceRecorder';
 import { PlaybackChordEditor } from './components/PlaybackChordEditor';
 import { ExportView } from './components/ExportView';
+import { Metronome } from './components/Metronome';
 import './App.css';
 
 const STORAGE_KEY = 'chordpro-draft-v1';
@@ -17,6 +18,7 @@ interface StoredDraft {
   key: KeyName;
   lyrics: string;
   wordGroups: WordGroup[];
+  sections: Section[];
   syllables: SyllableToken[];
 }
 
@@ -38,12 +40,13 @@ function App() {
   const [key, setKey] = useState<KeyName>(initialDraft?.key ?? 'C');
   const [lyrics, setLyrics] = useState(initialDraft?.lyrics ?? '');
   const [wordGroups, setWordGroups] = useState<WordGroup[]>(initialDraft?.wordGroups ?? []);
+  const [sections, setSections] = useState<Section[]>(initialDraft?.sections ?? []);
   const [syllables, setSyllables] = useState<SyllableToken[]>(initialDraft?.syllables ?? []);
 
   useEffect(() => {
-    const draft: StoredDraft = { step, title, key, lyrics, wordGroups, syllables };
+    const draft: StoredDraft = { step, title, key, lyrics, wordGroups, sections, syllables };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-  }, [step, title, key, lyrics, wordGroups, syllables]);
+  }, [step, title, key, lyrics, wordGroups, sections, syllables]);
 
   function startOver() {
     setStep('input');
@@ -51,6 +54,7 @@ function App() {
     setKey('C');
     setLyrics('');
     setWordGroups([]);
+    setSections([]);
     setSyllables([]);
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -68,6 +72,10 @@ function App() {
         </ol>
       </header>
 
+      <div className="toolbar">
+        <Metronome />
+      </div>
+
       {step === 'input' && (
         <LyricsInput
           initialTitle={title}
@@ -77,7 +85,9 @@ function App() {
             setTitle(t);
             setKey(k);
             setLyrics(l);
-            setWordGroups(parseLyricsToWordGroups(l));
+            const { groups, sections: parsedSections } = parseLyricsToWordGroups(l);
+            setWordGroups(groups);
+            setSections(parsedSections);
             setStep('edit-syllables');
           }}
         />
@@ -86,10 +96,11 @@ function App() {
       {step === 'edit-syllables' && (
         <SyllableEditor
           initialGroups={wordGroups}
+          sections={sections}
           onBack={() => setStep('input')}
           onSubmit={(groups) => {
             setWordGroups(groups);
-            setSyllables(wordGroupsToSyllables(groups));
+            setSyllables(wordGroupsToSyllables(groups, sections));
             setStep('record');
           }}
         />

@@ -4,6 +4,14 @@ export type KeyName =
   | 'C' | 'G' | 'D' | 'A' | 'E' | 'B' | 'F#'
   | 'Db' | 'Ab' | 'Eb' | 'Bb' | 'F';
 
+export type SectionType = 'verse' | 'chorus' | 'bridge' | 'other';
+
+export interface SectionLabel {
+  type: SectionType;
+  /** Original heading text as written, e.g. "Verse 1", "BRIDGE", "Tag". */
+  label: string;
+}
+
 export interface SyllableToken {
   id: string;
   text: string;
@@ -13,6 +21,8 @@ export interface SyllableToken {
   offsetMs: number | null;
   /** Scale degrees held to produce the current chord, e.g. [1] or [1, 3]. Empty = no chord placed. */
   chordDegrees: ScaleDegree[];
+  /** Set on the first syllable of a new section (verse/chorus/bridge/etc.) to mark where a heading goes. */
+  section?: SectionLabel;
 }
 
 export interface Song {

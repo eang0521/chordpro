@@ -15,7 +15,13 @@ export function LyricFlow({ syllables, currentIndex, songKey, showChords = false
   const nodes: ReactNode[] = [];
 
   syllables.forEach((syl, i) => {
-    if (syl.isLineStart && i !== 0) {
+    if (syl.section) {
+      nodes.push(
+        <div className={`section-heading section-${syl.section.type}`} key={`section-${syl.id}`}>
+          {syl.section.label}
+        </div>,
+      );
+    } else if (syl.isLineStart && i !== 0) {
       nodes.push(<br key={`br-${syl.id}`} />);
     } else if (syl.isWordStart && i !== 0) {
       nodes.push(' ');
