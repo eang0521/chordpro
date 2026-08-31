@@ -76,6 +76,8 @@ export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Pr
       return;
     }
     setCurrent((prev) => prev.map((s, i) => (i === index ? { ...s, chordDegrees: degrees } : s)));
+    // In manual (no-timing) mode, placing a chord doubles as "move on" — no separate Space needed.
+    if (!hasTiming) manualAdvance();
   }
 
   useChordKeys(assignChord, index >= 0);
@@ -132,7 +134,8 @@ export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Pr
         ) : (
           <>
             Pace recording was skipped, so press <kbd>Space</kbd> (or click the lyrics) to move to the
-            next syllable &mdash; skip any syllable that doesn't need a chord.{' '}
+            next syllable &mdash; skip any syllable that doesn't need a chord. Placing a chord moves on
+            automatically.{' '}
           </>
         )}
         While a syllable is highlighted, press <kbd>1</kbd>&ndash;<kbd>7</kbd> for a chord (2, 3, 6 are
