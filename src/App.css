@@ -198,6 +198,18 @@ button.secondary {
   border: 1px solid var(--border);
 }
 
+button.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: var(--accent);
+  font-weight: inherit;
+  font-size: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* Syllable editor */
 .syllable-editor {
   background: #12141a;

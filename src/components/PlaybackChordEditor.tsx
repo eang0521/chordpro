@@ -98,24 +98,54 @@ export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Pr
     setIndex(i);
   }
 
+  // If pace-recording was skipped, every syllable's offsetMs is still null — fall back to a
+  // manual walkthrough (Space advances one syllable at a time) instead of timed playback.
+  const hasTiming = current.length > 0 && current.every((s) => s.offsetMs !== null);
+
+  function manualAdvance() {
+    setIndex((i) => Math.min(i + 1, current.length - 1));
+  }
+
+  useEffect(() => {
+    if (hasTiming) return;
+    function handleSpace(e: KeyboardEvent) {
+      if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault();
+        manualAdvance();
+      }
+    }
+    window.addEventListener('keydown', handleSpace);
+    return () => window.removeEventListener('keydown', handleSpace);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasTiming, current.length]);
+
   const finished = index >= current.length - 1 && current.length > 0;
 
   return (
     <div className="panel">
       <h2>4. Place chords</h2>
       <p className="hint">
-        Press <kbd>Play</kbd> to step through the recorded pace. While a syllable is highlighted, press{' '}
-        <kbd>1</kbd>&ndash;<kbd>7</kbd> for a chord (2, 3, 6 are minor, 7 is diminished). Hold{' '}
-        <kbd>1</kbd>+<kbd>3</kbd>, <kbd>1</kbd>+<kbd>5</kbd>, or <kbd>4</kbd>+<kbd>6</kbd> together for a
-        slash-chord inversion. <kbd>Backspace</kbd> clears the current syllable's chord. Click any past
-        syllable to jump back to it while paused.
+        {hasTiming ? (
+          <>
+            Press <kbd>Play</kbd> to step through the recorded pace.{' '}
+          </>
+        ) : (
+          <>
+            Pace recording was skipped, so press <kbd>Space</kbd> (or click the lyrics) to move to the
+            next syllable &mdash; skip any syllable that doesn't need a chord.{' '}
+          </>
+        )}
+        While a syllable is highlighted, press <kbd>1</kbd>&ndash;<kbd>7</kbd> for a chord (2, 3, 6 are
+        minor, 7 is diminished). Hold <kbd>1</kbd>+<kbd>3</kbd>, <kbd>1</kbd>+<kbd>5</kbd>, or{' '}
+        <kbd>4</kbd>+<kbd>6</kbd> together for a slash-chord inversion. <kbd>Backspace</kbd> clears the
+        current syllable's chord. Click any past syllable to jump back to it{hasTiming ? ' while paused' : ''}.
       </p>
       <div className="recorder-status">
-        {index === -1 && <span>Press Play to begin.</span>}
+        {index === -1 && <span>{hasTiming ? 'Press Play to begin.' : 'Press Space to begin.'}</span>}
         {index >= 0 && (
           <span>
             Syllable {index + 1} / {current.length}
-            {playing ? ' (playing)' : ' (paused)'}
+            {hasTiming ? (playing ? ' (playing)' : ' (paused)') : ''}
           </span>
         )}
         {warning && <span className="warning"> &mdash; {warning}</span>}
@@ -136,10 +166,16 @@ export function PlaybackChordEditor({ syllables, songKey, onBack, onSubmit }: Pr
         <button className="secondary" onClick={restart}>
           Restart
         </button>
-        {!playing ? (
-          <button onClick={play}>Play &#9654;</button>
+        {hasTiming ? (
+          !playing ? (
+            <button onClick={play}>Play &#9654;</button>
+          ) : (
+            <button onClick={pause}>Pause &#10074;&#10074;</button>
+          )
         ) : (
-          <button onClick={pause}>Pause &#10074;&#10074;</button>
+          <button onClick={manualAdvance} disabled={finished}>
+            Next syllable &#9654;
+          </button>
         )}
         <button disabled={!finished} onClick={() => onSubmit(current)}>
           Continue to export &rarr;

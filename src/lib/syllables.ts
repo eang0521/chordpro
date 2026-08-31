@@ -1,9 +1,6 @@
-import Hypher from 'hypher';
-import englishPatterns from 'hyphenation.en-us';
 import type { SectionType, SyllableToken } from '../types';
 import { makeId } from './id';
-
-const hypher = new Hypher(englishPatterns);
+import { syllabifyCore } from './syllabify';
 
 /** A word's editable syllable breakdown, grouped by the line it appears on. */
 export interface WordGroup {
@@ -64,7 +61,7 @@ function hyphenateWord(word: string): string[] {
   const [, lead, core, trail] = match;
   if (!core) return [word];
 
-  const parts = hypher.hyphenate(core);
+  const parts = syllabifyCore(core);
   if (parts.length === 0) return [word];
 
   const result = [...parts];

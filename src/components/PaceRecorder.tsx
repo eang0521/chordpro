@@ -6,9 +6,10 @@ interface Props {
   syllables: SyllableToken[];
   onBack: () => void;
   onSubmit: (recorded: SyllableToken[]) => void;
+  onSkip: () => void;
 }
 
-export function PaceRecorder({ syllables, onBack, onSubmit }: Props) {
+export function PaceRecorder({ syllables, onBack, onSubmit, onSkip }: Props) {
   const [recorded, setRecorded] = useState<SyllableToken[]>(syllables);
   const [index, setIndex] = useState(-1);
   const startRef = useRef<number | null>(null);
@@ -54,7 +55,11 @@ export function PaceRecorder({ syllables, onBack, onSubmit }: Props) {
       <h2>3. Record the pace</h2>
       <p className="hint">
         Press <kbd>Space</kbd> (or click the lyrics) once per syllable, at whatever pace you want the
-        song sung. The gaps between your taps become the song's timing.
+        song sung. The gaps between your taps become the song's timing. Don't care about timing?{' '}
+        <button className="link-button" onClick={onSkip}>
+          Skip this step
+        </button>{' '}
+        and just place chords.
       </p>
       <div className="recorder-status">
         {index === -1 && <span>Ready &mdash; first tap starts the clock.</span>}

@@ -114,6 +114,7 @@ function App() {
             setSyllables(recorded);
             setStep('playback');
           }}
+          onSkip={() => setStep('playback')}
         />
       )}
 
