@@ -19,6 +19,12 @@ const ONSET_CLUSTERS = new Set([
 // Never a legal syllable onset in English — the whole cluster stays with the PREVIOUS syllable.
 const CODA_ONLY_CLUSTERS = new Set(['ng', 'ck']);
 
+// Common separable prefixes: the prefix boundary always wins over an onset-cluster heuristic
+// that would otherwise bridge it (e.g. "up" + "hold" → the "p"+"h" isn't the digraph in
+// "phone", so "upholding" must not become "u-phol-ding"). Excludes prefixes like "fore-" that
+// have too many non-prefixed collisions (forest, foreign) to apply safely.
+const SEPARABLE_PREFIXES = ['under', 'over', 'out', 'down', 'back', 'off', 'up'];
+
 type Span = [start: number, end: number];
 
 function splitCluster(cluster: string): [staysWithPrev: string, movesToNext: string] {
@@ -47,6 +53,16 @@ function isVowelAt(letters: string[], i: number): boolean {
 
 /** Splits one alphabetic word (no punctuation) into syllables. */
 export function syllabifyCore(core: string): string[] {
+  const lower = core.toLowerCase();
+  for (const prefix of SEPARABLE_PREFIXES) {
+    if (lower.length <= prefix.length || !lower.startsWith(prefix)) continue;
+    const remainder = core.slice(prefix.length);
+    // Only split here if what's left can actually carry its own syllable (guards against
+    // false positives — a word that merely starts with these letters but has no vowel left over).
+    if (!/[aeiouy]/i.test(remainder)) continue;
+    return [...syllabifyCore(core.slice(0, prefix.length)), ...syllabifyCore(remainder)];
+  }
+
   const letters = core.split('');
   const n = letters.length;
 
