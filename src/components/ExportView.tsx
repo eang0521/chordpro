@@ -1,15 +1,21 @@
 import { useState } from 'react';
 import type { Song } from '../types';
 import { songToChordPro } from '../lib/chordpro';
+import type { BlockMap } from '../lib/arrangement';
+import { generateWordDoc } from '../lib/wordDoc';
+import { downloadBlob, slugifyFilename } from '../lib/download';
 
 interface Props {
   song: Song;
+  blocks: BlockMap;
+  arrangement: string[];
   onBack: () => void;
   onStartOver: () => void;
 }
 
-export function ExportView({ song, onBack, onStartOver }: Props) {
+export function ExportView({ song, blocks, arrangement, onBack, onStartOver }: Props) {
   const [copied, setCopied] = useState(false);
+  const [generatingDocx, setGeneratingDocx] = useState(false);
   const text = songToChordPro(song);
 
   async function copy() {
@@ -24,18 +30,23 @@ export function ExportView({ song, onBack, onStartOver }: Props) {
 
   function download() {
     const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(song.title || 'song').trim().replace(/\s+/g, '_')}.cho`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `${slugifyFilename(song.title)}.cho`);
+  }
+
+  async function downloadDocx() {
+    setGeneratingDocx(true);
+    try {
+      const blob = await generateWordDoc(song.title, song.key, blocks, arrangement);
+      downloadBlob(blob, `${slugifyFilename(song.title)}.docx`);
+    } finally {
+      setGeneratingDocx(false);
+    }
   }
 
   return (
     <div className="panel">
       <h2>5. Export</h2>
-      <p className="hint">Your ChordPro file, ready to copy or download.</p>
+      <p className="hint">Your ChordPro file, ready to copy or download &mdash; or grab a Word doc chord chart.</p>
       <pre className="chordpro-output">{text}</pre>
       <div className="actions">
         <button className="secondary" onClick={onBack}>
@@ -45,6 +56,9 @@ export function ExportView({ song, onBack, onStartOver }: Props) {
           {copied ? 'Copied!' : 'Copy to clipboard'}
         </button>
         <button onClick={download}>Download .cho</button>
+        <button className="secondary" disabled={generatingDocx} onClick={downloadDocx}>
+          {generatingDocx ? 'Generating…' : 'Download .docx'}
+        </button>
         <button className="secondary" onClick={onStartOver}>
           Start a new song
         </button>

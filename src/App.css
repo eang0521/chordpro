@@ -500,6 +500,58 @@ button.link-button {
   padding: 6px 10px;
 }
 
+/* Chord chart preview */
+.chart-panel {
+  max-width: 820px;
+}
+
+.chart-panel-header,
+.arrangement-panel-header {
+  gap: 12px;
+}
+
+.chart-key {
+  color: var(--text-dim);
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+
+.chart-panel-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.chord-chart {
+  margin-top: 16px;
+  background: #12141a;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.chart-line {
+  margin-bottom: 14px;
+}
+
+.chart-line-chords,
+.chart-line-lyrics {
+  display: block;
+  white-space: pre;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 0.95rem;
+  overflow-x: auto;
+}
+
+.chart-line-chords {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.chart-line-lyrics {
+  color: var(--text);
+}
+
 /* Export */
 .chordpro-output {
   background: #12141a;

@@ -11,6 +11,7 @@ import { PlaybackChordEditor } from './components/PlaybackChordEditor';
 import { ExportView } from './components/ExportView';
 import { Metronome } from './components/Metronome';
 import { ArrangementEditor } from './components/ArrangementEditor';
+import { ChordChartView } from './components/ChordChartView';
 import './App.css';
 
 const STORAGE_KEY = 'chordpro-draft-v2';
@@ -50,6 +51,7 @@ function App() {
   const [blocks, setBlocks] = useState<BlockMap>(initialDraft?.blocks ?? {});
   const [arrangement, setArrangement] = useState<string[]>(initialDraft?.arrangement ?? []);
   const [showArrangement, setShowArrangement] = useState(false);
+  const [showChart, setShowChart] = useState(false);
 
   useEffect(() => {
     const draft: StoredDraft = { step, title, key, lyrics, wordGroups, sections, blocks, arrangement };
@@ -96,10 +98,17 @@ function App() {
         >
           Arrange sections
         </button>
+        <button className="secondary" disabled={arrangement.length === 0} onClick={() => setShowChart(true)}>
+          View chart
+        </button>
       </div>
 
       {showArrangement && (
         <ArrangementEditor blocks={blocks} arrangement={arrangement} onChange={(b, a) => { setBlocks(b); setArrangement(a); }} onClose={() => setShowArrangement(false)} />
+      )}
+
+      {showChart && (
+        <ChordChartView title={title} songKey={key} blocks={blocks} arrangement={arrangement} onClose={() => setShowChart(false)} />
       )}
 
       {step === 'input' && (
@@ -157,6 +166,8 @@ function App() {
       {step === 'export' && (
         <ExportView
           song={{ title, key, syllables: flatSyllables }}
+          blocks={blocks}
+          arrangement={arrangement}
           onBack={() => setStep('playback')}
           onStartOver={startOver}
         />

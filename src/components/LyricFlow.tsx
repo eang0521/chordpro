@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import type { KeyName, SectionLabel, SyllableToken } from '../types';
+import type { KeyName, SyllableToken } from '../types';
 import { resolveChordLabel } from '../lib/musicTheory';
+import { buildRows } from '../lib/lyricRows';
 
 interface Props {
   syllables: SyllableToken[];
@@ -11,20 +12,6 @@ interface Props {
   onSyllableClick?: (index: number) => void;
 }
 
-interface SectionRow {
-  kind: 'section';
-  key: string;
-  section: SectionLabel;
-}
-
-interface LineRow {
-  kind: 'line';
-  key: string;
-  indexes: number[];
-}
-
-type Row = SectionRow | LineRow;
-
 /** Walks up from an element to find its nearest vertically-scrollable ancestor. */
 function findScrollParent(el: HTMLElement | null): HTMLElement | null {
   let node = el?.parentElement ?? null;
@@ -33,24 +20,6 @@ function findScrollParent(el: HTMLElement | null): HTMLElement | null {
     node = node.parentElement;
   }
   return null;
-}
-
-/** Groups the flat syllable list into section-heading rows and per-line rows, so the
- * currently active line can be found and scrolled into view as a single element. */
-function buildRows(syllables: SyllableToken[]): Row[] {
-  const rows: Row[] = [];
-  syllables.forEach((syl, i) => {
-    if (syl.section) {
-      if (syl.section.label) rows.push({ kind: 'section', key: `section-${syl.id}`, section: syl.section });
-      rows.push({ kind: 'line', key: `line-${syl.id}`, indexes: [i] });
-    } else if (syl.isLineStart) {
-      rows.push({ kind: 'line', key: `line-${syl.id}`, indexes: [i] });
-    } else {
-      const lastRow = rows[rows.length - 1];
-      if (lastRow.kind === 'line') lastRow.indexes.push(i);
-    }
-  });
-  return rows;
 }
 
 /** Shared flowing lyric renderer used by the recorder and the playback/chord editor. */
