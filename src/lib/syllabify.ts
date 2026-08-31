@@ -25,6 +25,13 @@ const CODA_ONLY_CLUSTERS = new Set(['ng', 'ck']);
 // have too many non-prefixed collisions (forest, foreign) to apply safely.
 const SEPARABLE_PREFIXES = ['under', 'over', 'out', 'down', 'back', 'off', 'up'];
 
+// A small closed set of words where "-ed" keeps its own syllable as an adjective (naked,
+// wicked, ...) even though the general silent-"-ed" rule below would otherwise drop it —
+// there's essentially no common verb reading of these to conflict with.
+const RETAINS_ED_SYLLABLE = new Set([
+  'naked', 'wicked', 'ragged', 'rugged', 'jagged', 'crooked', 'sacred', 'wretched', 'dogged',
+]);
+
 type Span = [start: number, end: number];
 
 function splitCluster(cluster: string): [staysWithPrev: string, movesToNext: string] {
@@ -99,6 +106,19 @@ export function syllabifyCore(core: string): string[] {
     const isSyllabicLe = last[0] >= 2 && letters[last[0] - 1].toLowerCase() === 'l' && !isVowelAt(letters, last[0] - 2);
     if (!isSyllabicLe) groups.pop();
     else syllabicEIndex = groups.length - 1;
+  } else if (
+    last[0] === last[1] &&
+    last[1] === n - 2 &&
+    last[0] >= 1 &&
+    letters[last[1]].toLowerCase() === 'e' &&
+    letters[n - 1].toLowerCase() === 'd' &&
+    !RETAINS_ED_SYLLABLE.has(core.toLowerCase())
+  ) {
+    // "-ed" is silent after most stems (filled, called, walked, loved) but forms its own
+    // syllable when the stem ends in t/d (wanted, needed) — the double consonant sound
+    // would otherwise be unpronounceable.
+    const stemFinal = letters[last[0] - 1].toLowerCase();
+    if (stemFinal !== 't' && stemFinal !== 'd') groups.pop();
   }
 
   if (groups.length <= 1) return [core];
