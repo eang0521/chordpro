@@ -6,7 +6,7 @@ import type { ChartLineRow, SectionDisplayRow } from '../lib/chordChart';
 import { buildChartRows, flattenSections, groupIntoSections } from '../lib/chordChart';
 import { generateWordDoc } from '../lib/wordDoc';
 import { downloadBlob, slugifyFilename } from '../lib/download';
-import { CHORD_FONT_OPTIONS, DEFAULT_CHORD_FONT_ID, getChordFontOption } from '../lib/chordFonts';
+import { CHORD_FONT_OPTIONS, getChordFontOption } from '../lib/chordFonts';
 import {
   CONTENT_HEIGHT_PX,
   CONTENT_WIDTH_PX,
@@ -25,6 +25,10 @@ interface Props {
   songKey: KeyName;
   blocks: BlockMap;
   arrangement: string[];
+  fontId: string;
+  onFontIdChange: (id: string) => void;
+  lineSpacing: number;
+  onLineSpacingChange: (value: number) => void;
   onClose: () => void;
 }
 
@@ -98,9 +102,17 @@ function renderPageItem(item: PageItem, title: string, songKey: KeyName, pageAcc
   return item.kind === 'header' ? renderHeader(title, songKey) : renderDisplayRow(item.display, pageAccurate);
 }
 
-export function ChordChartView({ title, songKey, blocks, arrangement, onClose }: Props) {
-  const [fontId, setFontId] = useState<string>(DEFAULT_CHORD_FONT_ID);
-  const [lineSpacing, setLineSpacing] = useState(1);
+export function ChordChartView({
+  title,
+  songKey,
+  blocks,
+  arrangement,
+  fontId,
+  onFontIdChange,
+  lineSpacing,
+  onLineSpacingChange,
+  onClose,
+}: Props) {
   const [generating, setGenerating] = useState(false);
   const [pageMode, setPageMode] = useState(false);
   const displayRows = useMemo(
@@ -148,7 +160,7 @@ export function ChordChartView({ title, songKey, blocks, arrangement, onClose }:
             {title || 'Untitled'} <span className="chart-key">({songKey})</span>
           </h2>
           <div className="chart-panel-actions">
-            <select className="chart-font-select" value={fontId} onChange={(e) => setFontId(e.target.value)}>
+            <select className="chart-font-select" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
               {CHORD_FONT_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>
                   {opt.label}
@@ -165,7 +177,7 @@ export function ChordChartView({ title, songKey, blocks, arrangement, onClose }:
                 value={lineSpacing}
                 onChange={(e) => {
                   const v = Number(e.target.value);
-                  if (!Number.isNaN(v)) setLineSpacing(Math.min(1.2, Math.max(0.7, v)));
+                  if (!Number.isNaN(v)) onLineSpacingChange(Math.min(1.2, Math.max(0.7, v)));
                 }}
               />
             </label>

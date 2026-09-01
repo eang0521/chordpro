@@ -12,6 +12,7 @@ import { ExportView } from './components/ExportView';
 import { Metronome } from './components/Metronome';
 import { ArrangementEditor } from './components/ArrangementEditor';
 import { ChordChartView } from './components/ChordChartView';
+import { DEFAULT_CHORD_FONT_ID } from './lib/chordFonts';
 import './App.css';
 
 const STORAGE_KEY = 'chordpro-draft-v2';
@@ -52,6 +53,10 @@ function App() {
   const [arrangement, setArrangement] = useState<string[]>(initialDraft?.arrangement ?? []);
   const [showArrangement, setShowArrangement] = useState(false);
   const [showChart, setShowChart] = useState(false);
+  // Shared with ExportView so the chord chart's font/spacing choice stays the same regardless of
+  // which screen you download the .docx from, instead of each view defaulting independently.
+  const [chartFontId, setChartFontId] = useState<string>(DEFAULT_CHORD_FONT_ID);
+  const [chartLineSpacing, setChartLineSpacing] = useState(1);
 
   useEffect(() => {
     const draft: StoredDraft = { step, title, key, lyrics, wordGroups, sections, blocks, arrangement };
@@ -108,7 +113,17 @@ function App() {
       )}
 
       {showChart && (
-        <ChordChartView title={title} songKey={key} blocks={blocks} arrangement={arrangement} onClose={() => setShowChart(false)} />
+        <ChordChartView
+          title={title}
+          songKey={key}
+          blocks={blocks}
+          arrangement={arrangement}
+          fontId={chartFontId}
+          onFontIdChange={setChartFontId}
+          lineSpacing={chartLineSpacing}
+          onLineSpacingChange={setChartLineSpacing}
+          onClose={() => setShowChart(false)}
+        />
       )}
 
       {step === 'input' && (
@@ -168,6 +183,10 @@ function App() {
           song={{ title, key, syllables: flatSyllables }}
           blocks={blocks}
           arrangement={arrangement}
+          fontId={chartFontId}
+          onFontIdChange={setChartFontId}
+          lineSpacing={chartLineSpacing}
+          onLineSpacingChange={setChartLineSpacing}
           onBack={() => setStep('playback')}
           onStartOver={startOver}
         />

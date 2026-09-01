@@ -4,21 +4,33 @@ import { songToChordPro } from '../lib/chordpro';
 import type { BlockMap } from '../lib/arrangement';
 import { generateWordDoc } from '../lib/wordDoc';
 import { downloadBlob, slugifyFilename } from '../lib/download';
-import { CHORD_FONT_OPTIONS, DEFAULT_CHORD_FONT_ID } from '../lib/chordFonts';
+import { CHORD_FONT_OPTIONS } from '../lib/chordFonts';
 
 interface Props {
   song: Song;
   blocks: BlockMap;
   arrangement: string[];
+  fontId: string;
+  onFontIdChange: (id: string) => void;
+  lineSpacing: number;
+  onLineSpacingChange: (value: number) => void;
   onBack: () => void;
   onStartOver: () => void;
 }
 
-export function ExportView({ song, blocks, arrangement, onBack, onStartOver }: Props) {
+export function ExportView({
+  song,
+  blocks,
+  arrangement,
+  fontId,
+  onFontIdChange,
+  lineSpacing,
+  onLineSpacingChange,
+  onBack,
+  onStartOver,
+}: Props) {
   const [copied, setCopied] = useState(false);
   const [generatingDocx, setGeneratingDocx] = useState(false);
-  const [fontId, setFontId] = useState<string>(DEFAULT_CHORD_FONT_ID);
-  const [lineSpacing, setLineSpacing] = useState(1);
   const text = songToChordPro(song);
 
   async function copy() {
@@ -59,7 +71,7 @@ export function ExportView({ song, blocks, arrangement, onBack, onStartOver }: P
           {copied ? 'Copied!' : 'Copy to clipboard'}
         </button>
         <button onClick={download}>Download .cho</button>
-        <select className="chart-font-select" value={fontId} onChange={(e) => setFontId(e.target.value)}>
+        <select className="chart-font-select" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
           {CHORD_FONT_OPTIONS.map((opt) => (
             <option key={opt.id} value={opt.id}>
               {opt.label}
@@ -76,7 +88,7 @@ export function ExportView({ song, blocks, arrangement, onBack, onStartOver }: P
             value={lineSpacing}
             onChange={(e) => {
               const v = Number(e.target.value);
-              if (!Number.isNaN(v)) setLineSpacing(Math.min(1.2, Math.max(0.7, v)));
+              if (!Number.isNaN(v)) onLineSpacingChange(Math.min(1.2, Math.max(0.7, v)));
             }}
           />
         </label>
