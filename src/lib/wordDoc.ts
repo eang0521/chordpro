@@ -79,11 +79,15 @@ function buildProportionalChords(
   return { lyricLine, chords };
 }
 
+const WORD_SINGLE_LINE_UNITS = 240; // Word's own "line" unit for spacing.line: 240 = single (1.0x)
+
 /** Builds a downloadable .docx chord chart: title, key, and every section with its chords
  * placed directly above the lyrics they belong to. Section names sit in a narrow left column
  * so the lyrics/chords column doesn't have to give up its own line to the heading, and every
- * text run honors the chosen font. `lineSpacing` scales the vertical gap between lines (1.0 =
- * normal; 0.7–1.2 covers "more compact" to "a bit more room"). */
+ * text run honors the chosen font. `lineSpacing` scales both the gap after each line and each
+ * line's own height (1.0 = normal; 0.7–1.2 covers "more compact" to "a bit more room") — scaling
+ * only the gap barely moves the needle since it's small relative to the text itself, so Word's
+ * own per-line height needs to scale too for the effect to actually be visible. */
 export async function generateWordDoc(
   title: string,
   key: KeyName,
@@ -93,13 +97,19 @@ export async function generateWordDoc(
   lineSpacing = 1,
 ): Promise<Blob> {
   // Loaded on demand — the docx package is sizable and most sessions never export a Word doc.
-  const { Document, HeadingLevel, Packer, Paragraph, Table, TableBorders, TableCell, TableRow, Tab, TabStopType, TextRun, VerticalAlign, WidthType } =
+  const { Document, HeadingLevel, LineRuleType, Packer, Paragraph, Table, TableBorders, TableCell, TableRow, Tab, TabStopType, TextRun, VerticalAlign, WidthType } =
     await import('docx');
   const font = getChordFontOption(fontId);
   const sections = groupIntoSections(buildChartRows(blocks, arrangement, key));
 
   const lineGapTwips = Math.round(BASE_LINE_GAP_TWIPS * lineSpacing);
   const sectionGapTwips = Math.round(BASE_SECTION_GAP_TWIPS * lineSpacing);
+  const lineHeightUnits = Math.round(WORD_SINGLE_LINE_UNITS * lineSpacing);
+  const contentSpacing = (after: number) => ({
+    after,
+    line: lineHeightUnits,
+    lineRule: LineRuleType.AUTO,
+  });
 
   function buildLinePairParagraphs(row: ChartLineRow, isLast: boolean): Paragraph[] {
     const trailingGap = isLast ? sectionGapTwips : lineGapTwips;
@@ -110,7 +120,8 @@ export async function generateWordDoc(
       if (chordLine.trim()) {
         paragraphs.push(
           new Paragraph({
-            spacing: { after: 0 },
+            spacing: contentSpacing(0),
+            contextualSpacing: false,
             children: [
               new TextRun({ text: chordLine, font: font.wordFont, bold: true, color: CHORD_COLOR, size: FONT_SIZE_HALF_PT }),
             ],
@@ -119,7 +130,8 @@ export async function generateWordDoc(
       }
       paragraphs.push(
         new Paragraph({
-          spacing: { after: trailingGap },
+          spacing: contentSpacing(trailingGap),
+          contextualSpacing: false,
           children: [new TextRun({ text: lyricLine || ' ', font: font.wordFont, size: FONT_SIZE_HALF_PT })],
         }),
       );
@@ -131,7 +143,8 @@ export async function generateWordDoc(
       const tabStops: TabStopDefinition[] = chords.map((c) => ({ type: TabStopType.LEFT, position: c.twips }));
       paragraphs.push(
         new Paragraph({
-          spacing: { after: 0 },
+          spacing: contentSpacing(0),
+          contextualSpacing: false,
           tabStops,
           children: chords.map(
             (c) =>
@@ -148,7 +161,8 @@ export async function generateWordDoc(
     }
     paragraphs.push(
       new Paragraph({
-        spacing: { after: trailingGap },
+        spacing: contentSpacing(trailingGap),
+        contextualSpacing: false,
         children: [new TextRun({ text: lyricLine || ' ', font: font.wordFont, size: FONT_SIZE_HALF_PT })],
       }),
     );
