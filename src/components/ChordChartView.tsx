@@ -159,13 +159,13 @@ export function ChordChartView({ title, songKey, blocks, arrangement, onClose }:
               <span>Line spacing</span>
               <input
                 type="number"
-                min={0.8}
+                min={0.7}
                 max={1.2}
                 step={0.05}
                 value={lineSpacing}
                 onChange={(e) => {
                   const v = Number(e.target.value);
-                  if (!Number.isNaN(v)) setLineSpacing(Math.min(1.2, Math.max(0.8, v)));
+                  if (!Number.isNaN(v)) setLineSpacing(Math.min(1.2, Math.max(0.7, v)));
                 }}
               />
             </label>

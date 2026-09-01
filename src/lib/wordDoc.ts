@@ -83,7 +83,7 @@ function buildProportionalChords(
  * placed directly above the lyrics they belong to. Section names sit in a narrow left column
  * so the lyrics/chords column doesn't have to give up its own line to the heading, and every
  * text run honors the chosen font. `lineSpacing` scales the vertical gap between lines (1.0 =
- * normal; 0.8–1.2 covers "more compact" to "a bit more room"). */
+ * normal; 0.7–1.2 covers "more compact" to "a bit more room"). */
 export async function generateWordDoc(
   title: string,
   key: KeyName,
