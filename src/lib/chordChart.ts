@@ -50,3 +50,58 @@ export function buildChartRows(blocks: BlockMap, arrangement: string[], key: Key
     return { kind: 'line', key: row.key, tokens };
   });
 }
+
+export interface DocSection {
+  label: string;
+  type: SectionType;
+  lineRows: ChartLineRow[];
+}
+
+/** Groups the flat chart rows back into one entry per section, since both the Word doc and the
+ * on-screen preview put each section's label beside its lyrics/chords rather than above them.
+ * Lines before the first heading (or a song with none at all) become a single section with a
+ * blank label. */
+export function groupIntoSections(rows: ChartRow[]): DocSection[] {
+  const sections: DocSection[] = [];
+  let current: DocSection | null = null;
+  rows.forEach((row) => {
+    if (row.kind === 'heading') {
+      current = { label: row.label, type: row.type, lineRows: [] };
+      sections.push(current);
+    } else {
+      if (!current) {
+        current = { label: '', type: 'other', lineRows: [] };
+        sections.push(current);
+      }
+      current.lineRows.push(row);
+    }
+  });
+  return sections;
+}
+
+export interface SectionDisplayRow {
+  key: string;
+  section: DocSection;
+  row: ChartLineRow | null;
+  isFirstInSection: boolean;
+  isLastInSection: boolean;
+}
+
+/** Flattens sections into one entry per line-row (or a single blank entry for a label-only
+ * section), so a renderer can lay out a fixed-width label column beside the lyrics/chords —
+ * showing the label only on the section's first row, so it visually spans the section the same
+ * way a table cell's label sits beside multiple lines of content in the Word doc. */
+export function flattenSections(sections: DocSection[]): SectionDisplayRow[] {
+  return sections.flatMap((section, si): SectionDisplayRow[] => {
+    if (section.lineRows.length === 0) {
+      return [{ key: `s${si}`, section, row: null, isFirstInSection: true, isLastInSection: true }];
+    }
+    return section.lineRows.map((row, i) => ({
+      key: row.key,
+      section,
+      row,
+      isFirstInSection: i === 0,
+      isLastInSection: i === section.lineRows.length - 1,
+    }));
+  });
+}

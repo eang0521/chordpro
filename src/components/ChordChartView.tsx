@@ -2,12 +2,22 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { KeyName } from '../types';
 import type { BlockMap } from '../lib/arrangement';
-import type { ChartRow } from '../lib/chordChart';
-import { buildChartRows } from '../lib/chordChart';
+import type { ChartLineRow, SectionDisplayRow } from '../lib/chordChart';
+import { buildChartRows, flattenSections, groupIntoSections } from '../lib/chordChart';
 import { generateWordDoc } from '../lib/wordDoc';
 import { downloadBlob, slugifyFilename } from '../lib/download';
 import { CHORD_FONT_OPTIONS, DEFAULT_CHORD_FONT_ID, getChordFontOption } from '../lib/chordFonts';
-import { CONTENT_HEIGHT_PX, CONTENT_WIDTH_PX, FONT_SIZE_PT, MARGIN_PX, PAGE_HEIGHT_PX, PAGE_WIDTH_PX } from '../lib/pageLayout';
+import {
+  CONTENT_HEIGHT_PX,
+  CONTENT_WIDTH_PX,
+  FONT_SIZE_PT,
+  LABEL_COLUMN_PX,
+  LYRIC_COLUMN_PX,
+  MARGIN_PX,
+  PAGE_HEIGHT_PX,
+  PAGE_WIDTH_PX,
+  SECTION_COLORS,
+} from '../lib/pageLayout';
 import { paginateByHeight } from '../lib/pagination';
 
 interface Props {
@@ -23,16 +33,14 @@ function lineSpacingVar(value: number): Record<string, string> {
   return { '--line-spacing': String(value) };
 }
 
-function renderChartRow(row: ChartRow, key: number | string): ReactNode {
-  if (row.kind === 'heading') {
-    return (
-      <div className={`section-heading section-${row.type}`} key={key}>
-        {row.label}
-      </div>
-    );
-  }
+// The title/key header is its own item so it can be measured and paginated exactly like a
+// section row — it only ever lands on page 1, but reusing the same measurement pass keeps the
+// pagination math in one place instead of special-casing the first page's available height.
+type PageItem = { kind: 'header' } | { kind: 'row'; display: SectionDisplayRow };
+
+function renderLinePair(row: ChartLineRow): ReactNode {
   return (
-    <div className="chart-line-row" key={key}>
+    <div className="chart-line-row">
       {row.tokens.flatMap((tok, ti): ReactNode[] => {
         const nodes: ReactNode[] = [];
         if (ti > 0 && tok.isWordStart) nodes.push(' ');
@@ -50,30 +58,77 @@ function renderChartRow(row: ChartRow, key: number | string): ReactNode {
   );
 }
 
+/** Renders one section's label beside its lyrics/chords, matching the Word doc's two-column
+ * table layout: a narrow label column (shown only on the section's first row) beside a wider
+ * content column. `pageAccurate` locks both columns to the doc's true physical widths — the
+ * compact view instead lets the label column grow for long labels and the content column flow
+ * freely, since it isn't trying to simulate the printed page width. */
+function renderDisplayRow(display: SectionDisplayRow, pageAccurate: boolean): ReactNode {
+  const gapClass = display.isLastInSection ? 'chart-gap-section' : 'chart-gap-line';
+  const labelStyle = pageAccurate
+    ? { width: LABEL_COLUMN_PX, flexShrink: 0 }
+    : { minWidth: LABEL_COLUMN_PX, flexShrink: 0 };
+  const contentStyle = pageAccurate ? { width: LYRIC_COLUMN_PX } : undefined;
+  return (
+    <div className={`chart-section-row ${gapClass}`} key={display.key}>
+      <div className="chart-label-col" style={labelStyle}>
+        {display.isFirstInSection && display.section.label && (
+          <span className="chart-section-label" style={{ color: `#${SECTION_COLORS[display.section.type]}` }}>
+            {display.section.label}
+          </span>
+        )}
+      </div>
+      <div className="chart-content-col" style={contentStyle}>
+        {display.row ? renderLinePair(display.row) : <>&nbsp;</>}
+      </div>
+    </div>
+  );
+}
+
+function renderHeader(title: string, songKey: KeyName): ReactNode {
+  return (
+    <div className="chart-doc-header" key="header">
+      <span className="chart-doc-title">{title || 'Untitled'}</span>
+      <span className="chart-doc-key">Key: {songKey}</span>
+    </div>
+  );
+}
+
+function renderPageItem(item: PageItem, title: string, songKey: KeyName, pageAccurate: boolean): ReactNode {
+  return item.kind === 'header' ? renderHeader(title, songKey) : renderDisplayRow(item.display, pageAccurate);
+}
+
 export function ChordChartView({ title, songKey, blocks, arrangement, onClose }: Props) {
   const [fontId, setFontId] = useState<string>(DEFAULT_CHORD_FONT_ID);
   const [lineSpacing, setLineSpacing] = useState(1);
   const [generating, setGenerating] = useState(false);
   const [pageMode, setPageMode] = useState(false);
-  const rows = useMemo(() => buildChartRows(blocks, arrangement, songKey), [blocks, arrangement, songKey]);
+  const displayRows = useMemo(
+    () => flattenSections(groupIntoSections(buildChartRows(blocks, arrangement, songKey))),
+    [blocks, arrangement, songKey],
+  );
+  const pageItems = useMemo<PageItem[]>(
+    () => [{ kind: 'header' }, ...displayRows.map((display) => ({ kind: 'row' as const, display }))],
+    [displayRows],
+  );
   const font = getChordFontOption(fontId);
 
-  // Measure each row's real rendered height (in a hidden, page-content-width container) so we
-  // can greedily pack rows into US-Letter pages, matching the margins the Word export uses.
-  const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
+  // Measure each page item's real rendered height (in a hidden, page-content-width container) so
+  // we can greedily pack them into US-Letter pages, matching the margins the Word export uses.
+  const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [pages, setPages] = useState<number[][]>([]);
 
   useLayoutEffect(() => {
     // getBoundingClientRect().height excludes margins (and adjacent margins can collapse), so
-    // measure top-to-top distance between consecutive rows instead — that's the browser's
-    // actual resolved spacing, which top/bottom padding on a row alone wouldn't capture.
-    const tops = rows.map((_, i) => rowRefs.current[i]?.getBoundingClientRect().top ?? 0);
-    const heights = rows.map((_, i) => {
-      if (i + 1 < rows.length) return tops[i + 1] - tops[i];
-      return rowRefs.current[i]?.getBoundingClientRect().height ?? 0;
+    // measure top-to-top distance between consecutive items instead — that's the browser's
+    // actual resolved spacing, which top/bottom padding on an item alone wouldn't capture.
+    const tops = pageItems.map((_, i) => itemRefs.current[i]?.getBoundingClientRect().top ?? 0);
+    const heights = pageItems.map((_, i) => {
+      if (i + 1 < pageItems.length) return tops[i + 1] - tops[i];
+      return itemRefs.current[i]?.getBoundingClientRect().height ?? 0;
     });
     setPages(paginateByHeight(heights, CONTENT_HEIGHT_PX));
-  }, [rows, font.cssFont, lineSpacing]);
+  }, [pageItems, font.cssFont, lineSpacing]);
 
   async function downloadDocx() {
     setGenerating(true);
@@ -126,17 +181,17 @@ export function ChordChartView({ title, songKey, blocks, arrangement, onClose }:
           </div>
         </div>
 
-        {rows.length === 0 && <p className="hint">Nothing to show yet &mdash; split some lyrics into syllables first.</p>}
+        {displayRows.length === 0 && <p className="hint">Nothing to show yet &mdash; split some lyrics into syllables first.</p>}
 
         {/* Hidden measurement pass: same width as a page's printable area, so wrapping (and
-            therefore each row's true height) matches what page mode will actually show. */}
+            therefore each item's true height) matches what page mode will actually show. */}
         <div
           className="chart-measure"
           style={{ fontFamily: font.cssFont, fontSize: FONT_SIZE_PT, width: CONTENT_WIDTH_PX, ...lineSpacingVar(lineSpacing) }}
         >
-          {rows.map((row, i) => (
-            <div key={i} ref={(el) => { rowRefs.current[i] = el; }}>
-              {renderChartRow(row, i)}
+          {pageItems.map((item, i) => (
+            <div key={i} ref={(el) => { itemRefs.current[i] = el; }}>
+              {renderPageItem(item, title, songKey, true)}
             </div>
           ))}
         </div>
@@ -149,7 +204,9 @@ export function ChordChartView({ title, songKey, blocks, arrangement, onClose }:
                   className="chart-page-content"
                   style={{ fontFamily: font.cssFont, fontSize: FONT_SIZE_PT, padding: MARGIN_PX, ...lineSpacingVar(lineSpacing) }}
                 >
-                  {indices.map((i) => renderChartRow(rows[i], i))}
+                  {indices.map((i) => (
+                    <div key={i}>{renderPageItem(pageItems[i], title, songKey, true)}</div>
+                  ))}
                 </div>
                 <div className="chart-page-footer">
                   Page {pageIndex + 1} of {pages.length}
@@ -159,7 +216,7 @@ export function ChordChartView({ title, songKey, blocks, arrangement, onClose }:
           </div>
         ) : (
           <div className="chord-chart" style={{ fontFamily: font.cssFont, ...lineSpacingVar(lineSpacing) }}>
-            {rows.map((row, i) => renderChartRow(row, i))}
+            {displayRows.map((display) => renderDisplayRow(display, false))}
           </div>
         )}
       </div>

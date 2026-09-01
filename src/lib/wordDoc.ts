@@ -1,29 +1,26 @@
 import type { Paragraph, TabStopDefinition } from 'docx';
-import type { KeyName, SectionType } from '../types';
+import type { KeyName } from '../types';
 import type { BlockMap } from './arrangement';
-import type { ChartLineRow, ChartRow, ChartToken } from './chordChart';
-import { buildChartRows } from './chordChart';
+import type { ChartLineRow, ChartToken } from './chordChart';
+import { buildChartRows, groupIntoSections } from './chordChart';
 import { getChordFontOption } from './chordFonts';
-import { FONT_SIZE_PT, MARGIN_TWIPS, PAGE_HEIGHT_TWIPS, PAGE_WIDTH_TWIPS } from './pageLayout';
+import {
+  BASE_LINE_GAP_TWIPS,
+  BASE_SECTION_GAP_TWIPS,
+  CHORD_COLOR,
+  CONTENT_WIDTH_TWIPS,
+  FONT_SIZE_PT,
+  LABEL_COLUMN_TWIPS,
+  LYRIC_COLUMN_TWIPS,
+  MARGIN_TWIPS,
+  PAGE_HEIGHT_TWIPS,
+  PAGE_WIDTH_TWIPS,
+  SECTION_COLORS,
+} from './pageLayout';
 
-const CHORD_COLOR = '2563EB';
 const FONT_SIZE_HALF_PT = FONT_SIZE_PT * 2; // docx sizes are in half-points
+const KEY_FONT_SIZE_HALF_PT = 20; // 10pt, a touch smaller than the body text
 const MIN_GAP_TWIPS = 90; // guards against two chords landing on/behind the same tab stop
-
-const LABEL_COLUMN_TWIPS = 1800; // ~1.25in, enough for "Pre-Chorus 2" without wrapping
-const CONTENT_WIDTH_TWIPS = PAGE_WIDTH_TWIPS - 2 * MARGIN_TWIPS;
-const LYRIC_COLUMN_TWIPS = CONTENT_WIDTH_TWIPS - LABEL_COLUMN_TWIPS;
-
-// Base vertical spacing (twips) at a 1.0x line-spacing multiplier.
-const BASE_LINE_GAP_TWIPS = 120;
-const BASE_SECTION_GAP_TWIPS = 280;
-
-const SECTION_COLORS: Record<SectionType, string> = {
-  verse: '2563EB',
-  chorus: 'B45309',
-  bridge: '7E22CE',
-  other: '6B7280',
-};
 
 function pxToTwips(px: number): number {
   return Math.round(px * 15); // 1css px = 0.75pt = 15 twips, at the standard 96dpi CSS reference
@@ -80,33 +77,6 @@ function buildProportionalChords(
     if (chords[i].twips <= chords[i - 1].twips) chords[i].twips = chords[i - 1].twips + MIN_GAP_TWIPS;
   }
   return { lyricLine, chords };
-}
-
-interface DocSection {
-  label: string;
-  type: SectionType;
-  lineRows: ChartLineRow[];
-}
-
-/** Groups the flat chart rows back into one entry per section, since the Word layout puts each
- * section's label and its lyrics/chords side by side as a table row. Lines before the first
- * heading (or a song with none at all) become a single section with a blank label. */
-function groupIntoSections(rows: ChartRow[]): DocSection[] {
-  const sections: DocSection[] = [];
-  let current: DocSection | null = null;
-  rows.forEach((row) => {
-    if (row.kind === 'heading') {
-      current = { label: row.label, type: row.type, lineRows: [] };
-      sections.push(current);
-    } else {
-      if (!current) {
-        current = { label: '', type: 'other', lineRows: [] };
-        sections.push(current);
-      }
-      current.lineRows.push(row);
-    }
-  });
-  return sections;
 }
 
 /** Builds a downloadable .docx chord chart: title, key, and every section with its chords
@@ -229,11 +199,18 @@ export async function generateWordDoc(
         children: [
           new Paragraph({
             heading: HeadingLevel.HEADING_1,
-            children: [new TextRun({ text: title || 'Untitled' })],
-          }),
-          new Paragraph({
             spacing: { after: 240 },
-            children: [new TextRun({ text: `Key: ${key}`, italics: true, color: '6B7280' })],
+            tabStops: [{ type: TabStopType.RIGHT, position: CONTENT_WIDTH_TWIPS }],
+            children: [
+              new TextRun({ text: title || 'Untitled', font: font.wordFont }),
+              new TextRun({
+                children: [new Tab(), `Key: ${key}`],
+                italics: true,
+                color: '6B7280',
+                font: font.wordFont,
+                size: KEY_FONT_SIZE_HALF_PT,
+              }),
+            ],
           }),
           table,
         ],

@@ -553,7 +553,7 @@ button.link-button {
 }
 
 .chart-line-spacing input {
-  width: 4.5ch;
+  width: 6ch;
   background: #1e222c;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -576,13 +576,61 @@ button.link-button {
 .chart-line-row {
   line-height: 1.15;
   white-space: nowrap;
-  margin-bottom: calc(10px * var(--line-spacing, 1));
 }
 
-.chord-chart .section-heading,
-.chart-page-content .section-heading,
-.chart-measure .section-heading {
-  margin: calc(18px * var(--line-spacing, 1)) 0 calc(4px * var(--line-spacing, 1));
+/* Title/key header — mirrors the Word doc's title paragraph: title on the left in the chosen
+   font (inherited from the ancestor's fontFamily), key right-aligned on the same line. */
+.chart-doc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.chart-doc-title {
+  font-size: 1.8em;
+  font-weight: 700;
+}
+
+.chart-doc-key {
+  font-size: 0.85em;
+  font-style: italic;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+/* One row per section line-pair, laid out as a fixed-width label column beside a lyrics/chords
+   column — mirroring the Word doc's two-column table so the preview matches the export instead
+   of stacking the section name above the lyrics as its own line. */
+.chart-section-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.chart-label-col {
+  flex-shrink: 0;
+}
+
+.chart-content-col {
+  min-width: 0;
+}
+
+.chart-section-label {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Gap after a line-pair that isn't the last in its section (BASE_LINE_GAP_TWIPS, pageLayout.ts)
+   vs. the larger gap after a section's last line-pair (BASE_SECTION_GAP_TWIPS) — both scaled by
+   the same line-spacing multiplier the Word doc uses. */
+.chart-section-row.chart-gap-line {
+  margin-bottom: calc(6px * var(--line-spacing, 1));
+}
+
+.chart-section-row.chart-gap-section {
+  margin-bottom: calc(14px * var(--line-spacing, 1));
 }
 
 /* Each syllable stacks its chord above its lyric text in a column, and — since neither is
@@ -600,7 +648,7 @@ button.link-button {
   font-size: 0.75em;
   font-weight: 700;
   line-height: 1.4;
-  color: var(--accent);
+  color: #2563eb;
   white-space: nowrap;
 }
 
@@ -652,24 +700,8 @@ button.link-button {
   color: #1a1a1a;
 }
 
-.chart-page-content .chart-chord-label {
-  color: #2563eb;
-}
-
-.chart-page-content .section-heading.section-verse {
-  color: #2563eb;
-}
-
-.chart-page-content .section-heading.section-chorus {
-  color: #b45309;
-}
-
-.chart-page-content .section-heading.section-bridge {
-  color: #7e22ce;
-}
-
-.chart-page-content .section-heading.section-other {
-  color: #6b7280;
+.chart-page-content .chart-doc-title {
+  color: #1a1a1a;
 }
 
 .chart-page-footer {
