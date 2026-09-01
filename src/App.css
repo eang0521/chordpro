@@ -642,6 +642,12 @@ button.link-button {
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
+  /* An unchorded syllable's chord-label row is empty (zero height), so without this the whole
+     wrap is shorter than a chorded one and its default "baseline" (bottom margin edge, for a
+     column flex container) sits higher — pulling the syllable text up out of line with its
+     chorded neighbors. Bottom-aligning every wrap keeps the syllable text — always the last
+     child — on one consistent line regardless of whether a chord sits above it. */
+  vertical-align: bottom;
 }
 
 .chart-chord-label {
