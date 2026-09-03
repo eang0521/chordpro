@@ -72,3 +72,30 @@ export function resolveChordLabel(key: KeyName, degrees: ScaleDegree[]): string 
   }
   return null;
 }
+
+const ALL_DEGREES: ScaleDegree[] = [1, 2, 3, 4, 5, 6, 7];
+
+/**
+ * Inverse of `resolveChordLabel`: recovers the scale degree(s) a hand-typed chord symbol (e.g.
+ * from an edited ChordPro export) represents in the given key. Only recognizes the exact plain
+ * diatonic triads and slash-chord combos this app itself produces — any other chord spelling
+ * (extensions, borrowed chords, a typo) returns null, since it has no scale-degree representation
+ * in this app's model.
+ */
+export function parseChordLabel(key: KeyName, label: string): ScaleDegree[] | null {
+  const trimmed = label.trim();
+  if (!trimmed) return null;
+  const [primaryPart, bassPart] = trimmed.split('/');
+
+  const primaryDegree = ALL_DEGREES.find((d) => getChordLabel(key, d) === primaryPart);
+  if (primaryDegree === undefined) return null;
+  if (bassPart === undefined) return [primaryDegree];
+
+  const bassDegree = ALL_DEGREES.find((d) => getDegreeNote(key, d) === bassPart);
+  if (bassDegree === undefined) return null;
+
+  const degrees: ScaleDegree[] = [primaryDegree, bassDegree];
+  // Round-trip through resolveChordLabel to confirm this is one of the recognized combos —
+  // not every primary/bass pairing is a valid slash chord in this app's model.
+  return resolveChordLabel(key, degrees) === trimmed ? degrees : null;
+}

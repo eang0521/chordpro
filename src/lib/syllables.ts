@@ -57,12 +57,12 @@ function detectSectionHeader(line: string): { type: SectionType; label: string }
 // Lyrics pasted from lots of places (Genius, word processors with "smart quotes", hymnals)
 // use a curly apostrophe instead of a plain one — normalize to a plain ' so "Father's"-style
 // words match the word-boundary regex below instead of silently failing to split at all.
-function normalizeApostrophes(text: string): string {
+export function normalizeApostrophes(text: string): string {
   return text.replace(/[‘’ʼ`]/g, "'");
 }
 
 /** Splits one word into syllables, keeping any leading/trailing punctuation attached to its edge syllable. */
-function hyphenateWord(word: string): string[] {
+export function hyphenateWord(word: string): string[] {
   const match = word.match(/^([^A-Za-z0-9]*)([A-Za-z0-9'-]*)([^A-Za-z0-9]*)$/);
   if (!match) return [word];
   const [, lead, core, trail] = match;

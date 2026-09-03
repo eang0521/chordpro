@@ -13,6 +13,7 @@ import { Metronome } from './components/Metronome';
 import { ArrangementEditor } from './components/ArrangementEditor';
 import { ChordChartView } from './components/ChordChartView';
 import { DEFAULT_CHORD_FONT_ID } from './lib/chordFonts';
+import { parseChordProText } from './lib/chordproParser';
 import './App.css';
 
 const STORAGE_KEY = 'chordpro-draft-v2';
@@ -67,6 +68,17 @@ function App() {
 
   function updateToken(blockId: string, localIndex: number, updater: (tok: SyllableToken) => SyllableToken) {
     setBlocks((prev) => updateBlockToken(prev, blockId, localIndex, updater));
+  }
+
+  // Re-derives title/key/blocks/arrangement from hand-edited ChordPro text, so the visual chart
+  // and Word doc export (both driven by blocks/arrangement, not the raw text) stay in sync with
+  // manual edits instead of silently going stale.
+  function applyChordProEdits(text: string) {
+    const parsed = parseChordProText(text, title, key);
+    setTitle(parsed.title);
+    setKey(parsed.key);
+    setBlocks(Object.fromEntries(parsed.blocks.map((b) => [b.id, b])));
+    setArrangement(parsed.blocks.map((b) => b.id));
   }
 
   function startOver() {
@@ -187,6 +199,7 @@ function App() {
           onFontIdChange={setChartFontId}
           lineSpacing={chartLineSpacing}
           onLineSpacingChange={setChartLineSpacing}
+          onApplyChordPro={applyChordProEdits}
           onBack={() => setStep('playback')}
           onStartOver={startOver}
         />

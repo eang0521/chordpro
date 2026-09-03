@@ -14,6 +14,7 @@ interface Props {
   onFontIdChange: (id: string) => void;
   lineSpacing: number;
   onLineSpacingChange: (value: number) => void;
+  onApplyChordPro: (text: string) => void;
   onBack: () => void;
   onStartOver: () => void;
 }
@@ -26,15 +27,23 @@ export function ExportView({
   onFontIdChange,
   lineSpacing,
   onLineSpacingChange,
+  onApplyChordPro,
   onBack,
   onStartOver,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [generatingDocx, setGeneratingDocx] = useState(false);
+  const [applied, setApplied] = useState(false);
   const [text, setText] = useState(() => songToChordPro(song));
 
   function resetText() {
     setText(songToChordPro(song));
+  }
+
+  function applyEdits() {
+    onApplyChordPro(text);
+    setApplied(true);
+    setTimeout(() => setApplied(false), 1500);
   }
 
   async function copy() {
@@ -66,8 +75,9 @@ export function ExportView({
     <div className="panel">
       <h2>5. Export</h2>
       <p className="hint">
-        Your ChordPro file, ready to copy or download &mdash; edit it directly if you need to tweak anything. (The
-        Word doc export below uses the song's chords and lyrics, not your edits here.)
+        Your ChordPro file, ready to copy or download &mdash; edit it directly if you need to tweak anything. Click
+        "Apply to chart" to re-sync the visual chart and Word doc export with your edits (this re-splits lyrics into
+        syllables fresh, so any tapped timing is cleared).
       </p>
       <textarea
         className="chordpro-output"
@@ -85,6 +95,9 @@ export function ExportView({
         <button onClick={download}>Download .cho</button>
         <button className="secondary" onClick={resetText}>
           Reset edits
+        </button>
+        <button className="secondary" onClick={applyEdits}>
+          {applied ? 'Applied!' : 'Apply to chart'}
         </button>
         <select className="chart-font-select" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
           {CHORD_FONT_OPTIONS.map((opt) => (
