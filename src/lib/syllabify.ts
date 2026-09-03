@@ -85,6 +85,22 @@ export function syllabifyCore(core: string): string[] {
     }
   }
 
+  // "create"/"creation"/"creator"/"recreate"/"uncreated"/... have a genuine break between the
+  // root's "e" and "a" (cre-ate) that the vowel scan can't see, since "ea" usually IS one vowel
+  // sound (bread, eat, ahead). Two forms keep it merged instead: "creature(s)" — there "eat"+"ure"
+  // is the "-ture" suffix (nature, picture, future) — and "create's" own silent-e-plus-s plural
+  // ("creates" adds no syllable, same as "bikes"), where forcing the split would over-count.
+  const creatMatch = /creat/i.exec(core);
+  if (creatMatch) {
+    const suffix = core.slice(creatMatch.index + 5).toLowerCase();
+    const keepsMerged = suffix === 'ure' || suffix === 'ures' || suffix === 'es';
+    if (!keepsMerged) {
+      const eaStart = creatMatch.index + 2;
+      const eaGroupIndex = groups.findIndex(([start, end]) => start === eaStart && end === eaStart + 1);
+      if (eaGroupIndex !== -1) groups.splice(eaGroupIndex, 1, [eaStart, eaStart], [eaStart + 1, eaStart + 1]);
+    }
+  }
+
   // "-ing" almost always forms its own syllable, even when the stem ends in a vowel letter
   // that would otherwise merge with the suffix's "i" into one run (cry+ing, go+ing, be+ing).
   if (core.length > 3 && core.slice(-3).toLowerCase() === 'ing') {
