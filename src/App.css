@@ -652,6 +652,13 @@ button.link-button {
   vertical-align: bottom;
 }
 
+/* A wide chord on a mid-word syllable (e.g. "Bdim" on the "a" of "cre-a-tion") centers over
+   that syllable instead of starting flush with it, so the extra width splits evenly on both
+   sides of the letter instead of all drifting off to its right. */
+.chart-syl-wrap-mid {
+  align-items: center;
+}
+
 .chart-chord-label {
   font-size: 0.75em;
   font-weight: 700;

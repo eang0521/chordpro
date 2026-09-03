@@ -48,8 +48,15 @@ function renderLinePair(row: ChartLineRow): ReactNode {
       {row.tokens.flatMap((tok, ti): ReactNode[] => {
         const nodes: ReactNode[] = [];
         if (ti > 0 && tok.isWordStart) nodes.push(' ');
+        // A word-start syllable's wrap widening to fit a wide chord pushes the whole next WORD
+        // over, which reads fine (that's ordinary inter-word spacing). A mid-word syllable's
+        // wrap widening the same way only pushes the NEXT LETTER of the same word, which visibly
+        // splits the word apart and leaves a wide chord drifting off to the right of its own
+        // (often narrow) letter. Centering a mid-word chord over its syllable instead keeps it
+        // visually anchored to the letter it belongs to, however wide the chord label is.
+        const wrapClass = tok.isWordStart ? 'chart-syl-wrap' : 'chart-syl-wrap chart-syl-wrap-mid';
         nodes.push(
-          <span className="chart-syl-wrap" key={tok.key}>
+          <span className={wrapClass} key={tok.key}>
             <span className={`chart-chord-label ${tok.chordLabel ? '' : 'chart-chord-label-empty'}`}>
               {tok.chordLabel ?? ''}
             </span>
