@@ -724,13 +724,23 @@ button.link-button {
 
 /* Export */
 .chordpro-output {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   background: #12141a;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px;
-  white-space: pre-wrap;
+  color: var(--text);
   font-family: 'Cascadia Code', Consolas, monospace;
   font-size: 0.95rem;
-  max-height: 480px;
-  overflow: auto;
+  line-height: 1.5;
+  height: 320px;
+  max-height: 70vh;
+  resize: vertical;
+}
+
+.chordpro-output:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }

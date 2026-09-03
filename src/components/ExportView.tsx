@@ -31,7 +31,11 @@ export function ExportView({
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [generatingDocx, setGeneratingDocx] = useState(false);
-  const text = songToChordPro(song);
+  const [text, setText] = useState(() => songToChordPro(song));
+
+  function resetText() {
+    setText(songToChordPro(song));
+  }
 
   async function copy() {
     try {
@@ -61,8 +65,16 @@ export function ExportView({
   return (
     <div className="panel">
       <h2>5. Export</h2>
-      <p className="hint">Your ChordPro file, ready to copy or download &mdash; or grab a Word doc chord chart.</p>
-      <pre className="chordpro-output">{text}</pre>
+      <p className="hint">
+        Your ChordPro file, ready to copy or download &mdash; edit it directly if you need to tweak anything. (The
+        Word doc export below uses the song's chords and lyrics, not your edits here.)
+      </p>
+      <textarea
+        className="chordpro-output"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        spellCheck={false}
+      />
       <div className="actions">
         <button className="secondary" onClick={onBack}>
           &larr; Back
@@ -71,6 +83,9 @@ export function ExportView({
           {copied ? 'Copied!' : 'Copy to clipboard'}
         </button>
         <button onClick={download}>Download .cho</button>
+        <button className="secondary" onClick={resetText}>
+          Reset edits
+        </button>
         <select className="chart-font-select" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
           {CHORD_FONT_OPTIONS.map((opt) => (
             <option key={opt.id} value={opt.id}>
