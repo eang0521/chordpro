@@ -22,7 +22,7 @@ function findScrollParent(el: HTMLElement | null): HTMLElement | null {
   return null;
 }
 
-/** Shared flowing lyric renderer used by the recorder and the playback/chord editor. */
+/** Shared flowing lyric renderer used by the chord tapper. */
 export function LyricFlow({ syllables, currentIndex, songKey, showChords = false, onSyllableClick }: Props) {
   const currentLineRef = useRef<HTMLDivElement | null>(null);
 

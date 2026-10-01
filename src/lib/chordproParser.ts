@@ -78,9 +78,7 @@ const ANY_DIRECTIVE_RE = /^\{.*\}$/;
  * download. Falls back gracefully on anything it can't confidently parse (an unrecognized
  * {directive}, a chord that isn't one of the seven diatonic degrees in the current key, a
  * missing title/key) rather than failing outright — this is a best-effort re-derivation, not
- * strict validation. Section content is re-syllabified fresh from the edited text, so any tap
- * timing recorded earlier is not preserved — there's no reliable way to match edited lyrics
- * back to the old timing.
+ * strict validation. Section content is re-syllabified fresh from the edited text.
  */
 export function parseChordProText(text: string, fallbackTitle: string, fallbackKey: KeyName): ParsedChordProSong {
   let title = fallbackTitle;
@@ -147,7 +145,6 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
           text: span.text,
           isWordStart: span.isWordStart,
           isLineStart: i === 0,
-          offsetMs: null,
           chordDegrees,
           blockId: block.id,
           localIndex: block.syllables.length,

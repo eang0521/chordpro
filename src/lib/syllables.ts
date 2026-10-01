@@ -151,7 +151,6 @@ export function wordGroupsToBlocks(groups: WordGroup[], sections: Section[] = []
           text,
           isWordStart: isFirstOfWord,
           isLineStart: isFirstOfWord && isNewLine,
-          offsetMs: null,
           chordDegrees: [],
           blockId: block.id,
           localIndex: block.syllables.length,

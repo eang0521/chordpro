@@ -17,8 +17,6 @@ export interface SyllableToken {
   text: string;
   isWordStart: boolean;
   isLineStart: boolean;
-  /** Milliseconds from the start of the recording when this syllable was reached. Null until recorded. */
-  offsetMs: number | null;
   /** Scale degrees held to produce the current chord, e.g. [1] or [1, 3]. Empty = no chord placed. */
   chordDegrees: ScaleDegree[];
   /** Set on the first syllable of a section occurrence to mark where a heading goes when rendered. */
@@ -29,8 +27,8 @@ export interface SyllableToken {
 }
 
 /**
- * A named piece of song content (a verse, the chorus, a bridge, ...) with its own lyrics,
- * timing, and chords. A block is the single source of truth for its content — it can appear
+ * A named piece of song content (a verse, the chorus, a bridge, ...) with its own lyrics
+ * and chords. A block is the single source of truth for its content — it can appear
  * more than once in the song's arrangement, and every occurrence stays in sync since they all
  * read from (and write back to) the same block.
  */
@@ -48,4 +46,4 @@ export interface Song {
   syllables: SyllableToken[];
 }
 
-export type Step = 'input' | 'edit-syllables' | 'record' | 'playback' | 'export';
+export type Step = 'input' | 'edit-syllables' | 'chords' | 'export';

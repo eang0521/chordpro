@@ -73,11 +73,10 @@ export function ExportView({
 
   return (
     <div className="panel">
-      <h2>5. Export</h2>
+      <h2>4. Export</h2>
       <p className="hint">
         Your ChordPro file, ready to copy or download &mdash; edit it directly if you need to tweak anything. Click
-        "Apply to chart" to re-sync the visual chart and Word doc export with your edits (this re-splits lyrics into
-        syllables fresh, so any tapped timing is cleared).
+        "Apply to chart" to re-sync the visual chart and Word doc export with your edits.
       </p>
       <textarea
         className="chordpro-output"

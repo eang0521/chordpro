@@ -72,7 +72,7 @@ export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Pr
           &larr; Back
         </button>
         <button disabled={!canContinue} onClick={() => onSubmit(groups)}>
-          Continue to recording &rarr;
+          Continue to chords &rarr;
         </button>
       </div>
     </div>

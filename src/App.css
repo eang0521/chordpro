@@ -42,80 +42,6 @@
   background: var(--accent-dim);
 }
 
-/* Metronome toolbar */
-.toolbar {
-  margin-bottom: 20px;
-}
-
-.metronome {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 16px;
-}
-
-.metronome-toggle {
-  white-space: nowrap;
-}
-
-.metronome-bpm {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.metronome-step {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-}
-
-.metronome-bpm input {
-  width: 4.5ch;
-  background: #12141a;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  padding: 4px 6px;
-  font-size: 0.95rem;
-  text-align: center;
-}
-
-.metronome-bpm-label {
-  color: var(--text-dim);
-  font-size: 0.85rem;
-}
-
-.metronome-beats {
-  display: flex;
-  gap: 6px;
-}
-
-.metronome-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--border);
-  transition: background 0.05s, transform 0.05s;
-}
-
-.metronome-dot.accent {
-  box-shadow: inset 0 0 0 1.5px var(--text-dim);
-}
-
-.metronome-dot.active {
-  background: var(--accent);
-  transform: scale(1.25);
-}
-
 .panel {
   background: var(--panel-bg);
   border: 1px solid var(--border);
@@ -198,18 +124,6 @@ button.secondary {
   border: 1px solid var(--border);
 }
 
-button.link-button {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  color: var(--accent);
-  font-weight: inherit;
-  font-size: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
 /* Syllable editor */
 .syllable-editor {
   background: #12141a;
@@ -239,7 +153,7 @@ button.link-button {
   outline: 2px solid var(--accent);
 }
 
-/* Lyric flow (recorder + playback) */
+/* Lyric flow */
 .recorder-status {
   margin-bottom: 12px;
   color: var(--text-dim);
@@ -251,20 +165,14 @@ button.link-button {
   color: var(--danger);
 }
 
-.tap-zone,
 .lyric-display {
   background: #12141a;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 24px;
-  cursor: pointer;
   user-select: none;
   max-height: 50vh;
   overflow-y: auto;
-}
-
-.lyric-display {
-  cursor: default;
 }
 
 .lyric-flow {
@@ -344,18 +252,16 @@ button.link-button {
   color: var(--text-dim);
 }
 
-/* Arrangement editor */
+/* Toolbar */
 .toolbar {
+  margin-bottom: 20px;
   display: flex;
   align-items: flex-start;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.toolbar .metronome {
-  flex: 1 1 auto;
-}
-
+/* Arrangement editor */
 .arrangement-overlay {
   position: fixed;
   inset: 0;

@@ -76,7 +76,7 @@ export function ArrangementEditor({ blocks, arrangement, onChange, onClose }: Pr
         </div>
         <p className="hint">
           Drag a card (or use the arrows) to reorder the song. Duplicate a section to reuse it elsewhere
-          &mdash; every copy stays linked, so editing its lyrics, timing, or chords anywhere updates all
+          &mdash; every copy stays linked, so editing its lyrics or chords anywhere updates all
           of its occurrences. Need one copy to differ (e.g. a final chorus with a small change)? Click{' '}
           <strong>Unlink</strong> on it to give it its own independent content first.
         </p>

@@ -5,7 +5,7 @@ export type BlockMap = Record<string, Block>;
 
 /**
  * Expands the arrangement (an ordered list of block ids, which may repeat) into the flat
- * syllable sequence used for tapping pace, placing chords, and exporting. Repeated blocks
+ * syllable sequence used for placing chords and exporting. Repeated blocks
  * are "linked": each occurrence renders the SAME underlying tokens (so edits made through
  * `updateBlockToken` show up at every occurrence), only the React key is made unique per
  * occurrence. A section heading is attached to the first token of every occurrence, not just
@@ -61,7 +61,7 @@ export function duplicateArrangementItem(arrangement: string[], at: number): str
 
 /**
  * Splits one occurrence off into its own independent block (a full copy of the current
- * lyrics/timing/chords), so it can be edited without affecting the other linked occurrences —
+ * lyrics/chords), so it can be edited without affecting the other linked occurrences —
  * e.g. a final chorus that needs a small lyric change. No-op if this occurrence is already
  * the only one referencing its block.
  */

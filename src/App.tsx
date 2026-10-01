@@ -6,17 +6,15 @@ import type { BlockMap } from './lib/arrangement';
 import { deriveFlatSyllables, updateBlockToken } from './lib/arrangement';
 import { LyricsInput } from './components/LyricsInput';
 import { SyllableEditor } from './components/SyllableEditor';
-import { PaceRecorder } from './components/PaceRecorder';
-import { PlaybackChordEditor } from './components/PlaybackChordEditor';
+import { ChordTapper } from './components/ChordTapper';
 import { ExportView } from './components/ExportView';
-import { Metronome } from './components/Metronome';
 import { ArrangementEditor } from './components/ArrangementEditor';
 import { ChordChartView } from './components/ChordChartView';
 import { DEFAULT_CHORD_FONT_ID } from './lib/chordFonts';
 import { parseChordProText } from './lib/chordproParser';
 import './App.css';
 
-const STORAGE_KEY = 'chordpro-draft-v2';
+const STORAGE_KEY = 'chordpro-draft-v3';
 
 interface StoredDraft {
   step: Step;
@@ -98,7 +96,7 @@ function App() {
       <header className="app-header">
         <h1>ChordPro Tapper</h1>
         <ol className="steps">
-          {(['input', 'edit-syllables', 'record', 'playback', 'export'] as Step[]).map((s, i) => (
+          {(['input', 'edit-syllables', 'chords', 'export'] as Step[]).map((s, i) => (
             <li key={s} className={s === step ? 'active' : undefined}>
               {i + 1}
             </li>
@@ -107,7 +105,6 @@ function App() {
       </header>
 
       <div className="toolbar">
-        <Metronome />
         <button
           className="secondary"
           disabled={arrangement.length === 0}
@@ -165,27 +162,17 @@ function App() {
             const newBlocks = wordGroupsToBlocks(groups, sections);
             setBlocks(Object.fromEntries(newBlocks.map((b) => [b.id, b])));
             setArrangement(newBlocks.map((b) => b.id));
-            setStep('record');
+            setStep('chords');
           }}
         />
       )}
 
-      {step === 'record' && (
-        <PaceRecorder
-          syllables={flatSyllables}
-          onUpdateToken={updateToken}
-          onBack={() => setStep('edit-syllables')}
-          onSubmit={() => setStep('playback')}
-          onSkip={() => setStep('playback')}
-        />
-      )}
-
-      {step === 'playback' && (
-        <PlaybackChordEditor
+      {step === 'chords' && (
+        <ChordTapper
           syllables={flatSyllables}
           songKey={key}
           onUpdateToken={updateToken}
-          onBack={() => setStep('record')}
+          onBack={() => setStep('edit-syllables')}
           onSubmit={() => setStep('export')}
         />
       )}
@@ -200,7 +187,7 @@ function App() {
           lineSpacing={chartLineSpacing}
           onLineSpacingChange={setChartLineSpacing}
           onApplyChordPro={applyChordProEdits}
-          onBack={() => setStep('playback')}
+          onBack={() => setStep('chords')}
           onStartOver={startOver}
         />
       )}
