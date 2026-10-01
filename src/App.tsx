@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { KeyName, Step, SyllableToken } from './types';
+import type { Chord, KeyName, Step, SyllableToken } from './types';
 import type { Section, WordGroup } from './lib/syllables';
 import { parseLyricsToWordGroups, wordGroupsToBlocks } from './lib/syllables';
 import type { BlockMap } from './lib/arrangement';
@@ -14,7 +14,7 @@ import { DEFAULT_CHORD_FONT_ID } from './lib/chordFonts';
 import { parseChordProText } from './lib/chordproParser';
 import './App.css';
 
-const STORAGE_KEY = 'chordpro-draft-v3';
+const STORAGE_KEY = 'chordpro-draft-v4';
 
 interface StoredDraft {
   step: Step;
@@ -25,6 +25,7 @@ interface StoredDraft {
   sections: Section[];
   blocks: BlockMap;
   arrangement: string[];
+  palette: Chord[];
 }
 
 function loadDraft(): StoredDraft | null {
@@ -50,6 +51,7 @@ function App() {
   const [sections, setSections] = useState<Section[]>(initialDraft?.sections ?? []);
   const [blocks, setBlocks] = useState<BlockMap>(initialDraft?.blocks ?? {});
   const [arrangement, setArrangement] = useState<string[]>(initialDraft?.arrangement ?? []);
+  const [palette, setPalette] = useState<Chord[]>(initialDraft?.palette ?? []);
   const [showArrangement, setShowArrangement] = useState(false);
   const [showChart, setShowChart] = useState(false);
   // Shared with ExportView so the chord chart's font/spacing choice stays the same regardless of
@@ -58,9 +60,9 @@ function App() {
   const [chartLineSpacing, setChartLineSpacing] = useState(1);
 
   useEffect(() => {
-    const draft: StoredDraft = { step, title, key, lyrics, wordGroups, sections, blocks, arrangement };
+    const draft: StoredDraft = { step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-  }, [step, title, key, lyrics, wordGroups, sections, blocks, arrangement]);
+  }, [step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette]);
 
   const flatSyllables = useMemo(() => deriveFlatSyllables(blocks, arrangement), [blocks, arrangement]);
 
@@ -88,6 +90,7 @@ function App() {
     setSections([]);
     setBlocks({});
     setArrangement([]);
+    setPalette([]);
     localStorage.removeItem(STORAGE_KEY);
   }
 
@@ -171,6 +174,8 @@ function App() {
         <ChordTapper
           syllables={flatSyllables}
           songKey={key}
+          palette={palette}
+          onPaletteChange={setPalette}
           onUpdateToken={updateToken}
           onBack={() => setStep('edit-syllables')}
           onSubmit={() => setStep('export')}

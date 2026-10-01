@@ -1,5 +1,5 @@
 import type { KeyName, SectionType } from '../types';
-import { resolveChordLabel } from './musicTheory';
+import { formatChord } from './musicTheory';
 import { buildRows } from './lyricRows';
 import type { BlockMap } from './arrangement';
 import { deriveFlatSyllables } from './arrangement';
@@ -44,7 +44,7 @@ export function buildChartRows(blocks: BlockMap, arrangement: string[], key: Key
         key: syl.id,
         text: syl.text,
         isWordStart: syl.isWordStart,
-        chordLabel: syl.chordDegrees.length > 0 ? resolveChordLabel(key, syl.chordDegrees) : null,
+        chordLabel: syl.chord ? formatChord(key, syl.chord) : null,
       };
     });
     return { kind: 'line', key: row.key, tokens };

@@ -165,6 +165,55 @@ button.secondary {
   color: var(--danger);
 }
 
+.chord-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.chord-key {
+  display: inline-flex;
+  align-items: center;
+}
+
+.chord-key button.secondary {
+  padding: 4px 10px;
+  font-size: 0.9rem;
+}
+
+.chord-key kbd {
+  margin-right: 2px;
+}
+
+.chord-key-remove {
+  background: none;
+  color: var(--text-dim);
+  padding: 2px 6px;
+  font-size: 1rem;
+}
+
+.chord-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.chord-entry input {
+  background: #12141a;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 4px 8px;
+  font-size: 0.95rem;
+  width: 16ch;
+}
+
+.chord-entry-help {
+  font-size: 0.8rem;
+}
+
 .lyric-display {
   background: #12141a;
   border: 1px solid var(--border);

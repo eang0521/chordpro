@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { KeyName, SyllableToken } from '../types';
-import { resolveChordLabel } from '../lib/musicTheory';
+import { formatChord } from '../lib/musicTheory';
 import { buildRows } from '../lib/lyricRows';
 
 interface Props {
@@ -55,8 +55,7 @@ export function LyricFlow({ syllables, currentIndex, songKey, showChords = false
     const nodes: ReactNode[] = [];
     if (!isLineFirst && syl.isWordStart) nodes.push(' ');
 
-    const chordLabel =
-      showChords && songKey && syl.chordDegrees.length > 0 ? resolveChordLabel(songKey, syl.chordDegrees) : null;
+    const chordLabel = showChords && songKey && syl.chord ? formatChord(songKey, syl.chord) : null;
 
     const classes = ['syllable'];
     if (i === currentIndex) classes.push('current');

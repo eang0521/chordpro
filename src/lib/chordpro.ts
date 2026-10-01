@@ -1,5 +1,5 @@
 import type { Song } from '../types';
-import { resolveChordLabel } from './musicTheory';
+import { formatChord } from './musicTheory';
 
 type WrappedSectionType = 'verse' | 'chorus' | 'bridge';
 
@@ -38,7 +38,7 @@ export function songToChordPro(song: Song): string {
       currentLine += ' ';
     }
 
-    const chordLabel = syl.chordDegrees.length > 0 ? resolveChordLabel(song.key, syl.chordDegrees) : null;
+    const chordLabel = syl.chord ? formatChord(song.key, syl.chord) : null;
     if (chordLabel) currentLine += `[${chordLabel}]`;
     currentLine += syl.text;
   });

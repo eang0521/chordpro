@@ -1,5 +1,24 @@
 export type ScaleDegree = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
+/** A note relative to the song's key, e.g. { degree: 7, accidental: -1 } is the flat seven. */
+export interface ScaleNote {
+  degree: ScaleDegree;
+  /** Sharps (positive) or flats (negative) applied to the degree. */
+  accidental: number;
+}
+
+/**
+ * A chord stored relative to the song's key (Nashville-number style), so changing the key
+ * transposes it while keeping the spelling the user chose (E/G# stays E/G#, not E/Ab).
+ */
+export interface Chord {
+  root: ScaleNote;
+  /** Everything after the root, kept as typed: "", "m", "sus", "2", "m7", "maj7", "dim"... */
+  suffix: string;
+  /** Bass note for a slash chord. */
+  bass?: ScaleNote;
+}
+
 export type KeyName =
   | 'C' | 'G' | 'D' | 'A' | 'E' | 'B' | 'F#'
   | 'Db' | 'Ab' | 'Eb' | 'Bb' | 'F';
@@ -17,8 +36,8 @@ export interface SyllableToken {
   text: string;
   isWordStart: boolean;
   isLineStart: boolean;
-  /** Scale degrees held to produce the current chord, e.g. [1] or [1, 3]. Empty = no chord placed. */
-  chordDegrees: ScaleDegree[];
+  /** The chord placed on this syllable, or null for none. */
+  chord: Chord | null;
   /** Set on the first syllable of a section occurrence to mark where a heading goes when rendered. */
   section?: SectionLabel;
   /** Which block this token canonically belongs to, and its index within that block's syllable list. */

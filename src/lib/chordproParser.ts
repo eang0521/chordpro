@@ -1,6 +1,6 @@
-import type { Block, KeyName, ScaleDegree, SectionType } from '../types';
+import type { Block, KeyName, SectionType } from '../types';
 import { hyphenateWord, normalizeApostrophes } from './syllables';
-import { KEY_NAMES, parseChordLabel } from './musicTheory';
+import { KEY_NAMES, parseChord } from './musicTheory';
 import { makeId } from './id';
 
 export interface ParsedChordProSong {
@@ -76,7 +76,7 @@ const ANY_DIRECTIVE_RE = /^\{.*\}$/;
  * Parses hand-edited ChordPro text back into the app's structured song model, so the visual
  * chart and Word doc export stay in sync with manual text edits instead of only the raw .cho
  * download. Falls back gracefully on anything it can't confidently parse (an unrecognized
- * {directive}, a chord that isn't one of the seven diatonic degrees in the current key, a
+ * {directive}, a bracketed label that isn't a chord symbol, a
  * missing title/key) rather than failing outright — this is a best-effort re-derivation, not
  * strict validation. Section content is re-syllabified fresh from the edited text.
  */
@@ -139,13 +139,13 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
 
       spans.forEach((span, i) => {
         const label = labelBySpan.get(span);
-        const chordDegrees: ScaleDegree[] = (label && parseChordLabel(key, label)) || [];
+        const chord = label ? parseChord(key, label) : null;
         block.syllables.push({
           id: makeId(),
           text: span.text,
           isWordStart: span.isWordStart,
           isLineStart: i === 0,
-          chordDegrees,
+          chord,
           blockId: block.id,
           localIndex: block.syllables.length,
         });

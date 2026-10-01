@@ -1,101 +1,107 @@
-import type { KeyName, ScaleDegree } from '../types';
-
-const SHARP_CHROMATIC = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const FLAT_CHROMATIC = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-
-const KEY_INFO: Record<KeyName, { tonicIndex: number; useFlats: boolean }> = {
-  C: { tonicIndex: 0, useFlats: false },
-  G: { tonicIndex: 7, useFlats: false },
-  D: { tonicIndex: 2, useFlats: false },
-  A: { tonicIndex: 9, useFlats: false },
-  E: { tonicIndex: 4, useFlats: false },
-  B: { tonicIndex: 11, useFlats: false },
-  'F#': { tonicIndex: 6, useFlats: false },
-  Db: { tonicIndex: 1, useFlats: true },
-  Ab: { tonicIndex: 8, useFlats: true },
-  Eb: { tonicIndex: 3, useFlats: true },
-  Bb: { tonicIndex: 10, useFlats: true },
-  F: { tonicIndex: 5, useFlats: true },
-};
+import type { Chord, KeyName, ScaleDegree, ScaleNote } from '../types';
 
 export const KEY_NAMES: KeyName[] = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'Db', 'Ab', 'Eb', 'Bb', 'F'];
 
-// Semitone steps of the major scale from the tonic.
+const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+// Semitone steps of the major scale from the tonic — which is also the pitch of each natural
+// letter above C, so this one table serves both purposes.
 const MAJOR_SCALE_STEPS = [0, 2, 4, 5, 7, 9, 11];
 
-// Diatonic triad quality per scale degree (1-indexed via degree - 1).
-const DEGREE_QUALITY: Array<'maj' | 'min' | 'dim'> = ['maj', 'min', 'min', 'maj', 'maj', 'min', 'dim'];
-
-/** The recognized simultaneous-keypress combos and how they map to a slash chord. */
-const COMBO_MAP: Record<string, { primary: ScaleDegree; bass: ScaleDegree }> = {
-  '1,3': { primary: 1, bass: 3 },
-  '1,5': { primary: 1, bass: 5 },
-  '4,6': { primary: 4, bass: 6 },
-  '5,7': { primary: 5, bass: 7 },
-  '2,5': { primary: 5, bass: 2 },
-};
-
-export function getDegreeNote(key: KeyName, degree: ScaleDegree): string {
-  const info = KEY_INFO[key];
-  const semitone = (info.tonicIndex + MAJOR_SCALE_STEPS[degree - 1]) % 12;
-  const chromatic = info.useFlats ? FLAT_CHROMATIC : SHARP_CHROMATIC;
-  return chromatic[semitone];
-}
-
-export function getDegreeQuality(degree: ScaleDegree): 'maj' | 'min' | 'dim' {
-  return DEGREE_QUALITY[degree - 1];
-}
-
-export function getChordLabel(key: KeyName, degree: ScaleDegree): string {
-  const note = getDegreeNote(key, degree);
-  const quality = getDegreeQuality(degree);
-  const suffix = quality === 'min' ? 'm' : quality === 'dim' ? 'dim' : '';
-  return note + suffix;
-}
-
-/**
- * Resolves a set of simultaneously-held scale degrees to a chord label.
- * Single degree -> plain diatonic triad. Recognized pairs -> slash chord
- * (primary triad over the plain bass note of the second degree).
- * Returns null for unrecognized combinations.
- */
-export function resolveChordLabel(key: KeyName, degrees: ScaleDegree[]): string | null {
-  if (degrees.length === 0) return null;
-  if (degrees.length === 1) return getChordLabel(key, degrees[0]);
-  if (degrees.length === 2) {
-    const sorted = [...degrees].sort((a, b) => a - b);
-    const combo = COMBO_MAP[sorted.join(',')];
-    if (!combo) return null;
-    const primary = getChordLabel(key, combo.primary);
-    const bass = getDegreeNote(key, combo.bass);
-    return `${primary}/${bass}`;
-  }
-  return null;
-}
+// Diatonic triad suffix per scale degree (1-indexed via degree - 1).
+const DIATONIC_SUFFIX = ['', 'm', 'm', '', '', 'm', 'dim'];
 
 const ALL_DEGREES: ScaleDegree[] = [1, 2, 3, 4, 5, 6, 7];
 
+/** Maps any integer to -6..5, so a pitch difference reads as the smallest number of sharps/flats. */
+function wrapSemitones(n: number): number {
+  return ((((n + 6) % 12) + 12) % 12) - 6;
+}
+
+function parseNoteName(name: string): { letter: number; pitch: number } | null {
+  const match = /^([A-Ga-g])([#b]*)$/.exec(name);
+  if (!match) return null;
+  const letter = LETTERS.indexOf(match[1].toUpperCase());
+  const accidental = [...match[2]].reduce((sum, c) => sum + (c === '#' ? 1 : -1), 0);
+  return { letter, pitch: MAJOR_SCALE_STEPS[letter] + accidental };
+}
+
+function tonicOf(key: KeyName) {
+  return parseNoteName(key)!;
+}
+
+/** Spells a key-relative note as a letter name, e.g. degree 3 in D -> "F#", flat 7 in C -> "Bb". */
+export function spellNote(key: KeyName, note: ScaleNote): string {
+  const tonic = tonicOf(key);
+  const letter = (tonic.letter + note.degree - 1) % 7;
+  const pitch = tonic.pitch + MAJOR_SCALE_STEPS[note.degree - 1] + note.accidental;
+  const offset = wrapSemitones(pitch - MAJOR_SCALE_STEPS[letter]);
+  return LETTERS[letter] + (offset > 0 ? '#'.repeat(offset) : 'b'.repeat(-offset));
+}
+
+/** Inverse of `spellNote`: which scale degree (plus sharp/flat) a letter name is in the given key. */
+function noteFromName(key: KeyName, name: string): ScaleNote | null {
+  const parsed = parseNoteName(name);
+  if (!parsed) return null;
+  const tonic = tonicOf(key);
+  const degree = (((parsed.letter - tonic.letter) % 7) + 7) % 7 + 1;
+  const diatonicPitch = tonic.pitch + MAJOR_SCALE_STEPS[degree - 1];
+  return { degree: degree as ScaleDegree, accidental: wrapSemitones(parsed.pitch - diatonicPitch) };
+}
+
+function noteFromNumber(accidental: string, degree: string): ScaleNote {
+  return { degree: Number(degree) as ScaleDegree, accidental: accidental === '#' ? 1 : accidental === 'b' ? -1 : 0 };
+}
+
+/** The plain triad on a scale degree — what pressing 1-7 places (2, 3, 6 minor; 7 diminished). */
+export function diatonicChord(degree: ScaleDegree): Chord {
+  return { root: { degree, accidental: 0 }, suffix: DIATONIC_SUFFIX[degree - 1] };
+}
+
+export function formatChord(key: KeyName, chord: Chord): string {
+  const bass = chord.bass ? `/${spellNote(key, chord.bass)}` : '';
+  return spellNote(key, chord.root) + chord.suffix + bass;
+}
+
 /**
- * Inverse of `resolveChordLabel`: recovers the scale degree(s) a hand-typed chord symbol (e.g.
- * from an edited ChordPro export) represents in the given key. Only recognizes the exact plain
- * diatonic triads and slash-chord combos this app itself produces — any other chord spelling
- * (extensions, borrowed chords, a typo) returns null, since it has no scale-degree representation
- * in this app's model.
+ * Reads a typed chord symbol, either as letters ("Asus", "D2", "F#m/C#") or as Nashville-style
+ * numbers ("5sus", "1/3", "b7", "6m7"). A bare number with no suffix follows the 1-7 keys (so "6"
+ * is the minor six); anything else is taken literally. Numbers are checked first, so "b7" means
+ * the flat-seven chord rather than B7. Returns null if the text isn't a chord.
  */
-export function parseChordLabel(key: KeyName, label: string): ScaleDegree[] | null {
-  const trimmed = label.trim();
-  if (!trimmed) return null;
-  const [primaryPart, bassPart] = trimmed.split('/');
+export function parseChord(key: KeyName, text: string): Chord | null {
+  const trimmed = text.trim().replace(/♯/g, '#').replace(/♭/g, 'b');
 
-  const primaryDegree = ALL_DEGREES.find((d) => getChordLabel(key, d) === primaryPart);
-  if (primaryDegree === undefined) return null;
-  if (bassPart === undefined) return [primaryDegree];
+  const numeric = /^([#b]?)([1-7])([^/]*)(?:\/([#b]?)([1-7]))?$/.exec(trimmed);
+  if (numeric) {
+    const [, acc, degree, suffix, bassAcc, bassDegree] = numeric;
+    const root = noteFromNumber(acc, degree);
+    const chord: Chord =
+      suffix === '' && root.accidental === 0 ? diatonicChord(root.degree) : { root, suffix };
+    if (bassDegree) chord.bass = noteFromNumber(bassAcc, bassDegree);
+    return chord;
+  }
 
-  const bassDegree = ALL_DEGREES.find((d) => getDegreeNote(key, d) === bassPart);
-  if (bassDegree === undefined) return null;
+  const lettered = /^([A-Ga-g][#b]*)([^/]*)(?:\/([A-Ga-g][#b]*))?$/.exec(trimmed);
+  if (!lettered) return null;
+  const [, rootName, suffix, bassName] = lettered;
+  const root = noteFromName(key, rootName);
+  if (!root) return null;
+  const chord: Chord = { root, suffix };
+  if (bassName) {
+    const bass = noteFromName(key, bassName);
+    if (!bass) return null;
+    chord.bass = bass;
+  }
+  return chord;
+}
 
-  const degrees: ScaleDegree[] = [primaryDegree, bassDegree];
-  // Round-trip through resolveChordLabel to confirm this is one of the recognized combos —
-  // not every primary/bass pairing is a valid slash chord in this app's model.
-  return resolveChordLabel(key, degrees) === trimmed ? degrees : null;
+export function chordsEqual(a: Chord, b: Chord): boolean {
+  const sameNote = (x?: ScaleNote, y?: ScaleNote) =>
+    x === y || (!!x && !!y && x.degree === y.degree && x.accidental === y.accidental);
+  return sameNote(a.root, b.root) && a.suffix === b.suffix && sameNote(a.bass, b.bass);
+}
+
+/** True if one of the 1-7 keys already produces this chord, so it doesn't need a palette slot. */
+export function isDiatonicChord(chord: Chord): boolean {
+  return ALL_DEGREES.some((d) => chordsEqual(chord, diatonicChord(d)));
 }

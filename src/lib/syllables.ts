@@ -151,7 +151,7 @@ export function wordGroupsToBlocks(groups: WordGroup[], sections: Section[] = []
           text,
           isWordStart: isFirstOfWord,
           isLineStart: isFirstOfWord && isNewLine,
-          chordDegrees: [],
+          chord: null,
           blockId: block.id,
           localIndex: block.syllables.length,
         });
