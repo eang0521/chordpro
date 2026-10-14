@@ -1,20 +1,24 @@
 import { useState } from 'react';
 import type { KeyName } from '../types';
 import { KEY_NAMES } from '../lib/musicTheory';
+import { looksLikeChordPro } from '../lib/chordproParser';
 
 interface Props {
   initialTitle: string;
   initialKey: KeyName;
   initialLyrics: string;
   onSubmit: (title: string, key: KeyName, lyrics: string) => void;
+  /** Pasted text that's already ChordPro skips the syllable and chord steps. */
+  onImportChordPro: (title: string, key: KeyName, text: string) => void;
 }
 
-export function LyricsInput({ initialTitle, initialKey, initialLyrics, onSubmit }: Props) {
+export function LyricsInput({ initialTitle, initialKey, initialLyrics, onSubmit, onImportChordPro }: Props) {
   const [title, setTitle] = useState(initialTitle);
   const [key, setKey] = useState<KeyName>(initialKey);
   const [lyrics, setLyrics] = useState(initialLyrics);
 
   const canContinue = lyrics.trim().length > 0;
+  const isChordPro = looksLikeChordPro(lyrics);
 
   return (
     <div className="panel">
@@ -39,13 +43,25 @@ export function LyricsInput({ initialTitle, initialKey, initialLyrics, onSubmit 
           value={lyrics}
           onChange={(e) => setLyrics(e.target.value)}
           rows={14}
-          placeholder={'Paste lyrics here, one line per line of the song...'}
+          placeholder={'Paste lyrics here, one line per line of the song... or a ChordPro chart you already have'}
         />
       </label>
+      {isChordPro && (
+        <p className="hint">
+          This looks like ChordPro &mdash; it&rsquo;ll be imported as a finished chart, with its chords, and go
+          straight to export. Its own <code>{'{title}'}</code> and <code>{'{key}'}</code> win over the fields above.
+        </p>
+      )}
       <div className="actions">
-        <button disabled={!canContinue} onClick={() => onSubmit(title, key, lyrics)}>
-          Split into syllables &rarr;
-        </button>
+        {isChordPro ? (
+          <button disabled={!canContinue} onClick={() => onImportChordPro(title, key, lyrics)}>
+            Import ChordPro &rarr;
+          </button>
+        ) : (
+          <button disabled={!canContinue} onClick={() => onSubmit(title, key, lyrics)}>
+            Split into syllables &rarr;
+          </button>
+        )}
       </div>
     </div>
   );

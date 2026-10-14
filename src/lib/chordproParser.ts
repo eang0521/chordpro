@@ -77,6 +77,19 @@ const END_SECTION_RE = /^\{end_of_(?:verse|chorus|bridge|instrumental)\}$/i;
 const COMMENT_RE = /^\{comment:\s*(.*)\}$/i;
 const ANY_DIRECTIVE_RE = /^\{.*\}$/;
 
+// Signs that pasted text is ChordPro rather than plain lyrics: a {directive} on its own line, or
+// a [chord] in brackets (a letter chord like [G] or [F#m7/C#], or a number chord like [5sus]).
+// Only chord-like text may follow the root, so bracketed headings like [Chorus] or [Bridge] in
+// plain lyrics don't count.
+const DIRECTIVE_LINE_RE = /^\s*\{\s*(?:title|t|subtitle|st|key|start_of_\w+|end_of_\w+|so[cvb]|eo[cvb]|comment|c|ci)\s*[:}]/im;
+const INLINE_CHORD_RE =
+  /\[\s*\|?\s*(?:[A-G][#b]?|[#b]?[1-7])(?:maj|min|m|dim|aug|sus|add|M|\d|[#b+\-°ø()])*(?:\/(?:[A-G][#b]?|[#b]?[1-7]))?\s*\]/;
+
+/** True if pasted text looks like ChordPro, so it can be imported as a finished chart. */
+export function looksLikeChordPro(text: string): boolean {
+  return DIRECTIVE_LINE_RE.test(text) || INLINE_CHORD_RE.test(text);
+}
+
 /**
  * Parses hand-edited ChordPro text back into the app's structured song model, so the visual
  * chart and Word doc export stay in sync with manual text edits instead of only the raw .cho

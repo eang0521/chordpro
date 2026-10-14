@@ -608,7 +608,8 @@ button.secondary {
   color: var(--text);
   font-weight: 700;
   line-height: calc(1.2143 * var(--line-spacing, 1));
-  white-space: nowrap;
+  /* pre, not nowrap: lyrics spread apart to fit chords use runs of spaces ("e   -   ter"). */
+  white-space: pre;
 }
 
 /* Hidden measurement pass — same content width as a page, used only to measure row heights. */

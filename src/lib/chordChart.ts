@@ -170,10 +170,28 @@ const CHORD_MIN_GAP_PT = 4; // keeps a wide chord from running into the next one
 // Chords with no lyric under them are spaced out like counted beats ("G   C   | Csus   | C").
 const SLOT_GAP_PT = 14;
 
+// Most spaces to add on each side of a gap when spreading lyrics apart for a chord.
+const MAX_SPREAD_SPACES = 40;
+
+/**
+ * Widens the lyrics before a syllable until it starts at least at `minPt`, so its chord can sit
+ * over it without running into the chord before. Inside a word the syllables are split with a
+ * hyphen padded by the same number of spaces on each side, at least one ("e   -   ter - nal");
+ * between words the gap just gets more spaces.
+ */
+function spreadTo(lyricLine: string, minPt: number, withinWord: boolean, measure: TextMeasure): string {
+  for (let k = 1; k <= MAX_SPREAD_SPACES; k++) {
+    const gap = ' '.repeat(k);
+    const candidate = withinWord ? `${lyricLine}${gap}-${gap}` : lyricLine + gap;
+    if (measure(candidate, LYRIC_SIZE_PT, 'bold') >= minPt) return candidate;
+  }
+  return withinWord ? `${lyricLine} - ` : lyricLine;
+}
+
 /** Positions each chord at the true rendered width of the bold lyric text before its syllable,
- * so it lands above the right letter in any (proportional) font. The lyrics are never spread
- * apart to make room — a chord that would collide with the previous one is nudged right instead,
- * like a printed chart. Shared by the Word export (as tab stops) and the on-screen preview. */
+ * so it lands above the right letter in any (proportional) font. When a chord would run into the
+ * one before it, the lyrics are spread apart (see `spreadTo`) so every chord stays over its own
+ * syllable. Shared by the preview, the Word export (as tab stops) and the PDF. */
 export function placeChords(tokens: ChartToken[], measure: TextMeasure): PlacedLine {
   let lyricLine = '';
   const chords: PlacedLine['chords'] = [];
@@ -193,9 +211,18 @@ export function placeChords(tokens: ChartToken[], measure: TextMeasure): PlacedL
       nextFreePt = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic') + (trailing ? SLOT_GAP_PT : CHORD_MIN_GAP_PT);
       return;
     }
+    const withinWord = !tok.isWordStart && lyricLine !== '';
     if (tok.isWordStart && i !== 0 && lyricLine) lyricLine += ' ';
     if (tok.chordLabel) {
-      const at = Math.max(measure(lyricLine, LYRIC_SIZE_PT, 'bold'), nextFreePt);
+      let at = measure(lyricLine, LYRIC_SIZE_PT, 'bold');
+      if (at < nextFreePt && lyricLine) {
+        // Not enough room after the previous chord: spread the lyrics instead of pushing this
+        // chord off its syllable.
+        lyricLine = spreadTo(lyricLine, nextFreePt, withinWord, measure);
+        at = Math.max(measure(lyricLine, LYRIC_SIZE_PT, 'bold'), nextFreePt);
+      } else {
+        at = Math.max(at, nextFreePt);
+      }
       chords.push({ offsetPt: at, label: tok.chordLabel });
       nextFreePt = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic') + CHORD_MIN_GAP_PT;
     }

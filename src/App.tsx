@@ -101,8 +101,8 @@ function App() {
   // Re-derives title/key/blocks/arrangement from hand-edited ChordPro text, so the visual chart
   // and Word doc export (both driven by blocks/arrangement, not the raw text) stay in sync with
   // manual edits instead of silently going stale.
-  function applyChordProEdits(text: string) {
-    const parsed = parseChordProText(text, title, key);
+  function applyChordProEdits(text: string, fallbackTitle = title, fallbackKey = key) {
+    const parsed = parseChordProText(text, fallbackTitle, fallbackKey);
     setTitle(parsed.title);
     setKey(parsed.key);
     setBlocks(Object.fromEntries(parsed.blocks.map((b) => [b.id, b])));
@@ -201,6 +201,14 @@ function App() {
           initialTitle={title}
           initialKey={key}
           initialLyrics={lyrics}
+          onImportChordPro={(t, k, text) => {
+            // Already a chart: keep the text as the lyrics (for Back) and go straight to export.
+            setLyrics(text);
+            setWordGroups([]);
+            setSections([]);
+            applyChordProEdits(text, t, k);
+            setStep('export');
+          }}
           onSubmit={(t, k, l) => {
             setTitle(t);
             setKey(k);
