@@ -27,7 +27,7 @@ export interface SongStore {
 /** Thrown by get() for a song saved by a newer version of the app than this one. */
 export class NewerSongVersionError extends Error {
   constructor() {
-    super('This song was saved by a newer version of ChordPro Tapper. Reload the page to get it.');
+    super('This song was saved by a newer version of R4E ChordPro. Reload the page to get it.');
     this.name = 'NewerSongVersionError';
   }
 }

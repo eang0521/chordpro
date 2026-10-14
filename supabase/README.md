@@ -1,6 +1,6 @@
 # Setting up accounts and the song library (Supabase)
 
-ChordPro Tapper is a static site, hosted on Vercel (GitHub Pages still works too). Signed-in
+R4E ChordPro (Rehearsing for Eternity) is a static site, hosted on Vercel (GitHub Pages still works too). Signed-in
 users' songs live in a Supabase project that the browser talks to directly; row-level security
 keeps each person's songs private.
 Until the project's URL and key are filled in (step 5), the app runs signed-out only, exactly as

@@ -278,7 +278,7 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>ChordPro Tapper</h1>
+        <h1 title="Rehearsing for Eternity">R4E ChordPro</h1>
         <div className="header-right">
           {showEditor && (
             <ol className="steps">
