@@ -3,6 +3,7 @@ import { formatChord } from './musicTheory';
 import { buildRows } from './lyricRows';
 import type { BlockMap } from './arrangement';
 import { deriveFlatSyllables } from './arrangement';
+import { CHORD_SIZE_PT, LYRIC_SIZE_PT, measureTextPt } from './pageLayout';
 
 export interface ChartToken {
   key: string;
@@ -104,4 +105,32 @@ export function flattenSections(sections: DocSection[]): SectionDisplayRow[] {
       isLastInSection: i === section.lineRows.length - 1,
     }));
   });
+}
+
+export interface PlacedLine {
+  lyricLine: string;
+  /** Each chord's left edge, in points from the start of the lyric text. */
+  chords: { offsetPt: number; label: string }[];
+}
+
+const CHORD_MIN_GAP_PT = 4; // keeps a wide chord from running into the next one
+
+/** Positions each chord at the true rendered width of the bold lyric text before its syllable,
+ * so it lands above the right letter in any (proportional) font. The lyrics are never spread
+ * apart to make room — a chord that would collide with the previous one is nudged right instead,
+ * like a printed chart. Shared by the Word export (as tab stops) and the on-screen preview. */
+export function placeChords(tokens: ChartToken[], fontFamily: string): PlacedLine {
+  let lyricLine = '';
+  const chords: PlacedLine['chords'] = [];
+  let nextFreePt = 0;
+  tokens.forEach((tok, i) => {
+    if (tok.isWordStart && i !== 0) lyricLine += ' ';
+    if (tok.chordLabel) {
+      const at = Math.max(measureTextPt(lyricLine, fontFamily, LYRIC_SIZE_PT, 'bold'), nextFreePt);
+      chords.push({ offsetPt: at, label: tok.chordLabel });
+      nextFreePt = at + measureTextPt(tok.chordLabel, fontFamily, CHORD_SIZE_PT, 'italic') + CHORD_MIN_GAP_PT;
+    }
+    lyricLine += tok.text;
+  });
+  return { lyricLine, chords };
 }

@@ -535,35 +535,34 @@ button.secondary {
   white-space: nowrap;
 }
 
-/* Title/key header — mirrors the Word doc's title paragraph: title on the left in the chosen
-   font (inherited from the ancestor's fontFamily), key right-aligned on the same line. */
-.chart-doc-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
+/* Sizes are in em of the lyric size (14pt in the doc) so page mode, where 1em = 14px = 14pt,
+   matches the Word export exactly: 28pt title, 12pt labels and key, 11pt chords, fixed 14pt
+   chord lines and 17pt lyric lines, 8pt between sections (pageLayout.ts). */
 .chart-doc-title {
-  font-size: 1.8em;
+  font-size: 2em;
   font-weight: 700;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.15;
+  margin-bottom: 0.5em;
 }
 
-.chart-doc-key {
-  font-size: 0.85em;
+.chart-page-header {
+  font-size: 0.857em;
   font-style: italic;
-  color: #6b7280;
-  white-space: nowrap;
+  margin-bottom: 0.5em;
 }
 
-/* One row per section line-pair, laid out as a fixed-width label column beside a lyrics/chords
-   column — mirroring the Word doc's two-column table so the preview matches the export instead
-   of stacking the section name above the lyrics as its own line. */
+.chart-page-content .chart-page-header {
+  position: absolute;
+  margin: 0;
+}
+
+/* One row per section line-pair: a label column (sized per song, at least 1in) beside the
+   lyrics/chords, mirroring the Word doc's hanging-indent layout. */
 .chart-section-row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
 }
 
 .chart-label-col {
@@ -571,59 +570,39 @@ button.secondary {
 }
 
 .chart-content-col {
+  flex: 1;
   min-width: 0;
 }
 
 .chart-section-label {
+  font-size: 0.857em;
   font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-/* Gap after a line-pair that isn't the last in its section (BASE_LINE_GAP_TWIPS, pageLayout.ts)
-   vs. the larger gap after a section's last line-pair (BASE_SECTION_GAP_TWIPS) — both scaled by
-   the same line-spacing multiplier the Word doc uses. */
-.chart-section-row.chart-gap-line {
-  margin-bottom: calc(6px * var(--line-spacing, 1));
+  text-transform: uppercase;
 }
 
 .chart-section-row.chart-gap-section {
-  margin-bottom: calc(14px * var(--line-spacing, 1));
+  margin-bottom: calc(0.5714em * var(--line-spacing, 1));
 }
 
-/* Each syllable stacks its chord above its lyric text in a column, and — since neither is
-   given an explicit width — the wrapper naturally sizes to whichever of the two is WIDER.
-   A syllable with no chord (or a short chord) takes only as much room as its own letters need;
-   a syllable under a wide chord (e.g. "F#dim" over "a") gets pushed just wide enough for the
-   chord to fit without colliding with the next syllable. No JS measurement required. */
-.chart-syl-wrap {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  /* An unchorded syllable's chord-label row is empty (zero height), so without this the whole
-     wrap is shorter than a chorded one and its default "baseline" (bottom margin edge, for a
-     column flex container) sits higher — pulling the syllable text up out of line with its
-     chorded neighbors. Bottom-aligning every wrap keeps the syllable text — always the last
-     child — on one consistent line regardless of whether a chord sits above it. */
-  vertical-align: bottom;
-}
-
-/* A wide chord on a mid-word syllable (e.g. "Bdim" on the "a" of "cre-a-tion") centers over
-   that syllable instead of starting flush with it, so the extra width splits evenly on both
-   sides of the letter instead of all drifting off to its right. */
-.chart-syl-wrap-mid {
-  align-items: center;
+/* The chord line is a fixed-height row (a non-breaking space sets its height) with each chord
+   absolutely positioned at its measured offset over the lyric text below. */
+.chart-chord-line {
+  position: relative;
+  font-size: 0.7857em;
+  line-height: calc(1.2727 * var(--line-spacing, 1));
+  white-space: nowrap;
 }
 
 .chart-chord-label {
-  font-size: 0.75em;
-  font-weight: 700;
-  line-height: 1.4;
-  color: #2563eb;
-  white-space: nowrap;
+  position: absolute;
+  top: 0;
+  font-style: italic;
 }
 
 .chart-syllable {
   color: var(--text);
+  font-weight: 700;
+  line-height: calc(1.2143 * var(--line-spacing, 1));
   white-space: nowrap;
 }
 
@@ -667,10 +646,6 @@ button.secondary {
 }
 
 .chart-page-content .chart-syllable {
-  color: #1a1a1a;
-}
-
-.chart-page-content .chart-doc-title {
   color: #1a1a1a;
 }
 
