@@ -15,6 +15,7 @@ import { parseChordProText } from './lib/chordproParser';
 import './App.css';
 
 const STORAGE_KEY = 'chordpro-draft-v4';
+const DRAFT_KEY_PREFIX = 'chordpro-draft-';
 
 interface StoredDraft {
   step: Step;
@@ -40,6 +41,30 @@ function loadDraft(): StoredDraft | null {
   }
 }
 
+/** Drafts saved by older versions of the app are never read again, so drop them — on GitHub Pages
+ * the whole eang0521.github.io origin (every project hosted there) shares one ~5MB storage quota. */
+function removeOldDrafts() {
+  try {
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith(DRAFT_KEY_PREFIX) && k !== STORAGE_KEY)
+      .forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // Storage unavailable (e.g. blocked in a private window) — nothing to clean up.
+  }
+}
+
+/** Returns false instead of throwing when storage is full or unavailable, so a failed autosave
+ * never takes the whole app down. */
+function saveDraft(draft: StoredDraft): boolean {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+removeOldDrafts();
 const initialDraft = loadDraft();
 
 function App() {
@@ -58,10 +83,14 @@ function App() {
   // which screen you download the .docx from, instead of each view defaulting independently.
   const [chartFontId, setChartFontId] = useState<string>(DEFAULT_CHORD_FONT_ID);
   const [chartLineSpacing, setChartLineSpacing] = useState(1);
+  const [draftSaveFailed, setDraftSaveFailed] = useState(false);
 
   useEffect(() => {
     const draft: StoredDraft = { step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    // Mirrors the outcome of a write to an external system (localStorage) into state, which is
+    // exactly what an effect is for — there's no render-time way to know whether the save fit.
+    // oxlint-disable-next-line react/set-state-in-effect
+    setDraftSaveFailed(!saveDraft(draft));
   }, [step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette]);
 
   const flatSyllables = useMemo(() => deriveFlatSyllables(blocks, arrangement), [blocks, arrangement]);
@@ -91,7 +120,11 @@ function App() {
     setBlocks({});
     setArrangement([]);
     setPalette([]);
-    localStorage.removeItem(STORAGE_KEY);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Storage unavailable — there's no saved draft to clear.
+    }
   }
 
   return (
@@ -106,6 +139,13 @@ function App() {
           ))}
         </ol>
       </header>
+
+      {draftSaveFailed && (
+        <p className="hint draft-save-warning">
+          Your browser's storage for this site is full, so this song isn't being saved &mdash; it will be lost if you
+          reload or close the page. Export it before leaving.
+        </p>
+      )}
 
       <div className="toolbar">
         <button

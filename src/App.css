@@ -302,6 +302,11 @@ button.secondary {
 }
 
 /* Toolbar */
+.draft-save-warning {
+  color: var(--danger);
+  margin: 0 0 12px;
+}
+
 .toolbar {
   margin-bottom: 20px;
   display: flex;
