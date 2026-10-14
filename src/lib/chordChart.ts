@@ -167,8 +167,10 @@ export function isChordOnly(line: PlacedLine): boolean {
 }
 
 const CHORD_MIN_GAP_PT = 4; // keeps a wide chord from running into the next one
-// Chords with no lyric under them are spaced out like counted beats ("G   C   | Csus   | C").
+// Chords after a line's last word are spaced out like counted beats ("G   C   | Csus   | C").
 const SLOT_GAP_PT = 14;
+// Room on each side of a chord that sits before a word or syllable rather than on it.
+const SLOT_PAD_PT = 3;
 
 // Most spaces to add on each side of a gap when spreading lyrics apart for a chord.
 const MAX_SPREAD_SPACES = 40;
@@ -196,37 +198,37 @@ export function placeChords(tokens: ChartToken[], measure: TextMeasure): PlacedL
   let lyricLine = '';
   const chords: PlacedLine['chords'] = [];
   let nextFreePt = 0;
+  // Where the next syllable may start: past a chord that comes before it (a chord slot), so that
+  // chord clearly reads as before the syllable rather than on it.
+  let lyricsFromPt = 0;
   // Index of the line's last syllable with lyrics: slots after it are trailing chords.
   const lastLyric = tokens.reduce((last, tok, i) => (!tok.isSlot && tok.text ? i : last), -1);
   tokens.forEach((tok, i) => {
     if (tok.isSlot) {
-      // Takes no room in the lyrics. Between two words ("...ies [C/E] Your") its chord starts where
-      // the previous word ends, so it sits on the space just left of the next word. After the last
-      // word it's a trailing chord, spaced out like counted beats.
+      // A chord with no lyric under it. Before a word or syllable — at the start of the line,
+      // between words ("...ies [C/E] Your"), or inside a word ("i [C] magine") — it starts just
+      // past the previous word and the lyrics open up after it. After the line's last word it's a
+      // trailing chord, spaced out like counted beats.
       if (!tok.chordLabel) return;
       const trailing = i > lastLyric;
-      // Before the line's first word: a pickup chord, which the lyrics will make room for.
-      const leading = lyricLine === '' && !trailing;
       const wordsEnd = lyricLine ? measure(lyricLine, LYRIC_SIZE_PT, 'bold') : 0;
-      const at = Math.max(trailing && lyricLine ? wordsEnd + SLOT_GAP_PT : wordsEnd, nextFreePt);
+      const at = Math.max(lyricLine ? wordsEnd + (trailing ? SLOT_GAP_PT : SLOT_PAD_PT) : 0, nextFreePt);
+      const end = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic');
       chords.push({ offsetPt: at, label: tok.chordLabel });
-      nextFreePt = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic') + (trailing || leading ? SLOT_GAP_PT : CHORD_MIN_GAP_PT);
+      nextFreePt = end + (trailing ? SLOT_GAP_PT : CHORD_MIN_GAP_PT);
+      if (!trailing) lyricsFromPt = end + SLOT_PAD_PT;
       return;
     }
+    // Inside a word, a gap opened in the lyrics gets a hyphen ("e - ter - nal", "i - magine").
     const withinWord = !tok.isWordStart && lyricLine !== '';
     if (tok.isWordStart && i !== 0 && lyricLine) lyricLine += ' ';
-    // Chords placed before the first word push the lyrics right, so they stand clear of it.
-    if (lyricLine === '' && nextFreePt > 0) lyricLine = spreadTo('', nextFreePt, false, measure);
+    // Not enough room after the previous chord (or a chord slot just before): spread the lyrics
+    // instead of pushing this syllable's chord off it.
+    const startAt = Math.max(lyricsFromPt, tok.chordLabel ? nextFreePt : 0);
+    if (measure(lyricLine, LYRIC_SIZE_PT, 'bold') < startAt) lyricLine = spreadTo(lyricLine, startAt, withinWord, measure);
+    lyricsFromPt = 0;
     if (tok.chordLabel) {
-      let at = measure(lyricLine, LYRIC_SIZE_PT, 'bold');
-      if (at < nextFreePt && lyricLine) {
-        // Not enough room after the previous chord: spread the lyrics instead of pushing this
-        // chord off its syllable.
-        lyricLine = spreadTo(lyricLine, nextFreePt, withinWord, measure);
-        at = Math.max(measure(lyricLine, LYRIC_SIZE_PT, 'bold'), nextFreePt);
-      } else {
-        at = Math.max(at, nextFreePt);
-      }
+      const at = Math.max(measure(lyricLine, LYRIC_SIZE_PT, 'bold'), nextFreePt);
       chords.push({ offsetPt: at, label: tok.chordLabel });
       nextFreePt = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic') + CHORD_MIN_GAP_PT;
     }

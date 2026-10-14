@@ -9,6 +9,12 @@ interface Props {
   currentIndex: number;
   /** First and last index of a highlighted range, if more than the current syllable is highlighted. */
   selection?: [number, number] | null;
+  /**
+   * How to follow the current syllable: 'center' keeps its line in the middle (for tapping
+   * through the song); 'reveal' only scrolls when the line is off-screen, and then just enough to
+   * show it (for clicking and highlighting, so the lyrics don't jump out from under the mouse).
+   */
+  scrollMode?: 'center' | 'reveal';
   songKey?: KeyName;
   showChords?: boolean;
   onSyllableMouseDown?: (index: number, e: MouseEvent) => void;
@@ -30,6 +36,7 @@ export function LyricFlow({
   syllables,
   currentIndex,
   selection,
+  scrollMode = 'center',
   songKey,
   showChords = false,
   onSyllableMouseDown,
@@ -52,10 +59,23 @@ export function LyricFlow({
     const containerRect = container.getBoundingClientRect();
     const lineRect = lineEl.getBoundingClientRect();
     const offsetWithinContainer = lineRect.top - containerRect.top + container.scrollTop;
-    const target = offsetWithinContainer - container.clientHeight / 2 + lineRect.height / 2;
+    let target: number;
+    if (scrollMode === 'reveal') {
+      // Leave it alone while it's on screen; otherwise bring it just inside the nearer edge.
+      const margin = 8;
+      if (lineRect.top >= containerRect.top + margin && lineRect.bottom <= containerRect.bottom - margin) return;
+      target =
+        lineRect.top < containerRect.top + margin
+          ? offsetWithinContainer - margin
+          : offsetWithinContainer + lineRect.height - container.clientHeight + margin;
+    } else {
+      target = offsetWithinContainer - container.clientHeight / 2 + lineRect.height / 2;
+    }
     const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
     const clamped = Math.max(0, Math.min(maxScroll, target));
     container.scrollTo({ top: clamped, behavior: 'smooth' });
+    // Follows the cursor only; scrollMode is read at the time it moves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex]);
 
   const rows = buildRows(syllables);

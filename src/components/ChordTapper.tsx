@@ -71,6 +71,9 @@ export function ChordTapper({
   const [clipboard, setClipboard] = useState<ChordMark[] | null>(null);
   const undoRef = useRef<BlockMap[]>([]);
   const draggingRef = useRef(false);
+  // Clicking and highlighting only scroll the lyrics when the cursor goes off-screen; tapping
+  // through with the keyboard keeps the current line centered (see LyricFlow).
+  const [scrollMode, setScrollMode] = useState<'center' | 'reveal'>('center');
 
   function flash(text: string, isError = false) {
     setMessage({ text, isError });
@@ -279,6 +282,10 @@ export function ChordTapper({
       // tapper, or while typing in a field such as the key picker.
       if (e.target instanceof Element && e.target.closest('.arrangement-overlay, input, select, textarea')) return;
       if (e.altKey) return;
+      // Shift+arrows highlight like dragging, and copy/paste/undo work on a highlight: none of
+      // these should yank the lyrics around. Every other key taps through the song.
+      const highlighting = (e.shiftKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) || e.ctrlKey || e.metaKey;
+      setScrollMode(highlighting ? 'reveal' : 'center');
 
       if (e.ctrlKey || e.metaKey) {
         const key = e.key.toLowerCase();
@@ -423,11 +430,13 @@ export function ChordTapper({
           syllables={syllables}
           currentIndex={index}
           selection={selCount > 1 ? [selStart, selEnd] : null}
+          scrollMode={scrollMode}
           songKey={songKey}
           showChords
           onSyllableMouseDown={(i, e) => {
             e.preventDefault();
             draggingRef.current = true;
+            setScrollMode('reveal');
             moveTo(i, e.shiftKey);
           }}
           onSyllableMouseEnter={(i) => {
