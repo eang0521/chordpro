@@ -99,6 +99,8 @@ export function ChordTapper({
     if (typing) return;
     function handleKey(e: KeyboardEvent) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // Leave keys alone while a dialog (arrange sections, copy chords, ...) is open over the tapper.
+      if (e.target instanceof Element && e.target.closest('.arrangement-overlay')) return;
       if (e.code === 'Space' || e.key === ' ') {
         e.preventDefault();
         advance();

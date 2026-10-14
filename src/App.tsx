@@ -11,6 +11,7 @@ import { ExportView } from './components/ExportView';
 import { ArrangementEditor } from './components/ArrangementEditor';
 import { ChordChartView } from './components/ChordChartView';
 import { KeyControl } from './components/KeyControl';
+import { CopyChordsDialog } from './components/CopyChordsDialog';
 import { DEFAULT_CHORD_FONT_ID } from './lib/chordFonts';
 import { parseChordProText } from './lib/chordproParser';
 import './App.css';
@@ -80,6 +81,7 @@ function App() {
   const [palette, setPalette] = useState<Chord[]>(initialDraft?.palette ?? []);
   const [showArrangement, setShowArrangement] = useState(false);
   const [showChart, setShowChart] = useState(false);
+  const [showCopyChords, setShowCopyChords] = useState(false);
   // Shared with ExportView so the chord chart's font/spacing choice stays the same regardless of
   // which screen you download the .docx from, instead of each view defaulting independently.
   const [chartFontId, setChartFontId] = useState<string>(DEFAULT_CHORD_FONT_ID);
@@ -159,11 +161,28 @@ function App() {
         <button className="secondary" disabled={arrangement.length === 0} onClick={() => setShowChart(true)}>
           View chart
         </button>
+        <button
+          className="secondary"
+          disabled={new Set(arrangement).size < 2}
+          onClick={() => setShowCopyChords(true)}
+        >
+          Copy chords
+        </button>
         {step !== 'input' && <KeyControl songKey={key} onChange={setKey} />}
       </div>
 
       {showArrangement && (
         <ArrangementEditor blocks={blocks} arrangement={arrangement} onChange={(b, a) => { setBlocks(b); setArrangement(a); }} onClose={() => setShowArrangement(false)} />
+      )}
+
+      {showCopyChords && (
+        <CopyChordsDialog
+          blocks={blocks}
+          arrangement={arrangement}
+          songKey={key}
+          onApply={(block) => setBlocks((prev) => ({ ...prev, [block.id]: block }))}
+          onClose={() => setShowCopyChords(false)}
+        />
       )}
 
       {showChart && (

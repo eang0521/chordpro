@@ -710,3 +710,133 @@ button.secondary {
   padding-left: 8px;
   padding-right: 8px;
 }
+
+/* Copy chords dialog */
+.copy-chords-panel {
+  max-width: 820px;
+}
+
+.copy-chords-pickers {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0 12px;
+}
+
+.copy-chords-pickers label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.copy-chords-pickers select,
+.copy-line-controls select {
+  background: #1e222c;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
+.copy-line-controls select {
+  padding: 4px 6px;
+  font-size: 0.85rem;
+}
+
+.copy-chords-arrow {
+  color: var(--text-dim);
+  padding-bottom: 8px;
+}
+
+.copy-chords-alert {
+  border: 1px solid var(--danger);
+  background: rgba(255, 128, 128, 0.08);
+  color: var(--danger);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.copy-chords-ok {
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.copy-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.copy-line {
+  background: #12141a;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.copy-line-ok {
+  border-left-color: var(--accent);
+}
+
+.copy-line-warn {
+  border-left-color: var(--danger);
+}
+
+.copy-line-skipped {
+  opacity: 0.6;
+}
+
+.copy-line-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.copy-shift {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.copy-shift button {
+  padding: 2px 8px;
+  font-size: 0.7rem;
+}
+
+.copy-shift-value {
+  min-width: 6ch;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.copy-line-status {
+  color: var(--text-dim);
+}
+
+.copy-line-warn .copy-line-status {
+  color: var(--danger);
+}
+
+.copy-lyrics {
+  /* Room for the absolutely-positioned chord labels, which sit above each syllable. */
+  margin-top: 1.2em;
+  font-size: 1.05rem;
+  line-height: 2.4;
+}
+
+.copy-lyrics-source {
+  margin-top: 1.4em;
+  opacity: 0.55;
+  font-size: 0.9rem;
+  line-height: 2;
+}
