@@ -21,10 +21,12 @@ import {
   labelColumnTwips,
 } from '../lib/pageLayout';
 import { paginateByHeight } from '../lib/pagination';
+import { KeyControl } from './KeyControl';
 
 interface Props {
   title: string;
   songKey: KeyName;
+  onSongKeyChange: (key: KeyName) => void;
   blocks: BlockMap;
   arrangement: string[];
   fontId: string;
@@ -105,6 +107,7 @@ function renderPageItem(item: PageItem, title: string, labelColEm: number, fontF
 export function ChordChartView({
   title,
   songKey,
+  onSongKeyChange,
   blocks,
   arrangement,
   fontId,
@@ -164,6 +167,7 @@ export function ChordChartView({
             {title || 'Untitled'} <span className="chart-key">({songKey})</span>
           </h2>
           <div className="chart-panel-actions">
+            <KeyControl songKey={songKey} onChange={onSongKeyChange} />
             <select className="chart-font-select" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
               {CHORD_FONT_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>

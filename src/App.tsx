@@ -10,6 +10,7 @@ import { ChordTapper } from './components/ChordTapper';
 import { ExportView } from './components/ExportView';
 import { ArrangementEditor } from './components/ArrangementEditor';
 import { ChordChartView } from './components/ChordChartView';
+import { KeyControl } from './components/KeyControl';
 import { DEFAULT_CHORD_FONT_ID } from './lib/chordFonts';
 import { parseChordProText } from './lib/chordproParser';
 import './App.css';
@@ -158,6 +159,7 @@ function App() {
         <button className="secondary" disabled={arrangement.length === 0} onClick={() => setShowChart(true)}>
           View chart
         </button>
+        {step !== 'input' && <KeyControl songKey={key} onChange={setKey} />}
       </div>
 
       {showArrangement && (
@@ -168,6 +170,7 @@ function App() {
         <ChordChartView
           title={title}
           songKey={key}
+          onSongKeyChange={setKey}
           blocks={blocks}
           arrangement={arrangement}
           fontId={chartFontId}
@@ -224,6 +227,9 @@ function App() {
 
       {step === 'export' && (
         <ExportView
+          // The ChordPro text is generated once and then freely editable, so remount on a key
+          // change to regenerate it with the transposed chords instead of leaving it stale.
+          key={key}
           song={{ title, key, syllables: flatSyllables }}
           blocks={blocks}
           arrangement={arrangement}

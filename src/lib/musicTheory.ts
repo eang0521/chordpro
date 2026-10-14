@@ -2,6 +2,15 @@ import type { Chord, KeyName, ScaleDegree, ScaleNote } from '../types';
 
 export const KEY_NAMES: KeyName[] = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'Db', 'Ab', 'Eb', 'Bb', 'F'];
 
+// The same keys in pitch order, for stepping up or down a half step at a time.
+const CHROMATIC_KEYS: KeyName[] = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+/** The key `semitones` half steps above (or, if negative, below) the given one. */
+export function transposeKey(key: KeyName, semitones: number): KeyName {
+  const i = CHROMATIC_KEYS.indexOf(key);
+  return CHROMATIC_KEYS[(((i + semitones) % 12) + 12) % 12];
+}
+
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 // Semitone steps of the major scale from the tonic — which is also the pitch of each natural
 // letter above C, so this one table serves both purposes.

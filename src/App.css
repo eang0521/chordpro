@@ -686,3 +686,27 @@ button.secondary {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* Key / transpose control */
+.key-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.key-control select {
+  background: #1e222c;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
+.key-control button {
+  min-width: 2.25em;
+  padding-left: 8px;
+  padding-right: 8px;
+}
