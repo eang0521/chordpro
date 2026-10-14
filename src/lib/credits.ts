@@ -8,19 +8,20 @@ export function formatCopyright(text: string): string {
   return rest ? `© ${rest}` : '';
 }
 
+/** Ends with a period, without doubling one a name already ends with (e.g. "Inc."). */
+const sentence = (text: string) => (/[.!?]$/.test(text) ? text : `${text}.`);
+
 /**
  * The footer lines for a chart: who wrote it, then the copyright, leaving out whichever is
  * blank. "Words and music by A" when the same people wrote both, otherwise
- * "Words by A, music by B".
+ * "Words by A. Music by B."
  */
 export function creditLines(credits: SongCredits | undefined): string[] {
   if (!credits) return [];
   const words = credits.wordsBy.trim();
   const music = credits.separateMusic ? credits.musicBy.trim() : '';
-  let writers = '';
-  if (!credits.separateMusic) writers = words && `Words and music by ${words}`;
-  else if (words && music) writers = `Words by ${words}, music by ${music}`;
-  else if (words) writers = `Words by ${words}`;
-  else if (music) writers = `Music by ${music}`;
+  const writers = credits.separateMusic
+    ? [words && `Words by ${words}`, music && `Music by ${music}`].filter(Boolean).map(sentence).join(' ')
+    : words && `Words and music by ${words}`;
   return [writers, formatCopyright(credits.copyright)].filter(Boolean);
 }
