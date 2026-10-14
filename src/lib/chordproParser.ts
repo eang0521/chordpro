@@ -80,6 +80,8 @@ const START_SECTION_RE = /^\{start_of_(verse|chorus|bridge|instrumental):\s*(.*)
 const END_SECTION_RE = /^\{end_of_(?:verse|chorus|bridge|instrumental)\}$/i;
 const COMMENT_RE = /^\{comment:\s*(.*)\}$/i;
 const ANY_DIRECTIVE_RE = /^\{.*\}$/;
+// "(2x)", "2x", "(x2)", "x 3" at the very end of a line.
+const REPEAT_RE = /(?:^|\s)\(?\s*(?:(\d{1,2})\s*[x×]|[x×]\s*(\d{1,2}))\s*\)?\s*$/i;
 
 // Signs that pasted text is ChordPro rather than plain lyrics: a {directive} on its own line, or
 // a [chord] in brackets (a letter chord like [G] or [F#m7/C#], or a number chord like [5sus]).
@@ -162,9 +164,19 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
       }
       if (ANY_DIRECTIVE_RE.test(trimmed)) return; // unrecognized directive — skip, not lyrics
 
+      // A repeat count at the end of a line ("(2x)", "x2") marks how many times its section is
+      // played; it isn't a lyric.
+      const repeatMatch = REPEAT_RE.exec(rawLine);
+      const lineText = repeatMatch ? rawLine.slice(0, repeatMatch.index) : rawLine;
+      if (repeatMatch) {
+        if (!currentBlock) startBlock('other', '');
+        const times = Number(repeatMatch[1] ?? repeatMatch[2]);
+        if (times > 1) currentBlock!.repeat = times;
+      }
+
       // A lyric line, a line of lyrics plus trailing chords, or a chord-only line like
       // "[Am7] | [G/B] | [C] [C/E] | [F]".
-      const { plain, chords } = stripChordsWithOffsets(rawLine);
+      const { plain, chords } = stripChordsWithOffsets(lineText);
       if (plain.trim().length === 0 && chords.length === 0) return;
 
       if (!currentBlock) startBlock('other', '');

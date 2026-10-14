@@ -30,6 +30,8 @@ export interface SectionLabel {
   type: SectionType;
   /** Original heading text as written, e.g. "Verse 1", "BRIDGE", "Tag". */
   label: string;
+  /** How many times the section is played, when more than once (see Block.repeat). */
+  repeat?: number;
 }
 
 export interface SyllableToken {
@@ -67,6 +69,9 @@ export interface Block {
   type: SectionType;
   /** Display label, e.g. "Verse 1", "Chorus", "" for an unlabeled leading block. */
   label: string;
+  /** How many times the section is played in a row, e.g. 2 for an intro played twice. Printed
+   * as "2x" after its last chord. Unset (or 1) means once. */
+  repeat?: number;
   syllables: SyllableToken[];
 }
 

@@ -26,6 +26,8 @@ export interface ChartLineRow {
   kind: 'line';
   key: string;
   tokens: ChartToken[];
+  /** Set on a section's last line when the section repeats: printed as "2x" after its chords. */
+  repeat?: number;
 }
 
 export interface ChartKeyChangeRow {
@@ -52,6 +54,11 @@ export function buildChartRows(blocks: BlockMap, arrangement: ArrangementEntry[]
     if (row.kind === 'section') {
       return { kind: 'heading', type: row.section.type, label: row.section.label };
     }
+    // The last line of a section occurrence carries the section's repeat count, if it has one.
+    const lastIndex = row.indexes[row.indexes.length - 1];
+    const next = flat[lastIndex + 1];
+    const endsSection = !next || next.localIndex === 0;
+    const repeat = endsSection ? blocks[flat[lastIndex].blockId]?.repeat : undefined;
     const tokens = row.indexes.map((i) => {
       const syl = flat[i];
       return {
@@ -65,7 +72,7 @@ export function buildChartRows(blocks: BlockMap, arrangement: ArrangementEntry[]
         isSlot: !!syl.isChordSlot,
       };
     });
-    return { kind: 'line', key: row.key, tokens };
+    return { kind: 'line', key: row.key, tokens, ...(repeat && repeat > 1 ? { repeat } : {}) };
   });
 }
 
@@ -194,7 +201,7 @@ function spreadTo(lyricLine: string, minPt: number, withinWord: boolean, measure
  * so it lands above the right letter in any (proportional) font. When a chord would run into the
  * one before it, the lyrics are spread apart (see `spreadTo`) so every chord stays over its own
  * syllable. Shared by the preview, the Word export (as tab stops) and the PDF. */
-export function placeChords(tokens: ChartToken[], measure: TextMeasure): PlacedLine {
+export function placeChords(tokens: ChartToken[], measure: TextMeasure, repeat?: number): PlacedLine {
   let lyricLine = '';
   const chords: PlacedLine['chords'] = [];
   let nextFreePt = 0;
@@ -234,5 +241,14 @@ export function placeChords(tokens: ChartToken[], measure: TextMeasure): PlacedL
     }
     lyricLine += tok.text;
   });
+  if (repeat && repeat > 1) {
+    // "2x" after everything else on the line, spaced like a trailing chord, so the player sees it
+    // as they reach the end of the section.
+    const label = `${repeat}x`;
+    const last = chords[chords.length - 1];
+    const lyricsEnd = lyricLine.trim() ? measure(lyricLine, LYRIC_SIZE_PT, 'bold') + SLOT_GAP_PT : 0;
+    const chordsEnd = last ? last.offsetPt + measure(last.label, CHORD_SIZE_PT, 'italic') + SLOT_GAP_PT : 0;
+    chords.push({ offsetPt: Math.max(lyricsEnd, chordsEnd), label });
+  }
   return { lyricLine, chords };
 }

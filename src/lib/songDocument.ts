@@ -1,4 +1,5 @@
 import type { ArrangementEntry, Chord, KeyName, SongCredits, Step } from '../types';
+import { clampLineSpacing } from './pageLayout';
 import type { Section, WordGroup } from './syllables';
 import type { BlockMap } from './arrangement';
 import { DEFAULT_CHORD_FONT_ID } from './chordFonts';
@@ -114,7 +115,8 @@ export function upgradeSongDocument(raw: unknown): UpgradeResult {
     arrangement: raw.arrangement as ArrangementEntry[],
     palette: Array.isArray(raw.palette) ? (raw.palette as Chord[]) : base.palette,
     chartFontId: typeof raw.chartFontId === 'string' ? raw.chartFontId : base.chartFontId,
-    lineSpacing: typeof raw.lineSpacing === 'number' && raw.lineSpacing > 0 ? raw.lineSpacing : base.lineSpacing,
+    // Clamped, since songs saved before the minimum went up can be below it.
+    lineSpacing: typeof raw.lineSpacing === 'number' && raw.lineSpacing > 0 ? clampLineSpacing(raw.lineSpacing) : base.lineSpacing,
     // Version 1 had no credits; they start blank.
     credits: readCredits(raw.credits),
   };

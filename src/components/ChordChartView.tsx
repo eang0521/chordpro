@@ -25,6 +25,9 @@ import {
   labelColumnTwips,
   measureInFont,
   twipsToPreviewPx,
+  MAX_LINE_SPACING,
+  MIN_LINE_SPACING,
+  clampLineSpacing,
 } from '../lib/pageLayout';
 import { fitLineSpacing, paginateByHeight } from '../lib/pagination';
 import { KeyControl } from './KeyControl';
@@ -43,8 +46,6 @@ interface Props {
   onClose: () => void;
 }
 
-const MIN_LINE_SPACING = 0.7;
-const MAX_LINE_SPACING = 1.2;
 const FIT_MAX_PAGES = 2;
 
 /** Sets the --line-spacing CSS custom property (not a typed React.CSSProperties key). */
@@ -60,7 +61,7 @@ type PageItem = { kind: 'header' } | { kind: 'row'; display: SectionDisplayRow }
 /** Chords sit at the same measured offsets the Word export uses for its tab stops, absolutely
  * positioned over unspread lyric text, so the preview matches the doc letter for letter. */
 function renderLinePair(row: ChartLineRow, fontFamily: string): ReactNode {
-  const placed = placeChords(row.tokens, measureInFont(fontFamily));
+  const placed = placeChords(row.tokens, measureInFont(fontFamily), row.repeat);
   const { lyricLine, chords } = placed;
   if (isChordOnly(placed)) {
     // A chord-only line (a turn, an intro...) takes the lyric line's place, in chord type.
@@ -104,7 +105,8 @@ function renderDisplayRow(display: SectionDisplayRow, labelColEm: number, fontFa
   // Only rows with lyrics get a chord line above them; a chord-only row draws its chords on the
   // lyric line itself, so its label needs no spacer.
   const tokens = display.row?.tokens ?? [];
-  const hasChords = tokens.some((t) => t.chordLabel) && tokens.some((t) => !t.isSlot && t.text.trim());
+  const hasChords =
+    (tokens.some((t) => t.chordLabel) || !!display.row?.repeat) && tokens.some((t) => !t.isSlot && t.text.trim());
   return (
     <div className={`chart-section-row ${gapClass}`} key={display.key}>
       <div className="chart-label-col" style={{ width: `${labelColEm}em` }}>
@@ -293,7 +295,7 @@ export function ChordChartView({
                 value={lineSpacing}
                 onChange={(e) => {
                   const v = Number(e.target.value);
-                  if (!Number.isNaN(v)) onLineSpacingChange(Math.min(MAX_LINE_SPACING, Math.max(MIN_LINE_SPACING, v)));
+                  if (!Number.isNaN(v)) onLineSpacingChange(clampLineSpacing(v));
                   setFitMessage(null);
                 }}
               />

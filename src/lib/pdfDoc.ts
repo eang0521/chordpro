@@ -149,7 +149,9 @@ export async function generatePdf(
       items.push({ kind: 'row', height: lyricLine + sectionGap, label: section.label, lines: [] });
     }
     section.lineRows.forEach((row, i) => {
-      const lines = wrapTokens(row.tokens, lyricWidth, measure).map((piece) => placeChords(piece, measure));
+      // A wrapped line's repeat mark ("2x") goes at the end of its last piece.
+      const pieces = wrapTokens(row.tokens, lyricWidth, measure);
+      const lines = pieces.map((piece, p) => placeChords(piece, measure, p === pieces.length - 1 ? row.repeat : undefined));
       const isLast = i === section.lineRows.length - 1;
       const height =
         // A chord-only line takes just the lyric line's height (its chords sit on it).

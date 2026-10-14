@@ -7,6 +7,7 @@ import { generatePdf } from '../lib/pdfDoc';
 import { chartFilename, downloadBlob } from '../lib/download';
 import { songKeysOf } from '../lib/chordChart';
 import { CHORD_FONT_OPTIONS } from '../lib/chordFonts';
+import { MAX_LINE_SPACING, MIN_LINE_SPACING, clampLineSpacing } from '../lib/pageLayout';
 
 interface Props {
   song: Song;
@@ -123,13 +124,13 @@ export function ExportView({
           <span>Line spacing</span>
           <input
             type="number"
-            min={0.7}
-            max={1.2}
+            min={MIN_LINE_SPACING}
+            max={MAX_LINE_SPACING}
             step={0.05}
             value={lineSpacing}
             onChange={(e) => {
               const v = Number(e.target.value);
-              if (!Number.isNaN(v)) onLineSpacingChange(Math.min(1.2, Math.max(0.7, v)));
+              if (!Number.isNaN(v)) onLineSpacingChange(clampLineSpacing(v));
             }}
           />
         </label>

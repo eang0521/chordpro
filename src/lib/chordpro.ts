@@ -22,6 +22,7 @@ export function songToChordPro(song: Song): string {
 
   let currentLine = '';
   let openSection: WrappedSectionType | null = null;
+  let repeat = 1;
 
   function flushLine() {
     if (currentLine.length > 0) lines.push(currentLine);
@@ -36,6 +37,13 @@ export function songToChordPro(song: Song): string {
   }
 
   song.syllables.forEach((syl, i) => {
+    if (syl.localIndex === 0) repeat = syl.section?.repeat ?? 1;
+    // A repeated section ends its last line with "(2x)", which the parser reads back.
+    const next = song.syllables[i + 1];
+    const endsRepeatedSection = repeat > 1 && (!next || next.localIndex === 0);
+    const markRepeat = () => {
+      if (endsRepeatedSection) currentLine += `${currentLine ? ' ' : ''}(${repeat}x)`;
+    };
     // A key change is a {key} directive partway through the song; chords after it are spelled
     // in the new key.
     if (syl.keyChange) {
@@ -60,13 +68,17 @@ export function songToChordPro(song: Song): string {
     }
 
     // An empty chord slot is just a placeholder for a chord that hasn't been placed yet.
-    if (syl.isChordSlot && !syl.chord) return;
+    if (syl.isChordSlot && !syl.chord) {
+      markRepeat();
+      return;
+    }
     if (syl.isWordStart && currentLine.length > 0) currentLine += ' ';
     // Chords with no lyric under them (slots) are written as "[G] | [C]", the usual ChordPro way
     // to write a turnaround or instrumental line.
     if (syl.bar && syl.chord) currentLine += '| ';
     if (syl.chord) currentLine += `[${formatChord(transposeKey(song.key, syl.keyShift ?? 0), syl.chord)}]`;
     currentLine += syl.text;
+    markRepeat();
   });
   flushLine();
   closeOpenSection();

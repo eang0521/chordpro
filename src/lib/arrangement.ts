@@ -50,7 +50,7 @@ export function deriveFlatSyllables(blocks: BlockMap, arrangement: ArrangementEn
       flat.push({
         ...tok,
         id: `${occurrence}-${tok.id}`,
-        section: i === 0 ? { type: block.type, label: block.label } : undefined,
+        section: i === 0 ? { type: block.type, label: block.label, ...(block.repeat ? { repeat: block.repeat } : {}) } : undefined,
         keyShift,
         ...(i === 0 && pendingKeyChange ? { keyChange: true } : {}),
       });
@@ -114,6 +114,7 @@ export function unlinkArrangementItem(blocks: BlockMap, arrangement: Arrangement
     id: newId,
     type: block.type,
     label: block.label,
+    ...(block.repeat ? { repeat: block.repeat } : {}),
     syllables: block.syllables.map((tok) => ({ ...tok, id: makeId(), blockId: newId })),
   };
   const nextArrangement = arrangement.map((id, i) => (i === at ? newId : id));

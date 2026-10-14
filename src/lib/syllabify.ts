@@ -97,8 +97,35 @@ function isVowelAt(letters: string[], i: number): boolean {
   return !'aeiou'.includes(letters[i - 1].toLowerCase());
 }
 
+// Contraction endings that never add a syllable: there's, we're, I've, we'll, he'd, I'm, and the
+// old poetic o'er / e'er / ne'er.
+const CONTRACTION_RE = /^(.*[a-z])('(?:s|re|ve|ll|d|m|er))$/i;
+// "n't" is its own syllable after a consonant (did-n't, could-n't, is-n't), but joins the word
+// after a vowel (don't, can't, won't) or "are"/"were" (aren't, weren't). Other silent-e stems
+// keep the regular rules (hav-en't).
+const NOT_RE = /^(.*[a-z])(n't)$/i;
+
 /** Splits one alphabetic word (no punctuation) into syllables. */
 export function syllabifyCore(core: string): string[] {
+  // Split the word without its contraction ending, so a silent e stays silent ("there's", not
+  // "the-re's"), then put the ending back.
+  const notMatch = NOT_RE.exec(core);
+  if (notMatch) {
+    const [, stem, ending] = notMatch;
+    if (/[b-df-hj-np-tv-z]$/i.test(stem) && /[aeiouy]/i.test(stem)) return [...syllabifyCore(stem), ending];
+    if (/[aiouy]$/i.test(stem) || /^(?:a|we)re$/i.test(stem)) {
+      const syllables = syllabifyCore(stem);
+      syllables[syllables.length - 1] += ending;
+      return syllables;
+    }
+  }
+  const contraction = CONTRACTION_RE.exec(core);
+  if (contraction) {
+    const stem = syllabifyCore(contraction[1]);
+    stem[stem.length - 1] += contraction[2];
+    return stem;
+  }
+
   const lower = core.toLowerCase();
   for (const prefix of SEPARABLE_PREFIXES) {
     if (lower.length <= prefix.length || !lower.startsWith(prefix)) continue;

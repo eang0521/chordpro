@@ -81,7 +81,7 @@ export async function generateWordDoc(
       return;
     }
     section.lineRows.forEach((row, i) => {
-      const placed = placeChords(row.tokens, measure);
+      const placed = placeChords(row.tokens, measure, row.repeat);
       const { lyricLine, chords } = placed;
       const isLast = i === section.lineRows.length - 1;
       const withLabel = i === 0 && section.label;

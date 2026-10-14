@@ -96,6 +96,11 @@ export function ArrangementEditor({ blocks, arrangement, songKey, onChange, onCl
     onChange({ ...blocks, [blockId]: { ...blocks[blockId], label } }, arrangement);
   }
 
+  function setRepeat(blockId: string, times: number) {
+    const { repeat: _old, ...block } = blocks[blockId];
+    onChange({ ...blocks, [blockId]: times > 1 ? { ...block, repeat: times } : block }, arrangement);
+  }
+
   function retypeBlock(blockId: string, type: SectionType) {
     onChange({ ...blocks, [blockId]: { ...blocks[blockId], type } }, arrangement);
   }
@@ -215,6 +220,20 @@ export function ArrangementEditor({ blocks, arrangement, songKey, onChange, onCl
                     placeholder="Label (e.g. Verse 1)"
                     onChange={(e) => renameBlock(blockId, e.target.value)}
                   />
+                  <select
+                    className="arrangement-repeat"
+                    value={block.repeat ?? 1}
+                    onChange={(e) => setRepeat(blockId, Number(e.target.value))}
+                    aria-label="Times played"
+                    title="How many times this section is played in a row; 2x and up print after its last chord"
+                  >
+                    <option value={1}>once</option>
+                    {[2, 3, 4, 5, 6].map((n) => (
+                      <option key={n} value={n}>
+                        {n}x
+                      </option>
+                    ))}
+                  </select>
                   {linked && <span className="arrangement-linked-badge">linked</span>}
                 </div>
                 <div className="arrangement-card-preview">{previewText(block)}</div>

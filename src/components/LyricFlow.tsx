@@ -124,6 +124,7 @@ export function LyricFlow({
         ) : row.kind === 'section' ? (
           <div className={`section-heading section-${row.section.type}`} key={row.key}>
             {row.section.label}
+            {row.section.repeat && row.section.repeat > 1 ? <span className="section-repeat"> {row.section.repeat}x</span> : null}
           </div>
         ) : (
           <div className="lyric-line-row" key={row.key} ref={ri === currentRowIndex ? currentLineRef : undefined}>

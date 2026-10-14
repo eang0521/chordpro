@@ -24,6 +24,14 @@ export const CHORD_SIZE_PT = 11;
 export const CHORD_LINE_PT = 14;
 export const LYRIC_LINE_PT = 17;
 export const SECTION_GAP_PT = 8;
+
+// The range the line spacing multiplier can be set to (and Fit to page searches within).
+export const MIN_LINE_SPACING = 0.8;
+export const MAX_LINE_SPACING = 1.2;
+
+export function clampLineSpacing(value: number): number {
+  return Math.min(MAX_LINE_SPACING, Math.max(MIN_LINE_SPACING, value));
+}
 export const TITLE_GAP_PT = 14;
 
 // Section label column: 1in like the reference charts, widened for the whole song if some label
