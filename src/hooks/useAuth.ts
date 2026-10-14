@@ -41,16 +41,6 @@ export async function sendSignInLink(email: string): Promise<void> {
   if (error) throw error;
 }
 
-/** Leaves the page for Google's sign-in, which comes back to authRedirectUrl. */
-export async function signInWithGoogle(): Promise<void> {
-  if (!supabase) throw new Error('Accounts are not set up.');
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: { redirectTo: authRedirectUrl() },
-  });
-  if (error) throw error;
-}
-
 export async function signOut(): Promise<void> {
   // 'local' signs out only this browser; the default would also sign out every other device.
   await supabase?.auth.signOut({ scope: 'local' });

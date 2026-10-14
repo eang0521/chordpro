@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { sendSignInLink, signInWithGoogle } from '../hooks/useAuth';
+import { sendSignInLink } from '../hooks/useAuth';
 
 interface Props {
   onClose: () => void;
@@ -28,15 +28,6 @@ export function SignInDialog({ onClose }: Props) {
       );
     } finally {
       setSending(false);
-    }
-  }
-
-  async function google() {
-    setError(null);
-    try {
-      await signInWithGoogle();
-    } catch {
-      setError("Couldn't start Google sign-in. Try again, or use an emailed link.");
     }
   }
 
@@ -74,11 +65,6 @@ export function SignInDialog({ onClose }: Props) {
             </button>
           </form>
         )}
-
-        <div className="sign-in-divider">or</div>
-        <button className="secondary" onClick={() => void google()}>
-          Continue with Google
-        </button>
 
         {error && <p className="hint library-error">{error}</p>}
       </div>

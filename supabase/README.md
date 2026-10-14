@@ -3,10 +3,10 @@
 ChordPro Tapper is a static site, hosted on Vercel (GitHub Pages still works too). Signed-in
 users' songs live in a Supabase project that the browser talks to directly; row-level security
 keeps each person's songs private.
-Until the project's URL and key are filled in (step 6), the app runs signed-out only, exactly as
+Until the project's URL and key are filled in (step 5), the app runs signed-out only, exactly as
 before.
 
-Everything here is done by hand in the Vercel, Supabase and Google dashboards. It's all free tier.
+Everything here is done by hand in the Vercel and Supabase dashboards. It's all free tier.
 
 ## 0. Host the site on Vercel
 
@@ -66,41 +66,7 @@ fine for you and a few friends; if more people use it, set up your own SMTP unde
 The app asks to come back to whichever of these it's running on, and Supabase refuses any
 address not on the list.
 
-## 5. Sign-in with Google
-
-You need a Google Cloud OAuth client. The **client secret goes only into the Supabase
-dashboard**, never into this repo or the app.
-
-1. In Supabase, open **Authentication → Sign In / Providers → Google** and copy the
-   **Callback URL** it shows (`https://<project-ref>.supabase.co/auth/v1/callback`). Leave that
-   tab open.
-2. Go to <https://console.cloud.google.com>, and from the project picker at the top create a new
-   project (e.g. `chordpro`).
-3. Open **Google Auth Platform** (search "OAuth consent screen") and click **Get started**:
-   - App name `ChordPro Tapper`, user support email: yours.
-   - Audience: **External**.
-   - Contact email: yours. Agree to the policy and **Create**.
-4. **Branding**: under **Authorized domains** add `<project-ref>.supabase.co`. Save.
-5. **Data access → Add or remove scopes**: tick `openid`, `.../auth/userinfo.email` and
-   `.../auth/userinfo.profile`. Update, then Save.
-6. **Audience**: click **Publish app** so anyone with a Google account can sign in. (While it's
-   in *Testing*, only the test users you list there can.) These basic scopes don't need Google's
-   verification.
-7. **Clients → Create client**:
-   - Application type: **Web application**, name `ChordPro Tapper`.
-   - **Authorized JavaScript origins**: `<vercel-url>` and `http://localhost:5173` (plus
-     `https://eang0521.github.io` while GitHub Pages is still up). With no trailing slash.
-     Google only checks the redirect URI below for this sign-in flow, so these are a
-     precaution.
-   - **Authorized redirect URIs**: the Supabase callback URL from step 1.
-   - **Create**, then copy the **Client ID** and **Client secret**.
-8. Back in Supabase's **Google** provider: turn it on, paste the Client ID and Client secret,
-   and **Save**.
-
-Google's sign-in screen will say "to continue to `<project-ref>.supabase.co`". Showing your own
-domain there needs a paid Supabase custom domain, so that's expected.
-
-## 6. Connect the app
+## 5. Connect the app
 
 **Project Settings → API Keys** (or the **Connect** button):
 
@@ -114,7 +80,14 @@ key there: it bypasses row-level security.
 
 ## Checking row-level security
 
-With two accounts (say, an emailed link in one browser and Google in another), each sees only
+With two accounts (two email addresses, each signed in in its own browser), each sees only
 their own songs. Opening another account's song id gives "That song isn't in your library any
 more". In the SQL editor you can also pick the **authenticated** role and impersonate one user
 to see that `select * from songs` returns only theirs.
+
+## Adding Google sign-in later
+
+Supabase supports it with no code beyond a button calling
+`supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: authRedirectUrl() } })`.
+Google's consent screen asks for a privacy policy URL (a short page on the site will do), then
+an OAuth client whose redirect URI is the callback URL shown in Supabase's Google provider.

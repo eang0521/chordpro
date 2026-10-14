@@ -996,22 +996,6 @@ button.danger-solid {
   color: var(--danger);
 }
 
-.sign-in-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text-dim);
-  font-size: 0.85rem;
-  margin: 18px 0;
-}
-
-.sign-in-divider::before,
-.sign-in-divider::after {
-  content: '';
-  flex: 1;
-  border-top: 1px solid var(--border);
-}
-
 .sign-in-sent {
   line-height: 1.5;
 }
