@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Chord, KeyName, Step } from './types';
+import type { ArrangementEntry, Chord, KeyName, Step } from './types';
 import type { Section, WordGroup } from './lib/syllables';
 import { parseLyricsToWordGroups, wordGroupsToBlocks } from './lib/syllables';
 import type { BlockMap } from './lib/arrangement';
-import { deriveFlatSyllables } from './lib/arrangement';
+import { blockIdsOf, deriveFlatSyllables } from './lib/arrangement';
 import { LyricsInput } from './components/LyricsInput';
 import { SyllableEditor } from './components/SyllableEditor';
 import { ChordTapper } from './components/ChordTapper';
@@ -27,7 +27,7 @@ interface StoredDraft {
   wordGroups: WordGroup[];
   sections: Section[];
   blocks: BlockMap;
-  arrangement: string[];
+  arrangement: ArrangementEntry[];
   palette: Chord[];
 }
 
@@ -77,7 +77,7 @@ function App() {
   const [wordGroups, setWordGroups] = useState<WordGroup[]>(initialDraft?.wordGroups ?? []);
   const [sections, setSections] = useState<Section[]>(initialDraft?.sections ?? []);
   const [blocks, setBlocks] = useState<BlockMap>(initialDraft?.blocks ?? {});
-  const [arrangement, setArrangement] = useState<string[]>(initialDraft?.arrangement ?? []);
+  const [arrangement, setArrangement] = useState<ArrangementEntry[]>(initialDraft?.arrangement ?? []);
   const [palette, setPalette] = useState<Chord[]>(initialDraft?.palette ?? []);
   const [showArrangement, setShowArrangement] = useState(false);
   const [showChart, setShowChart] = useState(false);
@@ -106,7 +106,7 @@ function App() {
     setTitle(parsed.title);
     setKey(parsed.key);
     setBlocks(Object.fromEntries(parsed.blocks.map((b) => [b.id, b])));
-    setArrangement(parsed.blocks.map((b) => b.id));
+    setArrangement(parsed.arrangement);
   }
 
   function startOver() {
@@ -159,7 +159,7 @@ function App() {
         </button>
         <button
           className="secondary"
-          disabled={new Set(arrangement).size < 2}
+          disabled={new Set(blockIdsOf(arrangement)).size < 2}
           onClick={() => setShowCopyChords(true)}
         >
           Copy chords
@@ -168,7 +168,7 @@ function App() {
       </div>
 
       {showArrangement && (
-        <ArrangementEditor blocks={blocks} arrangement={arrangement} onChange={(b, a) => { setBlocks(b); setArrangement(a); }} onClose={() => setShowArrangement(false)} />
+        <ArrangementEditor blocks={blocks} arrangement={arrangement} songKey={key} onChange={(b, a) => { setBlocks(b); setArrangement(a); }} onClose={() => setShowArrangement(false)} />
       )}
 
       {showCopyChords && (
@@ -220,9 +220,9 @@ function App() {
           onBack={() => setStep('input')}
           onSubmit={(groups) => {
             setWordGroups(groups);
-            const newBlocks = wordGroupsToBlocks(groups, sections);
+            const { blocks: newBlocks, arrangement: newArrangement } = wordGroupsToBlocks(groups, sections, key);
             setBlocks(Object.fromEntries(newBlocks.map((b) => [b.id, b])));
-            setArrangement(newBlocks.map((b) => b.id));
+            setArrangement(newArrangement);
             setStep('chords');
           }}
         />

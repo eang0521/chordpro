@@ -1,6 +1,8 @@
-import type { Block, SectionType } from '../types';
+import type { ArrangementEntry, Block, KeyName, SectionType } from '../types';
 import { makeId } from './id';
 import { makeChordLine } from './chordSlots';
+import { makeKeyChange } from './arrangement';
+import { keyFromName, semitonesBetween } from './musicTheory';
 import { syllabifyCore } from './syllabify';
 
 /** A word's editable syllable breakdown, grouped by the line it appears on. */
@@ -15,6 +17,22 @@ export interface Section {
   type: SectionType;
   label: string;
   beforeLineIndex: number;
+  /** Set for a key change line ("Key change to D") rather than a section heading: the new key,
+   * or null if the line doesn't say. */
+  keyChange?: { to: KeyName | null };
+}
+
+// A line that marks a key change: "Key change", "Key change to D", "Modulate to Eb", "Key of D",
+// "New key: F#". Like section headings, only a line that is nothing else counts.
+const KEY_CHANGE_RE = /^(?:key\s*change|modulat(?:e|ion))(?:\s*(?:to|:|-|–)?\s*(?:the\s+)?(?:key\s+of\s+)?([A-G][#b♯♭]?))?\s*[:.!]?$/i;
+const NEW_KEY_RE = /^(?:new\s+)?key(?:\s+of|\s*:)\s*([A-G][#b♯♭]?)\s*\.?$/i;
+
+function detectKeyChange(line: string): { to: KeyName | null } | null {
+  const stripped = line.replace(/^[[(]\s*/, '').replace(/\s*[\])]$/, '').trim();
+  const match = KEY_CHANGE_RE.exec(stripped) ?? NEW_KEY_RE.exec(stripped);
+  if (!match) return null;
+  const name = match[1]?.replace('♯', '#').replace('♭', 'b');
+  return { to: name ? keyFromName(name) : null };
 }
 
 const SECTION_KEYWORDS = [
@@ -101,6 +119,12 @@ export function parseLyricsToWordGroups(text: string): { groups: WordGroup[]; se
       const trimmed = rawLine.trim();
       if (trimmed.length === 0) return;
 
+      const keyChange = detectKeyChange(trimmed);
+      if (keyChange) {
+        sections.push({ type: 'other', label: trimmed, beforeLineIndex: lineIndex, keyChange });
+        return;
+      }
+
       const header = detectSectionHeader(trimmed);
       if (header) {
         sections.push({ ...header, beforeLineIndex: lineIndex });
@@ -123,18 +147,27 @@ export function parseLyricsToWordGroups(text: string): { groups: WordGroup[]; se
  * Splits editable word groups (plus detected section headings) into one Block per section —
  * each block owns its own syllable tokens, ready to be reordered/duplicated in the arrangement.
  * Lyrics before the first heading (or a song with no headings at all) become a single
- * unlabeled "other" block, so every syllable always belongs to exactly one block.
+ * unlabeled "other" block, so every syllable always belongs to exactly one block. Returns the
+ * blocks plus the song's arrangement: the blocks in order, with any key change lines as key
+ * changes between them (relative to `songKey`).
  */
-export function wordGroupsToBlocks(groups: WordGroup[], sections: Section[] = []): Block[] {
+export function wordGroupsToBlocks(
+  groups: WordGroup[],
+  sections: Section[],
+  songKey: KeyName,
+): { blocks: Block[]; arrangement: ArrangementEntry[] } {
   const sectionsByLine = groupSectionsByLine(sections);
 
   const blocks: Block[] = [];
+  const arrangement: ArrangementEntry[] = [];
   let currentBlock: Block | null = null;
   let prevLineIndex: number | null = null;
+  let keyShift = 0;
 
   function startBlock(type: SectionType, label: string) {
     currentBlock = { id: makeId(), type, label, syllables: [] };
     blocks.push(currentBlock);
+    arrangement.push(currentBlock.id);
   }
 
   // A heading with no lyrics before the next heading: an instrumental one becomes a line of empty
@@ -144,6 +177,18 @@ export function wordGroupsToBlocks(groups: WordGroup[], sections: Section[] = []
     const id = makeId();
     const syllables = makeChordLine(id).map((tok, i) => ({ ...tok, localIndex: i }));
     blocks.push({ id, type: section.type, label: section.label, syllables });
+    arrangement.push(id);
+  }
+
+  // A key change line. One that doesn't name the new key goes up a whole step, the most common
+  // change (it can be adjusted in Arrange sections). One before any lyrics is ignored, since the
+  // song's key is picked on the first step.
+  function addKeyChange(section: Section) {
+    if (blocks.length === 0) return;
+    const to = section.keyChange?.to;
+    keyShift = to ? semitonesBetween(songKey, to) : (keyShift + 2) % 12;
+    arrangement.push(makeKeyChange(keyShift));
+    currentBlock = null; // lyrics after it start a new section, even without a heading
   }
 
   groups.forEach((group) => {
@@ -151,13 +196,14 @@ export function wordGroupsToBlocks(groups: WordGroup[], sections: Section[] = []
     prevLineIndex = group.lineIndex;
 
     const lineSections = isNewLine ? sectionsByLine.get(group.lineIndex) ?? [] : [];
-    lineSections.slice(0, -1).forEach(addEmptySection);
-    const section = lineSections[lineSections.length - 1];
-    if (section) {
-      startBlock(section.type, section.label);
-    } else if (!currentBlock) {
-      startBlock('other', '');
-    }
+    // The last heading on a line owns the lyrics that follow; earlier ones have none.
+    const lastHeading = lineSections.reduce((last, s, i) => (s.keyChange ? last : i), -1);
+    lineSections.forEach((s, i) => {
+      if (s.keyChange) addKeyChange(s);
+      else if (i === lastHeading) startBlock(s.type, s.label);
+      else addEmptySection(s);
+    });
+    if (!currentBlock) startBlock('other', '');
     const block = currentBlock!;
 
     group.syllables
@@ -176,18 +222,28 @@ export function wordGroupsToBlocks(groups: WordGroup[], sections: Section[] = []
       });
   });
 
-  // Headings after the last lyric line (e.g. an outro).
+  // Headings after the last lyric line (e.g. a key change into an outro).
   const lastLine = groups.length > 0 ? groups[groups.length - 1].lineIndex : -1;
-  sections.filter((s) => s.beforeLineIndex > lastLine).forEach(addEmptySection);
+  sections
+    .filter((s) => s.beforeLineIndex > lastLine)
+    .forEach((s) => (s.keyChange ? addKeyChange(s) : addEmptySection(s)));
 
-  return blocks;
+  return { blocks, arrangement };
 }
 
 /** Sections keyed by the lyric line they precede, in order — several headings can share a line
- * when all but the last have no lyrics of their own. */
+ * when all but the last have no lyrics of their own. A key change written just after the heading
+ * that owns the lyrics ("Chorus", then "Key change to D") is moved ahead of it, since it's that
+ * section that's in the new key. */
 export function groupSectionsByLine(sections: Section[]): Map<number, Section[]> {
   const byLine = new Map<number, Section[]>();
   sections.forEach((s) => byLine.set(s.beforeLineIndex, [...(byLine.get(s.beforeLineIndex) ?? []), s]));
+  byLine.forEach((line, index) => {
+    const lastHeading = line.reduce((last, s, i) => (s.keyChange ? last : i), -1);
+    if (lastHeading < 0) return;
+    const trailingKeyChanges = line.slice(lastHeading + 1);
+    byLine.set(index, [...line.slice(0, lastHeading), ...trailingKeyChanges, line[lastHeading]]);
+  });
   return byLine;
 }
 

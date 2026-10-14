@@ -38,13 +38,13 @@ export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Pr
         add or remove &middot; marks to change where it breaks. Section headings (Verse, Chorus,
         Bridge, etc.) are detected automatically and aren't tapped or charted. An instrumental heading
         (Intro, Turn, Midtro, Tag, Outro, ...) with no lyrics under it becomes a line of empty chord
-        slots to fill in on the next step.
+        slots to fill in on the next step. A line like &ldquo;Key change to D&rdquo; becomes a key change.
       </p>
       <div className="syllable-editor">
         {lineIndexes.map((lineIndex) => (
           <div key={lineIndex}>
             {(sectionsByLine.get(lineIndex) ?? []).map((s, i, all) => (
-              <SectionHeading key={i} section={s} empty={i < all.length - 1} />
+              <SectionHeading key={i} section={s} empty={all.slice(i + 1).some((later) => !later.keyChange)} />
             ))}
             <div className="syllable-line">
               {groups
@@ -82,6 +82,13 @@ export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Pr
 
 /** A detected heading. `empty` means no lyrics follow it before the next heading. */
 function SectionHeading({ section, empty }: { section: Section; empty: boolean }) {
+  if (section.keyChange) {
+    return (
+      <div className="key-change-heading">
+        {section.keyChange.to ? `Key change to ${section.keyChange.to}` : 'Key change (up a whole step)'}
+      </div>
+    );
+  }
   return (
     <div className={`section-heading section-${section.type}`}>
       {section.label}

@@ -3,7 +3,7 @@ import type { Chord, KeyName, ScaleDegree, SyllableToken } from '../types';
 import type { BlockMap } from '../lib/arrangement';
 import { updateBlockToken } from '../lib/arrangement';
 import { insertTokens, lineEnd, makeChordLine, makeChordSlot, removeToken } from '../lib/chordSlots';
-import { chordsEqual, diatonicChord, formatChord, isDiatonicChord, parseChord } from '../lib/musicTheory';
+import { chordsEqual, diatonicChord, formatChord, isDiatonicChord, parseChord, transposeKey } from '../lib/musicTheory';
 import { LyricFlow } from './LyricFlow';
 
 interface Props {
@@ -60,6 +60,9 @@ export function ChordTapper({
   const selStart = Math.min(index, anchor);
   const selEnd = Math.max(index, anchor);
   const selCount = index < 0 ? 0 : selEnd - selStart + 1;
+  // The key at the cursor, after any key changes: chord buttons show, and typed chords are read,
+  // in this key.
+  const cursorKey = index >= 0 ? transposeKey(songKey, syllables[index]?.keyShift ?? 0) : songKey;
 
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState('');
@@ -243,7 +246,7 @@ export function ChordTapper({
     // A leading "|" puts a bar line before the chord, as in "| Csus".
     const bar = /^\s*\|/.test(typed);
     const text = typed.replace(/^\s*\|\s*/, '');
-    const chord = parseChord(songKey, text);
+    const chord = parseChord(cursorKey, text);
     if (!chord) {
       flash(`Couldn't read "${typed}" as a chord`, true);
       return;
@@ -321,7 +324,7 @@ export function ChordTapper({
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, anchor, syllables, palette, typing, songKey, clipboard]);
+  }, [index, anchor, syllables, palette, typing, cursorKey, clipboard]);
 
   const finished = index >= syllables.length - 1 && syllables.length > 0;
 
@@ -346,13 +349,13 @@ export function ChordTapper({
       </p>
       <div className="chord-keys">
         {DEGREES.map((d) => (
-          <ChordKey key={d} hotkey={String(d)} label={formatChord(songKey, diatonicChord(d))} onPlace={() => placeChord(diatonicChord(d))} disabled={index < 0} />
+          <ChordKey key={d} hotkey={String(d)} label={formatChord(cursorKey, diatonicChord(d))} onPlace={() => placeChord(diatonicChord(d))} disabled={index < 0} />
         ))}
         {palette.map((chord, i) => (
           <ChordKey
-            key={`${i}-${formatChord(songKey, chord)}`}
+            key={`${i}-${formatChord(cursorKey, chord)}`}
             hotkey={PALETTE_KEYS[i]}
-            label={formatChord(songKey, chord)}
+            label={formatChord(cursorKey, chord)}
             onPlace={() => placeChord(chord)}
             onRemove={() => onPaletteChange(palette.filter((_, j) => j !== i))}
             disabled={index < 0}
@@ -364,6 +367,7 @@ export function ChordTapper({
         {index >= 0 && !typing && (
           <span>
             Syllable {index + 1} / {syllables.length}
+            {cursorKey !== songKey && <> &middot; key of {cursorKey}</>}
             {selCount > 1 && <> &middot; {selCount} highlighted</>}
             {clipboard && <> &middot; {pluralize(clipboard.length, 'syllable')} of chords copied</>}
           </span>

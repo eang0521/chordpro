@@ -1,12 +1,15 @@
-import type { Block, KeyName, SectionType } from '../types';
+import type { ArrangementEntry, Block, KeyName, SectionType } from '../types';
 import { hyphenateWord, normalizeApostrophes } from './syllables';
-import { KEY_NAMES, parseChord } from './musicTheory';
+import { keyFromName, parseChord, semitonesBetween } from './musicTheory';
+import { makeKeyChange } from './arrangement';
 import { makeId } from './id';
 import { makeChordLine } from './chordSlots';
 
 export interface ParsedChordProSong {
   title: string;
   key: KeyName;
+  /** The blocks in order, with any key changes between them. */
+  arrangement: ArrangementEntry[];
   blocks: Block[];
 }
 
@@ -85,13 +88,17 @@ const ANY_DIRECTIVE_RE = /^\{.*\}$/;
 export function parseChordProText(text: string, fallbackTitle: string, fallbackKey: KeyName): ParsedChordProSong {
   let title = fallbackTitle;
   let key: KeyName = fallbackKey;
+  // The key chords are being read in: the song's key until a later {key} changes it.
+  let currentKey: KeyName = fallbackKey;
 
   const blocks: Block[] = [];
+  const arrangement: ArrangementEntry[] = [];
   let currentBlock: Block | null = null;
 
   function startBlock(type: SectionType, label: string) {
     currentBlock = { id: makeId(), type, label, syllables: [] };
     blocks.push(currentBlock);
+    arrangement.push(currentBlock.id);
   }
 
   normalizeApostrophes(text)
@@ -107,9 +114,16 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
       }
       const keyMatch = KEY_RE.exec(trimmed);
       if (keyMatch) {
-        const candidate = keyMatch[1].trim();
-        const matchedKey = KEY_NAMES.find((k) => k === candidate);
-        if (matchedKey) key = matchedKey;
+        const matchedKey = keyFromName(keyMatch[1]);
+        if (!matchedKey) return;
+        if (blocks.length === 0) {
+          key = matchedKey; // before any lyrics: the song's key
+        } else {
+          // Partway through: a key change. The next section starts fresh in the new key.
+          arrangement.push(makeKeyChange(semitonesBetween(key, matchedKey)));
+          currentBlock = null;
+        }
+        currentKey = matchedKey;
         return;
       }
       const startMatch = START_SECTION_RE.exec(trimmed);
@@ -169,7 +183,7 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
           pendingBar = true;
           label = label.slice(1).trim();
         }
-        const chord = label ? parseChord(key, label) : null;
+        const chord = label ? parseChord(currentKey, label) : null;
         block.syllables.push({
           id: makeId(),
           text: item.kind === 'span' ? item.span.text : '',
@@ -194,5 +208,5 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
     }
   });
 
-  return { title, key, blocks };
+  return { title, key, blocks, arrangement };
 }

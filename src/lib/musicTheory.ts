@@ -11,6 +11,21 @@ export function transposeKey(key: KeyName, semitones: number): KeyName {
   return CHROMATIC_KEYS[(((i + semitones) % 12) + 12) % 12];
 }
 
+/** Half steps up (0-11) from one key to another. */
+export function semitonesBetween(from: KeyName, to: KeyName): number {
+  return (((CHROMATIC_KEYS.indexOf(to) - CHROMATIC_KEYS.indexOf(from)) % 12) + 12) % 12;
+}
+
+/** Reads a key name as written ("D", "Bb", "C#", "d"), matching it to the app's spelling of that
+ * key (C# is Db), or null if it isn't a key. */
+export function keyFromName(name: string): KeyName | null {
+  const trimmed = name.trim();
+  const normalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  const parsed = parseNoteName(normalized);
+  if (!parsed) return null;
+  return CHROMATIC_KEYS[((parsed.pitch % 12) + 12) % 12];
+}
+
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 // Semitone steps of the major scale from the tonic — which is also the pitch of each natural
 // letter above C, so this one table serves both purposes.

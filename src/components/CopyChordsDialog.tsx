@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
-import type { Block, Chord, KeyName, SyllableToken } from '../types';
+import type { ArrangementEntry, Block, Chord, KeyName, SyllableToken } from '../types';
 import type { BlockMap } from '../lib/arrangement';
+import { blockIdsOf } from '../lib/arrangement';
 import type { LineMapping } from '../lib/copyChords';
 import { applyCopy, defaultMappings, previewLine, splitLines } from '../lib/copyChords';
 import { formatChord } from '../lib/musicTheory';
 
 interface Props {
   blocks: BlockMap;
-  arrangement: string[];
+  arrangement: ArrangementEntry[];
   songKey: KeyName;
   onApply: (block: Block) => void;
   onClose: () => void;
@@ -50,7 +51,7 @@ function pluralize(n: number, word: string): string {
 export function CopyChordsDialog({ blocks, arrangement, songKey, onApply, onClose }: Props) {
   // Each block once, in the order it first appears in the song.
   const blockIds = useMemo(
-    () => [...new Set(arrangement)].filter((id) => blocks[id] && blocks[id].syllables.length > 0),
+    () => [...new Set(blockIdsOf(arrangement))].filter((id) => blocks[id] && blocks[id].syllables.length > 0),
     [arrangement, blocks],
   );
 

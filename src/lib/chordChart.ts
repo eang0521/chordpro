@@ -1,5 +1,5 @@
-import type { KeyName, SectionType } from '../types';
-import { formatChord } from './musicTheory';
+import type { ArrangementEntry, KeyName, SectionType } from '../types';
+import { formatChord, transposeKey } from './musicTheory';
 import { buildRows } from './lyricRows';
 import type { BlockMap } from './arrangement';
 import { deriveFlatSyllables } from './arrangement';
@@ -28,7 +28,13 @@ export interface ChartLineRow {
   tokens: ChartToken[];
 }
 
-export type ChartRow = ChartHeadingRow | ChartLineRow;
+export interface ChartKeyChangeRow {
+  kind: 'keyChange';
+  /** The key the song changes to. */
+  key: KeyName;
+}
+
+export type ChartRow = ChartHeadingRow | ChartLineRow | ChartKeyChangeRow;
 
 /**
  * Builds the chart as raw per-syllable tokens (text, word-boundary, resolved chord), with no
@@ -36,10 +42,13 @@ export type ChartRow = ChartHeadingRow | ChartLineRow;
  * whatever way suits its medium (CSS positioning for the browser, measured tab stops or
  * monospace padding for Word).
  */
-export function buildChartRows(blocks: BlockMap, arrangement: string[], key: KeyName): ChartRow[] {
+export function buildChartRows(blocks: BlockMap, arrangement: ArrangementEntry[], key: KeyName): ChartRow[] {
   const flat = deriveFlatSyllables(blocks, arrangement);
   const rows = buildRows(flat);
   return rows.map((row) => {
+    if (row.kind === 'keyChange') {
+      return { kind: 'keyChange', key: transposeKey(key, row.keyShift) };
+    }
     if (row.kind === 'section') {
       return { kind: 'heading', type: row.section.type, label: row.section.label };
     }
@@ -49,7 +58,10 @@ export function buildChartRows(blocks: BlockMap, arrangement: string[], key: Key
         key: syl.id,
         text: syl.text,
         isWordStart: syl.isWordStart,
-        chordLabel: syl.chord ? `${syl.bar ? '| ' : ''}${formatChord(key, syl.chord)}` : null,
+        // Chords are spelled in the key this part of the song is played in.
+        chordLabel: syl.chord
+          ? `${syl.bar ? '| ' : ''}${formatChord(transposeKey(key, syl.keyShift ?? 0), syl.chord)}`
+          : null,
         isSlot: !!syl.isChordSlot,
       };
     });
@@ -61,6 +73,8 @@ export interface DocSection {
   label: string;
   type: SectionType;
   lineRows: ChartLineRow[];
+  /** Set when the song changes key right before this section: the new key. */
+  keyChange?: KeyName;
 }
 
 /** Groups the flat chart rows back into one entry per section, since both the Word doc and the
@@ -70,16 +84,21 @@ export interface DocSection {
 export function groupIntoSections(rows: ChartRow[]): DocSection[] {
   const sections: DocSection[] = [];
   let current: DocSection | null = null;
+  let keyChange: KeyName | undefined;
+  function start(label: string, type: SectionType) {
+    current = { label, type, lineRows: [], ...(keyChange ? { keyChange } : {}) };
+    sections.push(current);
+    keyChange = undefined;
+  }
   rows.forEach((row) => {
-    if (row.kind === 'heading') {
-      current = { label: row.label, type: row.type, lineRows: [] };
-      sections.push(current);
+    if (row.kind === 'keyChange') {
+      keyChange = row.key;
+    } else if (row.kind === 'heading') {
+      start(row.label, row.type);
     } else {
-      if (!current) {
-        current = { label: '', type: 'other', lineRows: [] };
-        sections.push(current);
-      }
-      current.lineRows.push(row);
+      // A key change always starts a new section, even an unlabeled one, so it has somewhere to print.
+      if (!current || keyChange) start('', 'other');
+      current!.lineRows.push(row);
     }
   });
   return sections;

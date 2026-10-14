@@ -1,5 +1,5 @@
 import type { Song } from '../types';
-import { formatChord } from './musicTheory';
+import { formatChord, transposeKey } from './musicTheory';
 
 type WrappedSectionType = 'verse' | 'chorus' | 'bridge' | 'instrumental';
 
@@ -22,10 +22,18 @@ export function songToChordPro(song: Song): string {
   }
 
   song.syllables.forEach((syl, i) => {
-    if (syl.section && syl.section.label) {
+    // A key change is a {key} directive partway through the song; chords after it are spelled
+    // in the new key.
+    if (syl.keyChange) {
       flushLine();
       closeOpenSection();
       if (lines[lines.length - 1] !== '') lines.push('');
+      lines.push(`{key: ${transposeKey(song.key, syl.keyShift ?? 0)}}`);
+    }
+    if (syl.section && syl.section.label) {
+      flushLine();
+      closeOpenSection();
+      if (lines[lines.length - 1] !== '' && !syl.keyChange) lines.push('');
 
       if (syl.section.type === 'other') {
         lines.push(`{comment: ${syl.section.label}}`);
@@ -43,7 +51,7 @@ export function songToChordPro(song: Song): string {
     // Chords with no lyric under them (slots) are written as "[G] | [C]", the usual ChordPro way
     // to write a turnaround or instrumental line.
     if (syl.bar && syl.chord) currentLine += '| ';
-    if (syl.chord) currentLine += `[${formatChord(song.key, syl.chord)}]`;
+    if (syl.chord) currentLine += `[${formatChord(transposeKey(song.key, syl.keyShift ?? 0), syl.chord)}]`;
     currentLine += syl.text;
   });
   flushLine();

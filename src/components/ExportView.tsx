@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Song } from '../types';
+import type { ArrangementEntry, Song } from '../types';
 import { songToChordPro } from '../lib/chordpro';
 import type { BlockMap } from '../lib/arrangement';
 import { generateWordDoc } from '../lib/wordDoc';
@@ -10,7 +10,7 @@ import { CHORD_FONT_OPTIONS } from '../lib/chordFonts';
 interface Props {
   song: Song;
   blocks: BlockMap;
-  arrangement: string[];
+  arrangement: ArrangementEntry[];
   fontId: string;
   onFontIdChange: (id: string) => void;
   lineSpacing: number;

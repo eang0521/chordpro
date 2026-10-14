@@ -1,28 +1,61 @@
-import type { Block, SyllableToken } from '../types';
+import type { ArrangementEntry, Block, KeyChange, SyllableToken } from '../types';
 import { makeId } from './id';
 
 export type BlockMap = Record<string, Block>;
 
+export function isKeyChange(entry: ArrangementEntry | undefined): entry is KeyChange {
+  return typeof entry === 'object' && entry !== null && entry.kind === 'keyChange';
+}
+
+/** The arrangement's block ids, in order (repeats included), without its key changes. */
+export function blockIdsOf(arrangement: ArrangementEntry[]): string[] {
+  return arrangement.filter((e): e is string => typeof e === 'string');
+}
+
+export function makeKeyChange(semitones: number): KeyChange {
+  return { kind: 'keyChange', id: makeId(), semitones: ((semitones % 12) + 12) % 12 };
+}
+
+/** Semitones above the song's key in effect just before position `at`. */
+export function keyShiftBefore(arrangement: ArrangementEntry[], at: number): number {
+  for (let i = Math.min(at, arrangement.length) - 1; i >= 0; i--) {
+    const entry = arrangement[i];
+    if (isKeyChange(entry)) return entry.semitones;
+  }
+  return 0;
+}
+
 /**
- * Expands the arrangement (an ordered list of block ids, which may repeat) into the flat
- * syllable sequence used for placing chords and exporting. Repeated blocks
+ * Expands the arrangement (an ordered list of block ids, which may repeat, plus key changes)
+ * into the flat syllable sequence used for placing chords and exporting. Repeated blocks
  * are "linked": each occurrence renders the SAME underlying tokens (so edits made through
  * `updateBlockToken` show up at every occurrence), only the React key is made unique per
  * occurrence. A section heading is attached to the first token of every occurrence, not just
- * the first time the block appears.
+ * the first time the block appears. Every token also carries the key it's played in
+ * (`keyShift`), and the first one after a key change is flagged with `keyChange`.
  */
-export function deriveFlatSyllables(blocks: BlockMap, arrangement: string[]): SyllableToken[] {
+export function deriveFlatSyllables(blocks: BlockMap, arrangement: ArrangementEntry[]): SyllableToken[] {
   const flat: SyllableToken[] = [];
-  arrangement.forEach((blockId, occurrence) => {
-    const block = blocks[blockId];
-    if (!block) return;
+  let keyShift = 0;
+  let pendingKeyChange = false;
+  arrangement.forEach((entry, occurrence) => {
+    if (isKeyChange(entry)) {
+      pendingKeyChange = entry.semitones !== keyShift || pendingKeyChange;
+      keyShift = entry.semitones;
+      return;
+    }
+    const block = blocks[entry];
+    if (!block || block.syllables.length === 0) return;
     block.syllables.forEach((tok, i) => {
       flat.push({
         ...tok,
         id: `${occurrence}-${tok.id}`,
         section: i === 0 ? { type: block.type, label: block.label } : undefined,
+        keyShift,
+        ...(i === 0 && pendingKeyChange ? { keyChange: true } : {}),
       });
     });
+    pendingKeyChange = false;
   });
   return flat;
 }
@@ -40,7 +73,7 @@ export function updateBlockToken(
   return { ...blocks, [blockId]: { ...block, syllables } };
 }
 
-export function moveArrangementItem(arrangement: string[], from: number, to: number): string[] {
+export function moveArrangementItem(arrangement: ArrangementEntry[], from: number, to: number): ArrangementEntry[] {
   if (from === to || from < 0 || to < 0 || from >= arrangement.length || to >= arrangement.length) {
     return arrangement;
   }
@@ -51,9 +84,9 @@ export function moveArrangementItem(arrangement: string[], from: number, to: num
 }
 
 /** Inserts another reference to the same (linked) block right after the given position. */
-export function duplicateArrangementItem(arrangement: string[], at: number): string[] {
+export function duplicateArrangementItem(arrangement: ArrangementEntry[], at: number): ArrangementEntry[] {
   const blockId = arrangement[at];
-  if (blockId == null) return arrangement;
+  if (typeof blockId !== 'string') return arrangement;
   const next = [...arrangement];
   next.splice(at + 1, 0, blockId);
   return next;
@@ -65,12 +98,12 @@ export function duplicateArrangementItem(arrangement: string[], at: number): str
  * e.g. a final chorus that needs a small lyric change. No-op if this occurrence is already
  * the only one referencing its block.
  */
-export function unlinkArrangementItem(blocks: BlockMap, arrangement: string[], at: number): {
+export function unlinkArrangementItem(blocks: BlockMap, arrangement: ArrangementEntry[], at: number): {
   blocks: BlockMap;
-  arrangement: string[];
+  arrangement: ArrangementEntry[];
 } {
   const blockId = arrangement[at];
-  const block = blockId != null ? blocks[blockId] : undefined;
+  const block = typeof blockId === 'string' ? blocks[blockId] : undefined;
   if (!block) return { blocks, arrangement };
 
   const otherOccurrences = arrangement.some((id, i) => id === blockId && i !== at);
@@ -87,15 +120,16 @@ export function unlinkArrangementItem(blocks: BlockMap, arrangement: string[], a
   return { blocks: { ...blocks, [newId]: copy }, arrangement: nextArrangement };
 }
 
-/** Removes one occurrence from the arrangement; deletes the block itself if that was its last occurrence. */
+/** Removes one entry from the arrangement; deletes a block itself if that was its last occurrence. */
 export function removeArrangementItem(
   blocks: BlockMap,
-  arrangement: string[],
+  arrangement: ArrangementEntry[],
   at: number,
-): { blocks: BlockMap; arrangement: string[] } {
+): { blocks: BlockMap; arrangement: ArrangementEntry[] } {
   const blockId = arrangement[at];
   if (blockId == null) return { blocks, arrangement };
   const nextArrangement = arrangement.filter((_, i) => i !== at);
+  if (typeof blockId !== 'string') return { blocks, arrangement: nextArrangement };
   const stillUsed = nextArrangement.includes(blockId);
   if (stillUsed) return { blocks, arrangement: nextArrangement };
   const { [blockId]: _removed, ...rest } = blocks;

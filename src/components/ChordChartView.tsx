@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { KeyName } from '../types';
+import type { ArrangementEntry, KeyName } from '../types';
 import type { BlockMap } from '../lib/arrangement';
 import type { ChartLineRow, SectionDisplayRow } from '../lib/chordChart';
 import { buildChartRows, flattenSections, groupIntoSections, isChordOnly, placeChords } from '../lib/chordChart';
@@ -30,7 +30,7 @@ interface Props {
   songKey: KeyName;
   onSongKeyChange: (key: KeyName) => void;
   blocks: BlockMap;
-  arrangement: string[];
+  arrangement: ArrangementEntry[];
   fontId: string;
   onFontIdChange: (id: string) => void;
   lineSpacing: number;
@@ -100,7 +100,8 @@ function renderDisplayRow(display: SectionDisplayRow, labelColEm: number, fontFa
   // lyric line itself, so its label needs no spacer.
   const tokens = display.row?.tokens ?? [];
   const hasChords = tokens.some((t) => t.chordLabel) && tokens.some((t) => !t.isSlot && t.text.trim());
-  return (
+  const keyChange = display.isFirstInSection ? display.section.keyChange : undefined;
+  const row = (
     <div className={`chart-section-row ${gapClass}`} key={display.key}>
       <div className="chart-label-col" style={{ width: `${labelColEm}em` }}>
         {display.isFirstInSection && display.section.label && (
@@ -113,6 +114,16 @@ function renderDisplayRow(display: SectionDisplayRow, labelColEm: number, fontFa
         )}
       </div>
       <div className="chart-content-col">{display.row ? renderLinePair(display.row, fontFamily) : <>&nbsp;</>}</div>
+    </div>
+  );
+  if (!keyChange) return row;
+  // Part of the section's first row, so pagination never strands it at the bottom of a page.
+  return (
+    <div key={display.key}>
+      <div className="chart-key-change">
+        <span className="chart-key-change-label">Key change to</span> {keyChange}
+      </div>
+      {row}
     </div>
   );
 }

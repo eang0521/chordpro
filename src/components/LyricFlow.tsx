@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import type { KeyName, SyllableToken } from '../types';
-import { formatChord } from '../lib/musicTheory';
+import { formatChord, transposeKey } from '../lib/musicTheory';
 import { buildRows } from '../lib/lyricRows';
 
 interface Props {
@@ -68,7 +68,9 @@ export function LyricFlow({
     if (!isLineFirst && syl.isWordStart) nodes.push(' ');
 
     const chordLabel =
-      showChords && songKey && syl.chord ? `${syl.bar ? '| ' : ''}${formatChord(songKey, syl.chord)}` : null;
+      showChords && songKey && syl.chord
+        ? `${syl.bar ? '| ' : ''}${formatChord(transposeKey(songKey, syl.keyShift ?? 0), syl.chord)}`
+        : null;
 
     const classes = ['syllable'];
     if (syl.isChordSlot) classes.push('syllable-slot');
@@ -95,7 +97,11 @@ export function LyricFlow({
   return (
     <div className="lyric-flow">
       {rows.map((row, ri) =>
-        row.kind === 'section' ? (
+        row.kind === 'keyChange' ? (
+          <div className="key-change-heading" key={row.key}>
+            Key change{songKey ? <> to {transposeKey(songKey, row.keyShift)}</> : null}
+          </div>
+        ) : row.kind === 'section' ? (
           <div className={`section-heading section-${row.section.type}`} key={row.key}>
             {row.section.label}
           </div>

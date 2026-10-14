@@ -44,6 +44,11 @@ export interface SyllableToken {
   /** A chord slot with no lyric under it (text is ''), for instrumental chords: a turnaround
    * after a line's last word, or a whole chord-only line such as a turn or intro. */
   isChordSlot?: boolean;
+  /** Set only on the flattened song (see deriveFlatSyllables): semitones above the song's key
+   * that this syllable is played in, after any key changes before it. */
+  keyShift?: number;
+  /** Set only on the flattened song: this is the first syllable after a key change. */
+  keyChange?: boolean;
   /** Set on the first syllable of a section occurrence to mark where a heading goes when rendered. */
   section?: SectionLabel;
   /** Which block this token canonically belongs to, and its index within that block's syllable list. */
@@ -64,6 +69,21 @@ export interface Block {
   label: string;
   syllables: SyllableToken[];
 }
+
+/**
+ * A key change (modulation) in the arrangement: everything after it, up to the next one, is
+ * played in a new key. Stored as semitones above the song's key rather than as a key name, so
+ * transposing the song moves the key change along with it.
+ */
+export interface KeyChange {
+  kind: 'keyChange';
+  id: string;
+  /** 0-11 semitones above the song's key. */
+  semitones: number;
+}
+
+/** One entry in the song's arrangement: a block id (blocks may repeat) or a key change. */
+export type ArrangementEntry = string | KeyChange;
 
 export interface Song {
   title: string;
