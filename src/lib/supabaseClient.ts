@@ -4,12 +4,12 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 // (supabase/migrations) is what keeps each person's songs private. Never put the service_role
 // / secret key here — it bypasses row-level security. Left empty, the app runs signed-out only,
 // exactly as it did before accounts existed.
-const SUPABASE_URL = '';
-const SUPABASE_ANON_KEY = '';
+const SUPABASE_URL = 'https://bpsrqjjetfzadyahtpnj.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_eLjlNjZWTUZ_qiUMUIeYvw_HcJJH-OC';
 
 export const supabase: SupabaseClient | null =
-  SUPABASE_URL && SUPABASE_ANON_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
         auth: {
           // The implicit flow lets an emailed sign-in link work in whichever browser opens it
           // (often a phone's mail app), where PKCE would need it to be the same browser that

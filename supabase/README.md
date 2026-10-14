@@ -73,7 +73,7 @@ address not on the list.
 - **Project URL**: `https://<project-ref>.supabase.co`
 - **Publishable key** (`sb_publishable_…`), or the legacy **anon** key (`eyJ…`)
 
-Put both in `SUPABASE_URL` and `SUPABASE_ANON_KEY` in
+Put both in `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in
 [`src/lib/supabaseClient.ts`](../src/lib/supabaseClient.ts). They are public by design;
 row-level security is what protects the data. Never use the **secret** / **service_role**
 key there: it bypasses row-level security.
