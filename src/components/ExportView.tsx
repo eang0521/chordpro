@@ -8,6 +8,7 @@ import { chartFilename, downloadBlob } from '../lib/download';
 import { songKeysOf } from '../lib/chordChart';
 import { CHORD_FONT_OPTIONS } from '../lib/chordFonts';
 import { MAX_LINE_SPACING, MIN_LINE_SPACING, clampLineSpacing } from '../lib/pageLayout';
+import { creditLines } from '../lib/credits';
 
 interface Props {
   song: Song;
@@ -17,9 +18,12 @@ interface Props {
   onFontIdChange: (id: string) => void;
   lineSpacing: number;
   onLineSpacingChange: (value: number) => void;
-  onApplyChordPro: (text: string) => void;
-  onBack: () => void;
-  onStartOver: () => void;
+  // Not needed (and never called) in read-only mode.
+  onApplyChordPro?: (text: string) => void;
+  onBack?: () => void;
+  onStartOver?: () => void;
+  /** For a public song: view, copy and download only — no editing, no other steps. */
+  readOnly?: boolean;
 }
 
 export function ExportView({
@@ -33,6 +37,7 @@ export function ExportView({
   onApplyChordPro,
   onBack,
   onStartOver,
+  readOnly = false,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [generatingDocx, setGeneratingDocx] = useState(false);
@@ -46,7 +51,7 @@ export function ExportView({
   }
 
   function applyEdits() {
-    onApplyChordPro(text);
+    onApplyChordPro?.(text);
     setApplied(true);
     setTimeout(() => setApplied(false), 1500);
   }
@@ -88,31 +93,51 @@ export function ExportView({
 
   return (
     <div className="panel">
-      <h2>4. Export</h2>
-      <p className="hint">
-        Your ChordPro file, ready to copy or download &mdash; edit it directly if you need to tweak anything. Click
-        "Apply to chart" to re-sync the visual chart and Word doc export with your edits.
-      </p>
+      {readOnly ? (
+        <>
+          <h2>{song.title || 'Untitled'}</h2>
+          {creditLines(song.credits).map((line) => (
+            <p className="hint public-song-credit" key={line}>
+              {line}
+            </p>
+          ))}
+        </>
+      ) : (
+        <>
+          <h2>4. Export</h2>
+          <p className="hint">
+            Your ChordPro file, ready to copy or download &mdash; edit it directly if you need to tweak anything.
+            Click "Apply to chart" to re-sync the visual chart and Word doc export with your edits.
+          </p>
+        </>
+      )}
       <textarea
         className="chordpro-output"
         value={text}
+        readOnly={readOnly}
         onChange={(e) => setText(e.target.value)}
         spellCheck={false}
       />
       <div className="actions">
-        <button className="secondary" onClick={onBack}>
-          &larr; Back
-        </button>
+        {!readOnly && (
+          <button className="secondary" onClick={onBack}>
+            &larr; Back
+          </button>
+        )}
         <button className="secondary" onClick={copy}>
           {copied ? 'Copied!' : 'Copy to clipboard'}
         </button>
         <button onClick={download}>Download .cho</button>
-        <button className="secondary" onClick={resetText}>
-          Reset edits
-        </button>
-        <button className="secondary" onClick={applyEdits}>
-          {applied ? 'Applied!' : 'Apply to chart'}
-        </button>
+        {!readOnly && (
+          <>
+            <button className="secondary" onClick={resetText}>
+              Reset edits
+            </button>
+            <button className="secondary" onClick={applyEdits}>
+              {applied ? 'Applied!' : 'Apply to chart'}
+            </button>
+          </>
+        )}
         <select className="chart-font-select" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
           {CHORD_FONT_OPTIONS.map((opt) => (
             <option key={opt.id} value={opt.id}>
@@ -140,9 +165,11 @@ export function ExportView({
         <button className="secondary" disabled={generatingPdf} onClick={downloadPdf}>
           {generatingPdf ? 'Generating…' : 'Download PDF'}
         </button>
-        <button className="secondary" onClick={onStartOver}>
-          Start a new song
-        </button>
+        {!readOnly && (
+          <button className="secondary" onClick={onStartOver}>
+            Start a new song
+          </button>
+        )}
       </div>
     </div>
   );

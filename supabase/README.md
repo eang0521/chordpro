@@ -77,6 +77,22 @@ Put both in `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in
 row-level security is what protects the data. Never use the **secret** / **service_role**
 key there: it bypasses row-level security.
 
+## 6. Public songs
+
+1. **SQL Editor → New query**: paste all of
+   [`migrations/0002_public_songs.sql`](migrations/0002_public_songs.sql) and **Run**.
+2. **Table Editor → publishers → Insert row**: add each person who may publish, by the email
+   they sign in with, **in lowercase** (e.g. `someone@example.com`). Delete a row to take
+   publishing away; their songs already published stay public.
+
+Anyone can browse **Public songs** without signing in. Publishers see **Publish** (or
+**Update public version**) on their own library songs, and **Remove from public songs** on the
+public page of a song they published. The list itself can't be read or changed from the site,
+only from this dashboard.
+
+To take down any public song (whoever published it), delete its row in **Table Editor →
+public_songs**.
+
 ## Checking row-level security
 
 With two accounts (two email addresses, each signed in in its own browser), each sees only

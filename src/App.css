@@ -1178,3 +1178,33 @@ button.library-open:hover:not(:disabled) {
   font-weight: 400;
   text-transform: none;
 }
+
+/* Public songs */
+.toolbar-spacer {
+  flex: 1;
+}
+
+.public-search {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 0.9rem;
+  width: min(280px, 100%);
+}
+
+.public-search:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.public-song-credit {
+  margin: -8px 0 12px;
+}
+
+button.link-button.publish-view {
+  align-self: center;
+  font-size: 0.85rem;
+}

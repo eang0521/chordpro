@@ -16,7 +16,7 @@ import { SongLibrary } from './components/SongLibrary';
 import { SignInDialog } from './components/SignInDialog';
 import { CreditsFields } from './components/CreditsFields';
 import { parseChordProText } from './lib/chordproParser';
-import { SONG_SCHEMA_VERSION, emptySongDocument, isBlankSong, type SongDocument } from './lib/songDocument';
+import { SONG_SCHEMA_VERSION, emptySongDocument, isBlankSong, newSongId, type SongDocument } from './lib/songDocument';
 import {
   clearLocalDraft,
   loadLocalDraft,
@@ -28,11 +28,16 @@ import {
 import { supabase } from './lib/supabaseClient';
 import { createSupabaseSongStore } from './lib/supabaseSongStore';
 import { NewerSongVersionError } from './lib/songStore';
+import { createSupabasePublicSongStore } from './lib/publicSongStore';
+import { PublicSongList } from './components/PublicSongList';
+import { PublicSongPage } from './components/PublicSongPage';
+import { PublishControl } from './components/PublishControl';
 import { useAuth, signOut } from './hooks/useAuth';
 import { useAutosave } from './hooks/useAutosave';
 import './App.css';
 
 const songStore = supabase ? createSupabaseSongStore(supabase) : null;
+const publicStore = supabase ? createSupabasePublicSongStore(supabase) : null;
 // Module-level so useAutosave gets the same function every render.
 const saveToLibrary = (doc: SongDocument) => songStore!.save(doc);
 
@@ -60,6 +65,15 @@ function openSongOnReload(): string | null {
 const initialDraft = loadLocalDraft() ?? emptySongDocument();
 removeOldDrafts();
 
+// The public songs have their own addresses (#/public, #/public/<id>), so a song can be shared
+// as a link. Anything else in the hash, like a sign-in link's token, isn't a route.
+type PublicRoute = { songId: string | null } | null;
+
+function parseRoute(hash: string): PublicRoute {
+  const match = /^#\/public(?:\/([0-9a-f-]{36}))?\/?$/i.exec(hash);
+  return match ? { songId: match[1] ?? null } : null;
+}
+
 function App() {
   const auth = useAuth();
   const userId = auth.status === 'signedIn' ? auth.user.id : null;
@@ -70,6 +84,8 @@ function App() {
   const [showSignIn, setShowSignIn] = useState(false);
   const [draftToUpload, setDraftToUpload] = useState<SongDocument | null>(null);
   const [uploadFailed, setUploadFailed] = useState(false);
+  const [route, setRoute] = useState<PublicRoute>(() => (publicStore ? parseRoute(window.location.hash) : null));
+  const [isPublisher, setIsPublisher] = useState(false);
 
   const [songId, setSongId] = useState(initialDraft.id);
   const [step, setStep] = useState<Step>(initialDraft.step);
@@ -271,9 +287,54 @@ function App() {
     clearLocalDraft();
   }
 
+  // Back/forward and hand-edited addresses move between the public pages and the app.
+  useEffect(() => {
+    if (!publicStore) return;
+    const sync = () => setRoute(parseRoute(window.location.hash));
+    window.addEventListener('popstate', sync);
+    window.addEventListener('hashchange', sync);
+    return () => {
+      window.removeEventListener('popstate', sync);
+      window.removeEventListener('hashchange', sync);
+    };
+  }, []);
+
+  // Only publishers see Publish; the database enforces the same list on every write.
+  useEffect(() => {
+    if (!userId || !publicStore) return;
+    let cancelled = false;
+    publicStore
+      .isPublisher()
+      .then((allowed) => !cancelled && setIsPublisher(allowed))
+      .catch(() => !cancelled && setIsPublisher(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  async function goToPublic(songId: string | null = null) {
+    if (!route && !(await leaveLibrarySong())) return;
+    window.history.pushState(null, '', songId ? `#/public/${songId}` : '#/public');
+    setRoute({ songId });
+  }
+
+  function leavePublic() {
+    window.history.pushState(null, '', window.location.pathname + window.location.search);
+    setRoute(null);
+  }
+
+  /** A private, editable copy of a public song, opened in the editor. */
+  async function copyPublicSong(publicDoc: SongDocument) {
+    if (!songStore) return;
+    const copy: SongDocument = { ...publicDoc, id: newSongId(), step: 'export' };
+    await songStore.save(copy);
+    leavePublic();
+    await openSong(copy.id);
+  }
+
   // Signed in, only a library song is ever shown in the editor — never the local draft for a
   // moment while switching over, where an edit would end up in the wrong place.
-  const showEditor = auth.status !== 'loading' && (userId ? editingLibrarySong : source === 'local');
+  const showEditor = !route && auth.status !== 'loading' && (userId ? editingLibrarySong : source === 'local');
 
   return (
     <div className="app">
@@ -289,6 +350,16 @@ function App() {
               ))}
             </ol>
           )}
+          {publicStore && !route && (
+            <button className="secondary" onClick={() => void goToPublic()}>
+              Public songs
+            </button>
+          )}
+          {route && auth.status !== 'signedIn' && (
+            <button className="secondary" onClick={leavePublic}>
+              My song
+            </button>
+          )}
           {auth.status === 'signedOut' && (
             <button className="secondary" onClick={() => setShowSignIn(true)}>
               Sign in
@@ -296,8 +367,14 @@ function App() {
           )}
           {auth.status === 'signedIn' && (
             <div className="account">
-              {screen === 'editor' && (
-                <button className="secondary" onClick={() => void showLibrary()}>
+              {(route || screen === 'editor') && (
+                <button
+                  className="secondary"
+                  onClick={() => {
+                    if (route) leavePublic();
+                    void showLibrary();
+                  }}
+                >
                   My songs
                 </button>
               )}
@@ -334,9 +411,24 @@ function App() {
         </div>
       )}
 
-      {(auth.status === 'loading' || (userId && screen === 'opening')) && <p className="hint">Loading&hellip;</p>}
+      {!route && (auth.status === 'loading' || (userId && screen === 'opening')) && <p className="hint">Loading&hellip;</p>}
 
-      {songStore && userId && screen === 'library' && (
+      {route && publicStore && route.songId && (
+        <PublicSongPage
+          key={route.songId}
+          store={publicStore}
+          id={route.songId}
+          userId={userId}
+          onBack={() => void goToPublic()}
+          onCopyToLibrary={copyPublicSong}
+          onSignIn={() => setShowSignIn(true)}
+        />
+      )}
+      {route && publicStore && !route.songId && (
+        <PublicSongList store={publicStore} onOpen={(id) => void goToPublic(id)} />
+      )}
+
+      {!route && songStore && userId && screen === 'library' && (
         <SongLibrary store={songStore} message={libraryMessage} onOpen={(id) => void openSong(id)} onNew={() => void newLibrarySong()} />
       )}
 
@@ -375,6 +467,9 @@ function App() {
               </button>
             )}
             {step !== 'input' && <KeyControl songKey={key} onChange={setKey} />}
+            {editingLibrarySong && isPublisher && publicStore && (
+              <PublishControl store={publicStore} doc={doc} onViewPublic={(id) => void goToPublic(id)} />
+            )}
             {editingLibrarySong && (
               <span className={`save-status save-status-${autosave.status}`} role="status">
                 {autosave.status === 'saved' && 'Saved'}

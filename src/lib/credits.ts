@@ -18,10 +18,15 @@ const sentence = (text: string) => (/[.!?]$/.test(text) ? text : `${text}.`);
  */
 export function creditLines(credits: SongCredits | undefined): string[] {
   if (!credits) return [];
+  return [writersLine(credits), formatCopyright(credits.copyright)].filter(Boolean);
+}
+
+/** Just the writers part of the credits, or '' if none were entered. */
+export function writersLine(credits: SongCredits | undefined): string {
+  if (!credits) return '';
   const words = credits.wordsBy.trim();
   const music = credits.separateMusic ? credits.musicBy.trim() : '';
-  const writers = credits.separateMusic
+  return credits.separateMusic
     ? [words && `Words by ${words}`, music && `Music by ${music}`].filter(Boolean).map(sentence).join(' ')
     : words && `Words and music by ${words}`;
-  return [writers, formatCopyright(credits.copyright)].filter(Boolean);
 }
