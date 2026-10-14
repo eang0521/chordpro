@@ -170,7 +170,7 @@ const CHORD_MIN_GAP_PT = 4; // keeps a wide chord from running into the next one
 // Chords after a line's last word are spaced out like counted beats ("G   C   | Csus   | C").
 const SLOT_GAP_PT = 14;
 // Room on each side of a chord that sits before a word or syllable rather than on it.
-const SLOT_PAD_PT = 3;
+const SLOT_PAD_PT = 1.5;
 
 // Most spaces to add on each side of a gap when spreading lyrics apart for a chord.
 const MAX_SPREAD_SPACES = 40;
