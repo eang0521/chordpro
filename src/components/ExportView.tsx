@@ -4,7 +4,8 @@ import { songToChordPro } from '../lib/chordpro';
 import type { BlockMap } from '../lib/arrangement';
 import { generateWordDoc } from '../lib/wordDoc';
 import { generatePdf } from '../lib/pdfDoc';
-import { downloadBlob, slugifyFilename } from '../lib/download';
+import { chartFilename, downloadBlob } from '../lib/download';
+import { songKeysOf } from '../lib/chordChart';
 import { CHORD_FONT_OPTIONS } from '../lib/chordFonts';
 
 interface Props {
@@ -37,6 +38,7 @@ export function ExportView({
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [applied, setApplied] = useState(false);
   const [text, setText] = useState(() => songToChordPro(song));
+  const filename = (extension: string) => chartFilename(song.title, songKeysOf(blocks, arrangement, song.key), extension);
 
   function resetText() {
     setText(songToChordPro(song));
@@ -60,14 +62,14 @@ export function ExportView({
 
   function download() {
     const blob = new Blob([text], { type: 'text/plain' });
-    downloadBlob(blob, `${slugifyFilename(song.title)}.cho`);
+    downloadBlob(blob, filename('cho'));
   }
 
   async function downloadDocx() {
     setGeneratingDocx(true);
     try {
       const blob = await generateWordDoc(song.title, song.key, blocks, arrangement, fontId, lineSpacing);
-      downloadBlob(blob, `${slugifyFilename(song.title)}.docx`);
+      downloadBlob(blob, filename('docx'));
     } finally {
       setGeneratingDocx(false);
     }
@@ -77,7 +79,7 @@ export function ExportView({
     setGeneratingPdf(true);
     try {
       const blob = await generatePdf(song.title, song.key, blocks, arrangement, fontId, lineSpacing);
-      downloadBlob(blob, `${slugifyFilename(song.title)}.pdf`);
+      downloadBlob(blob, filename('pdf'));
     } finally {
       setGeneratingPdf(false);
     }

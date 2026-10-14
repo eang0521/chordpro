@@ -112,15 +112,26 @@ export interface SectionDisplayRow {
   isLastInSection: boolean;
 }
 
+/** Every key the song is played in, in order: just the song's key unless it changes key partway. */
+export function songKeys(sections: DocSection[], songKey: KeyName): KeyName[] {
+  const keys: KeyName[] = [songKey];
+  sections.forEach((s) => {
+    if (s.keyChange && s.keyChange !== keys[keys.length - 1]) keys.push(s.keyChange);
+  });
+  return keys;
+}
+
+/** `songKeys` straight from the song's blocks and arrangement. */
+export function songKeysOf(blocks: BlockMap, arrangement: ArrangementEntry[], songKey: KeyName): KeyName[] {
+  return songKeys(groupIntoSections(buildChartRows(blocks, arrangement, songKey)), songKey);
+}
+
 /**
  * The page header's key: "Key of C", or every key the song is played in, in order, when it
  * changes key partway ("Key: F-G"). Key changes print only here, not in the chart itself.
  */
 export function keyHeaderText(sections: DocSection[], songKey: KeyName): string {
-  const keys: KeyName[] = [songKey];
-  sections.forEach((s) => {
-    if (s.keyChange && s.keyChange !== keys[keys.length - 1]) keys.push(s.keyChange);
-  });
+  const keys = songKeys(sections, songKey);
   return keys.length === 1 ? `Key of ${songKey}` : `Key: ${keys.join('-')}`;
 }
 
@@ -167,14 +178,19 @@ export function placeChords(tokens: ChartToken[], measure: TextMeasure): PlacedL
   let lyricLine = '';
   const chords: PlacedLine['chords'] = [];
   let nextFreePt = 0;
+  // Index of the line's last syllable with lyrics: slots after it are trailing chords.
+  const lastLyric = tokens.reduce((last, tok, i) => (!tok.isSlot && tok.text ? i : last), -1);
   tokens.forEach((tok, i) => {
     if (tok.isSlot) {
-      // Takes no room in the lyrics; its chord follows the last word (or the previous chord).
+      // Takes no room in the lyrics. Between two words ("...ies [C/E] Your") its chord starts where
+      // the previous word ends, so it sits on the space just left of the next word. After the last
+      // word it's a trailing chord, spaced out like counted beats.
       if (!tok.chordLabel) return;
-      const afterWords = lyricLine ? measure(lyricLine, LYRIC_SIZE_PT, 'bold') + SLOT_GAP_PT : 0;
-      const at = Math.max(afterWords, nextFreePt);
+      const trailing = i > lastLyric;
+      const wordsEnd = lyricLine ? measure(lyricLine, LYRIC_SIZE_PT, 'bold') : 0;
+      const at = Math.max(trailing && lyricLine ? wordsEnd + SLOT_GAP_PT : wordsEnd, nextFreePt);
       chords.push({ offsetPt: at, label: tok.chordLabel });
-      nextFreePt = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic') + SLOT_GAP_PT;
+      nextFreePt = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic') + (trailing ? SLOT_GAP_PT : CHORD_MIN_GAP_PT);
       return;
     }
     if (tok.isWordStart && i !== 0 && lyricLine) lyricLine += ' ';

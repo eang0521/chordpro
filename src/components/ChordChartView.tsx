@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 import type { ArrangementEntry, KeyName } from '../types';
 import type { BlockMap } from '../lib/arrangement';
 import type { ChartLineRow, SectionDisplayRow } from '../lib/chordChart';
-import { buildChartRows, flattenSections, groupIntoSections, isChordOnly, keyHeaderText, placeChords } from '../lib/chordChart';
+import { buildChartRows, flattenSections, groupIntoSections, isChordOnly, keyHeaderText, placeChords, songKeys } from '../lib/chordChart';
 import { generateWordDoc } from '../lib/wordDoc';
 import { generatePdf } from '../lib/pdfDoc';
-import { downloadBlob, slugifyFilename } from '../lib/download';
+import { chartFilename, downloadBlob } from '../lib/download';
 import { CHORD_FONT_OPTIONS, getChordFontOption, loadChordFont } from '../lib/chordFonts';
 import {
   CHORD_SIZE_PT,
@@ -236,7 +236,7 @@ export function ChordChartView({
     setGenerating(true);
     try {
       const blob = await generateWordDoc(title, songKey, blocks, arrangement, fontId, lineSpacing);
-      downloadBlob(blob, `${slugifyFilename(title)}.docx`);
+      downloadBlob(blob, chartFilename(title, songKeys(sections, songKey), 'docx'));
     } finally {
       setGenerating(false);
     }
@@ -246,7 +246,7 @@ export function ChordChartView({
     setGeneratingPdf(true);
     try {
       const blob = await generatePdf(title, songKey, blocks, arrangement, fontId, lineSpacing);
-      downloadBlob(blob, `${slugifyFilename(title)}.pdf`);
+      downloadBlob(blob, chartFilename(title, songKeys(sections, songKey), 'pdf'));
     } finally {
       setGeneratingPdf(false);
     }
