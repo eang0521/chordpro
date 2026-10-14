@@ -10,9 +10,11 @@ interface Props {
   onSubmit: (title: string, key: KeyName, lyrics: string) => void;
   /** Pasted text that's already ChordPro skips the syllable and chord steps. */
   onImportChordPro: (title: string, key: KeyName, text: string) => void;
+  /** Every edit, before Continue, so a song still on this step is autosaved too. */
+  onChange: (title: string, key: KeyName, lyrics: string) => void;
 }
 
-export function LyricsInput({ initialTitle, initialKey, initialLyrics, onSubmit, onImportChordPro }: Props) {
+export function LyricsInput({ initialTitle, initialKey, initialLyrics, onSubmit, onImportChordPro, onChange }: Props) {
   const [title, setTitle] = useState(initialTitle);
   const [key, setKey] = useState<KeyName>(initialKey);
   const [lyrics, setLyrics] = useState(initialLyrics);
@@ -25,11 +27,24 @@ export function LyricsInput({ initialTitle, initialKey, initialLyrics, onSubmit,
       <h2>1. Song &amp; lyrics</h2>
       <label className="field">
         <span>Title</span>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Song title" />
+        <input
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            onChange(e.target.value, key, lyrics);
+          }}
+          placeholder="Song title"
+        />
       </label>
       <label className="field">
         <span>Key</span>
-        <select value={key} onChange={(e) => setKey(e.target.value as KeyName)}>
+        <select
+          value={key}
+          onChange={(e) => {
+            setKey(e.target.value as KeyName);
+            onChange(title, e.target.value as KeyName, lyrics);
+          }}
+        >
           {KEY_NAMES.map((k) => (
             <option key={k} value={k}>
               {k} Major
@@ -41,7 +56,10 @@ export function LyricsInput({ initialTitle, initialKey, initialLyrics, onSubmit,
         <span>Lyrics</span>
         <textarea
           value={lyrics}
-          onChange={(e) => setLyrics(e.target.value)}
+          onChange={(e) => {
+            setLyrics(e.target.value);
+            onChange(title, key, e.target.value);
+          }}
           rows={14}
           placeholder={'Paste lyrics here, one line per line of the song... or a ChordPro chart you already have'}
         />

@@ -929,3 +929,184 @@ button.secondary {
   padding: 4px 6px;
   font-size: 0.85rem;
 }
+
+/* Accounts and the song library */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.account-email {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-right button,
+.library-actions button {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+button.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+}
+
+button.secondary.danger {
+  color: var(--danger);
+}
+
+button.danger-solid {
+  background: var(--danger);
+}
+
+.dialog-panel {
+  max-width: 440px;
+}
+
+.dialog-panel h2 {
+  margin-top: 0;
+}
+
+.save-status {
+  align-self: center;
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.save-status-error {
+  color: var(--danger);
+}
+
+.sign-in-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin: 18px 0;
+}
+
+.sign-in-divider::before,
+.sign-in-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+
+.sign-in-sent {
+  line-height: 1.5;
+}
+
+.library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.library-header h2 {
+  margin: 0;
+}
+
+.library-error {
+  color: var(--danger);
+}
+
+.library-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.library-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 10px 6px 6px;
+}
+
+button.library-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 8px 10px;
+}
+
+button.library-open:hover:not(:disabled) {
+  background: var(--panel-bg);
+  filter: none;
+}
+
+.library-title {
+  font-size: 1rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-meta {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.library-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .app-header {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .account-email {
+    display: none;
+  }
+
+  .library-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .library-actions {
+    padding: 0 0 4px 10px;
+  }
+}

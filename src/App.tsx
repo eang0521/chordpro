@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ArrangementEntry, Chord, KeyName, Step } from './types';
 import type { Section, WordGroup } from './lib/syllables';
 import { parseLyricsToWordGroups, wordGroupsToBlocks } from './lib/syllables';
@@ -12,89 +12,234 @@ import { ArrangementEditor } from './components/ArrangementEditor';
 import { ChordChartView } from './components/ChordChartView';
 import { KeyControl } from './components/KeyControl';
 import { CopyChordsDialog } from './components/CopyChordsDialog';
-import { DEFAULT_CHORD_FONT_ID } from './lib/chordFonts';
+import { SongLibrary } from './components/SongLibrary';
+import { SignInDialog } from './components/SignInDialog';
 import { parseChordProText } from './lib/chordproParser';
+import { SONG_SCHEMA_VERSION, emptySongDocument, isBlankSong, type SongDocument } from './lib/songDocument';
+import {
+  clearLocalDraft,
+  loadLocalDraft,
+  markUploadOffered,
+  removeOldDrafts,
+  saveLocalDraft,
+  wasUploadOffered,
+} from './lib/localDraft';
+import { supabase } from './lib/supabaseClient';
+import { createSupabaseSongStore } from './lib/supabaseSongStore';
+import { NewerSongVersionError } from './lib/songStore';
+import { useAuth, signOut } from './hooks/useAuth';
+import { useAutosave } from './hooks/useAutosave';
 import './App.css';
 
-const STORAGE_KEY = 'chordpro-draft-v4';
-const DRAFT_KEY_PREFIX = 'chordpro-draft-';
+const songStore = supabase ? createSupabaseSongStore(supabase) : null;
+// Module-level so useAutosave gets the same function every render.
+const saveToLibrary = (doc: SongDocument) => songStore!.save(doc);
 
-interface StoredDraft {
-  step: Step;
-  title: string;
-  key: KeyName;
-  lyrics: string;
-  wordGroups: WordGroup[];
-  sections: Section[];
-  blocks: BlockMap;
-  arrangement: ArrangementEntry[];
-  palette: Chord[];
+// The library song open on this device, so a reload reopens it instead of dropping back to
+// the list. Per device on purpose: each device can be working on a different song.
+const OPEN_SONG_KEY = 'chordpro-open-song';
+
+function rememberOpenSong(id: string | null) {
+  try {
+    if (id) localStorage.setItem(OPEN_SONG_KEY, id);
+    else localStorage.removeItem(OPEN_SONG_KEY);
+  } catch {
+    // Storage unavailable — a reload just shows the library instead.
+  }
 }
 
-function loadDraft(): StoredDraft | null {
+function openSongOnReload(): string | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredDraft;
-    if (!parsed || typeof parsed.blocks !== 'object' || !Array.isArray(parsed.arrangement)) return null;
-    return parsed;
+    return localStorage.getItem(OPEN_SONG_KEY);
   } catch {
     return null;
   }
 }
 
-/** Drafts saved by older versions of the app are never read again, so drop them — on GitHub Pages
- * the whole eang0521.github.io origin (every project hosted there) shares one ~5MB storage quota. */
-function removeOldDrafts() {
-  try {
-    Object.keys(localStorage)
-      .filter((k) => k.startsWith(DRAFT_KEY_PREFIX) && k !== STORAGE_KEY)
-      .forEach((k) => localStorage.removeItem(k));
-  } catch {
-    // Storage unavailable (e.g. blocked in a private window) — nothing to clean up.
-  }
-}
-
-/** Returns false instead of throwing when storage is full or unavailable, so a failed autosave
- * never takes the whole app down. */
-function saveDraft(draft: StoredDraft): boolean {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
+const initialDraft = loadLocalDraft() ?? emptySongDocument();
 removeOldDrafts();
-const initialDraft = loadDraft();
 
 function App() {
-  const [step, setStep] = useState<Step>(initialDraft?.step ?? 'input');
-  const [title, setTitle] = useState(initialDraft?.title ?? '');
-  const [key, setKey] = useState<KeyName>(initialDraft?.key ?? 'C');
-  const [lyrics, setLyrics] = useState(initialDraft?.lyrics ?? '');
-  const [wordGroups, setWordGroups] = useState<WordGroup[]>(initialDraft?.wordGroups ?? []);
-  const [sections, setSections] = useState<Section[]>(initialDraft?.sections ?? []);
-  const [blocks, setBlocks] = useState<BlockMap>(initialDraft?.blocks ?? {});
-  const [arrangement, setArrangement] = useState<ArrangementEntry[]>(initialDraft?.arrangement ?? []);
-  const [palette, setPalette] = useState<Chord[]>(initialDraft?.palette ?? []);
+  const auth = useAuth();
+  const userId = auth.status === 'signedIn' ? auth.user.id : null;
+  // 'local' is the single signed-out draft kept in this browser, 'cloud' a library song.
+  const [source, setSource] = useState<'local' | 'cloud'>('local');
+  const [screen, setScreen] = useState<'editor' | 'library' | 'opening'>('editor');
+  const [libraryMessage, setLibraryMessage] = useState<string | null>(null);
+  const [showSignIn, setShowSignIn] = useState(false);
+  const [draftToUpload, setDraftToUpload] = useState<SongDocument | null>(null);
+  const [uploadFailed, setUploadFailed] = useState(false);
+
+  const [songId, setSongId] = useState(initialDraft.id);
+  const [step, setStep] = useState<Step>(initialDraft.step);
+  const [title, setTitle] = useState(initialDraft.title);
+  const [key, setKey] = useState<KeyName>(initialDraft.key);
+  const [lyrics, setLyrics] = useState(initialDraft.lyrics);
+  const [wordGroups, setWordGroups] = useState<WordGroup[]>(initialDraft.wordGroups);
+  const [sections, setSections] = useState<Section[]>(initialDraft.sections);
+  const [blocks, setBlocks] = useState<BlockMap>(initialDraft.blocks);
+  const [arrangement, setArrangement] = useState<ArrangementEntry[]>(initialDraft.arrangement);
+  const [palette, setPalette] = useState<Chord[]>(initialDraft.palette);
   const [showArrangement, setShowArrangement] = useState(false);
   const [showChart, setShowChart] = useState(false);
   const [showCopyChords, setShowCopyChords] = useState(false);
-  // Shared with ExportView so the chord chart's font/spacing choice stays the same regardless of
-  // which screen you download the .docx from, instead of each view defaulting independently.
-  const [chartFontId, setChartFontId] = useState<string>(DEFAULT_CHORD_FONT_ID);
-  const [chartLineSpacing, setChartLineSpacing] = useState(1);
+  // Saved with the song, and shared with ExportView so the chord chart's font/spacing choice
+  // stays the same regardless of which screen you download the .docx from.
+  const [chartFontId, setChartFontId] = useState<string>(initialDraft.chartFontId);
+  const [chartLineSpacing, setChartLineSpacing] = useState(initialDraft.lineSpacing);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
 
+  const doc = useMemo<SongDocument>(
+    () => ({
+      schemaVersion: SONG_SCHEMA_VERSION,
+      id: songId,
+      step,
+      title,
+      key,
+      lyrics,
+      wordGroups,
+      sections,
+      blocks,
+      arrangement,
+      palette,
+      chartFontId,
+      lineSpacing: chartLineSpacing,
+    }),
+    [songId, step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette, chartFontId, chartLineSpacing],
+  );
+
+  const editingLibrarySong = source === 'cloud' && screen === 'editor';
+  const autosave = useAutosave(editingLibrarySong ? doc : null, saveToLibrary);
+
   useEffect(() => {
-    const draft: StoredDraft = { step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette };
+    if (source !== 'local') return;
     // Mirrors the outcome of a write to an external system (localStorage) into state, which is
     // exactly what an effect is for — there's no render-time way to know whether the save fit.
     // oxlint-disable-next-line react/set-state-in-effect
-    setDraftSaveFailed(!saveDraft(draft));
-  }, [step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette]);
+    setDraftSaveFailed(!saveLocalDraft(doc));
+  }, [source, doc]);
+
+  function loadDocument(next: SongDocument) {
+    setSongId(next.id);
+    setStep(next.step);
+    setTitle(next.title);
+    setKey(next.key);
+    setLyrics(next.lyrics);
+    setWordGroups(next.wordGroups);
+    setSections(next.sections);
+    setBlocks(next.blocks);
+    setArrangement(next.arrangement);
+    setPalette(next.palette);
+    setChartFontId(next.chartFontId);
+    setChartLineSpacing(next.lineSpacing);
+    setShowArrangement(false);
+    setShowChart(false);
+    setShowCopyChords(false);
+  }
+
+  /** Gets the open library song's last edits saved before showing something else. Resolves
+   * false if they couldn't be saved and the user chose to stay. */
+  async function leaveLibrarySong(): Promise<boolean> {
+    if (!editingLibrarySong) return true;
+    if (await autosave.flush()) return true;
+    return window.confirm("Your latest changes couldn't be saved. Leave this song anyway and lose them?");
+  }
+
+  async function openSong(id: string) {
+    if (!songStore || !(await leaveLibrarySong())) return;
+    setLibraryMessage(null);
+    try {
+      const song = await songStore.get(id);
+      if (!song) {
+        rememberOpenSong(null);
+        setLibraryMessage("That song isn't in your library any more.");
+        setScreen('library');
+        return;
+      }
+      loadDocument(song);
+      setSource('cloud');
+      setScreen('editor');
+      rememberOpenSong(song.id);
+    } catch (err) {
+      rememberOpenSong(null);
+      setLibraryMessage(err instanceof NewerSongVersionError ? err.message : "Couldn't open that song. Check your connection and try again.");
+      setScreen('library');
+    }
+  }
+
+  async function newLibrarySong() {
+    if (!(await leaveLibrarySong())) return;
+    const song = emptySongDocument();
+    loadDocument(song);
+    setSource('cloud');
+    setScreen('editor');
+    // Nothing is written until something is typed, so backing out leaves no empty song behind.
+    rememberOpenSong(song.id);
+  }
+
+  async function showLibrary() {
+    if (!(await leaveLibrarySong())) return;
+    setLibraryMessage(null);
+    setScreen('library');
+    rememberOpenSong(null);
+  }
+
+  async function handleSignOut() {
+    if (!(await leaveLibrarySong())) return;
+    rememberOpenSong(null);
+    await signOut();
+  }
+
+  // Switch between the local draft and the library whenever someone signs in or out — here or
+  // in another tab. Tracks the previous user so a token refresh or the first render does nothing.
+  const prevUserId = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (auth.status === 'loading') return;
+    const prev = prevUserId.current;
+    prevUserId.current = userId;
+    if (prev === userId || (prev === undefined && !userId)) return;
+
+    if (userId) {
+      // Follows an external system (the auth session), which is what an effect is for.
+      // oxlint-disable-next-line react/set-state-in-effect
+      setSource('cloud');
+      const reopen = openSongOnReload();
+      // 'opening' hides the editor, which still holds the signed-out draft, until the song arrives.
+      setScreen(reopen ? 'opening' : 'library');
+      if (reopen) void openSong(reopen);
+      // First sign-in on this device: offer to bring the signed-out draft along so it isn't lost.
+      const local = loadLocalDraft();
+      if (local && !isBlankSong(local) && !wasUploadOffered(local.id)) setDraftToUpload(local);
+    } else {
+      loadDocument(loadLocalDraft() ?? emptySongDocument());
+      setSource('local');
+      setScreen('editor');
+      setDraftToUpload(null);
+    }
+    // Only sign-in changes should trigger this; the handlers it calls read current state anyway.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.status, userId]);
+
+  async function uploadDraft(draft: SongDocument) {
+    if (!songStore) return;
+    setUploadFailed(false);
+    try {
+      await songStore.save(draft);
+    } catch {
+      setUploadFailed(true);
+      return;
+    }
+    markUploadOffered(draft.id);
+    // It lives in the library now; keeping a copy here too would just be a second, diverging version.
+    clearLocalDraft();
+    setDraftToUpload(null);
+    await openSong(draft.id);
+  }
+
+  function skipUpload(draft: SongDocument) {
+    markUploadOffered(draft.id);
+    setDraftToUpload(null);
+  }
 
   const flatSyllables = useMemo(() => deriveFlatSyllables(blocks, arrangement), [blocks, arrangement]);
 
@@ -110,160 +255,234 @@ function App() {
   }
 
   function startOver() {
-    setStep('input');
-    setTitle('');
-    setKey('C');
-    setLyrics('');
-    setWordGroups([]);
-    setSections([]);
-    setBlocks({});
-    setArrangement([]);
-    setPalette([]);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // Storage unavailable — there's no saved draft to clear.
+    // Signed in, the finished song stays in the library; signed out, the one draft is replaced.
+    if (source === 'cloud') {
+      void newLibrarySong();
+      return;
     }
+    loadDocument(emptySongDocument());
+    clearLocalDraft();
   }
+
+  // Signed in, only a library song is ever shown in the editor — never the local draft for a
+  // moment while switching over, where an edit would end up in the wrong place.
+  const showEditor = auth.status !== 'loading' && (userId ? editingLibrarySong : source === 'local');
 
   return (
     <div className="app">
       <header className="app-header">
         <h1>ChordPro Tapper</h1>
-        <ol className="steps">
-          {(['input', 'edit-syllables', 'chords', 'export'] as Step[]).map((s, i) => (
-            <li key={s} className={s === step ? 'active' : undefined}>
-              {i + 1}
-            </li>
-          ))}
-        </ol>
+        <div className="header-right">
+          {showEditor && (
+            <ol className="steps">
+              {(['input', 'edit-syllables', 'chords', 'export'] as Step[]).map((s, i) => (
+                <li key={s} className={s === step ? 'active' : undefined}>
+                  {i + 1}
+                </li>
+              ))}
+            </ol>
+          )}
+          {auth.status === 'signedOut' && (
+            <button className="secondary" onClick={() => setShowSignIn(true)}>
+              Sign in
+            </button>
+          )}
+          {auth.status === 'signedIn' && (
+            <div className="account">
+              {screen === 'editor' && (
+                <button className="secondary" onClick={() => void showLibrary()}>
+                  My songs
+                </button>
+              )}
+              <span className="account-email" title={auth.user.email}>
+                {auth.user.email}
+              </span>
+              <button className="secondary" onClick={() => void handleSignOut()}>
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
-      {draftSaveFailed && (
-        <p className="hint draft-save-warning">
-          Your browser's storage for this site is full, so this song isn't being saved &mdash; it will be lost if you
-          reload or close the page. Export it before leaving.
-        </p>
+      {showSignIn && auth.status === 'signedOut' && <SignInDialog onClose={() => setShowSignIn(false)} />}
+
+      {draftToUpload && (
+        <div className="arrangement-overlay">
+          <div className="arrangement-panel dialog-panel" role="dialog" aria-modal="true">
+            <h2>Add your song to your library?</h2>
+            <p className="hint">
+              &ldquo;{draftToUpload.title.trim() || 'Untitled'}&rdquo; was saved in this browser before you signed in.
+              Add it to your library so you can open it on any device. If you don&rsquo;t, it stays here and comes
+              back when you sign out.
+            </p>
+            {uploadFailed && <p className="hint library-error">Couldn&rsquo;t upload it. Check your connection and try again.</p>}
+            <div className="actions">
+              <button onClick={() => void uploadDraft(draftToUpload)}>Add to library</button>
+              <button className="secondary" onClick={() => skipUpload(draftToUpload)}>
+                Not now
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
-      <div className="toolbar">
-        <button
-          className="secondary"
-          disabled={arrangement.length === 0}
-          onClick={() => setShowArrangement(true)}
-        >
-          Arrange sections
-        </button>
-        <button className="secondary" disabled={arrangement.length === 0} onClick={() => setShowChart(true)}>
-          View chart
-        </button>
-        <button
-          className="secondary"
-          disabled={new Set(blockIdsOf(arrangement)).size < 2}
-          onClick={() => setShowCopyChords(true)}
-        >
-          Copy chords
-        </button>
-        {step !== 'input' && <KeyControl songKey={key} onChange={setKey} />}
-      </div>
+      {(auth.status === 'loading' || (userId && screen === 'opening')) && <p className="hint">Loading&hellip;</p>}
 
-      {showArrangement && (
-        <ArrangementEditor blocks={blocks} arrangement={arrangement} songKey={key} onChange={(b, a) => { setBlocks(b); setArrangement(a); }} onClose={() => setShowArrangement(false)} />
+      {songStore && userId && screen === 'library' && (
+        <SongLibrary store={songStore} message={libraryMessage} onOpen={(id) => void openSong(id)} onNew={() => void newLibrarySong()} />
       )}
 
-      {showCopyChords && (
-        <CopyChordsDialog
-          blocks={blocks}
-          arrangement={arrangement}
-          songKey={key}
-          onApply={(block) => setBlocks((prev) => ({ ...prev, [block.id]: block }))}
-          onClose={() => setShowCopyChords(false)}
-        />
-      )}
+      {showEditor && (
+        // Keyed by song so each screen's own state (typed-but-unsubmitted text, scroll, selection)
+        // starts fresh when a different song is opened instead of carrying over.
+        <div key={songId}>
+          {draftSaveFailed && source === 'local' && (
+            <p className="hint draft-save-warning">
+              Your browser's storage for this site is full, so this song isn't being saved &mdash; it will be lost if you
+              reload or close the page. Export it before leaving.
+            </p>
+          )}
 
-      {showChart && (
-        <ChordChartView
-          title={title}
-          songKey={key}
-          onSongKeyChange={setKey}
-          blocks={blocks}
-          arrangement={arrangement}
-          fontId={chartFontId}
-          onFontIdChange={setChartFontId}
-          lineSpacing={chartLineSpacing}
-          onLineSpacingChange={setChartLineSpacing}
-          onClose={() => setShowChart(false)}
-        />
-      )}
+          <div className="toolbar">
+            <button
+              className="secondary"
+              disabled={arrangement.length === 0}
+              onClick={() => setShowArrangement(true)}
+            >
+              Arrange sections
+            </button>
+            <button className="secondary" disabled={arrangement.length === 0} onClick={() => setShowChart(true)}>
+              View chart
+            </button>
+            <button
+              className="secondary"
+              disabled={new Set(blockIdsOf(arrangement)).size < 2}
+              onClick={() => setShowCopyChords(true)}
+            >
+              Copy chords
+            </button>
+            {step !== 'input' && <KeyControl songKey={key} onChange={setKey} />}
+            {editingLibrarySong && (
+              <span className={`save-status save-status-${autosave.status}`} role="status">
+                {autosave.status === 'saved' && 'Saved'}
+                {autosave.status === 'saving' && 'Saving…'}
+                {autosave.status === 'error' && (
+                  <>
+                    Couldn&rsquo;t save{' '}
+                    <button className="link-button" onClick={() => void autosave.flush()}>
+                      Retry
+                    </button>
+                  </>
+                )}
+              </span>
+            )}
+          </div>
 
-      {step === 'input' && (
-        <LyricsInput
-          initialTitle={title}
-          initialKey={key}
-          initialLyrics={lyrics}
-          onImportChordPro={(t, k, text) => {
-            // Already a chart: keep the text as the lyrics (for Back) and go straight to export.
-            setLyrics(text);
-            setWordGroups([]);
-            setSections([]);
-            applyChordProEdits(text, t, k);
-            setStep('export');
-          }}
-          onSubmit={(t, k, l) => {
-            setTitle(t);
-            setKey(k);
-            setLyrics(l);
-            const { groups, sections: parsedSections } = parseLyricsToWordGroups(l);
-            setWordGroups(groups);
-            setSections(parsedSections);
-            setStep('edit-syllables');
-          }}
-        />
-      )}
+          {showArrangement && (
+            <ArrangementEditor blocks={blocks} arrangement={arrangement} songKey={key} onChange={(b, a) => { setBlocks(b); setArrangement(a); }} onClose={() => setShowArrangement(false)} />
+          )}
 
-      {step === 'edit-syllables' && (
-        <SyllableEditor
-          initialGroups={wordGroups}
-          sections={sections}
-          onBack={() => setStep('input')}
-          onSubmit={(groups) => {
-            setWordGroups(groups);
-            const { blocks: newBlocks, arrangement: newArrangement } = wordGroupsToBlocks(groups, sections, key);
-            setBlocks(Object.fromEntries(newBlocks.map((b) => [b.id, b])));
-            setArrangement(newArrangement);
-            setStep('chords');
-          }}
-        />
-      )}
+          {showCopyChords && (
+            <CopyChordsDialog
+              blocks={blocks}
+              arrangement={arrangement}
+              songKey={key}
+              onApply={(block) => setBlocks((prev) => ({ ...prev, [block.id]: block }))}
+              onClose={() => setShowCopyChords(false)}
+            />
+          )}
 
-      {step === 'chords' && (
-        <ChordTapper
-          syllables={flatSyllables}
-          songKey={key}
-          palette={palette}
-          onPaletteChange={setPalette}
-          onUpdateBlocks={setBlocks}
-          onBack={() => setStep('edit-syllables')}
-          onSubmit={() => setStep('export')}
-        />
-      )}
+          {showChart && (
+            <ChordChartView
+              title={title}
+              songKey={key}
+              onSongKeyChange={setKey}
+              blocks={blocks}
+              arrangement={arrangement}
+              fontId={chartFontId}
+              onFontIdChange={setChartFontId}
+              lineSpacing={chartLineSpacing}
+              onLineSpacingChange={setChartLineSpacing}
+              onClose={() => setShowChart(false)}
+            />
+          )}
 
-      {step === 'export' && (
-        <ExportView
-          // The ChordPro text is generated once and then freely editable, so remount on a key
-          // change to regenerate it with the transposed chords instead of leaving it stale.
-          key={key}
-          song={{ title, key, syllables: flatSyllables }}
-          blocks={blocks}
-          arrangement={arrangement}
-          fontId={chartFontId}
-          onFontIdChange={setChartFontId}
-          lineSpacing={chartLineSpacing}
-          onLineSpacingChange={setChartLineSpacing}
-          onApplyChordPro={applyChordProEdits}
-          onBack={() => setStep('chords')}
-          onStartOver={startOver}
-        />
+          {step === 'input' && (
+            <LyricsInput
+              initialTitle={title}
+              initialKey={key}
+              initialLyrics={lyrics}
+              onChange={(t, k, l) => {
+                setTitle(t);
+                setKey(k);
+                setLyrics(l);
+              }}
+              onImportChordPro={(t, k, text) => {
+                // Already a chart: keep the text as the lyrics (for Back) and go straight to export.
+                setLyrics(text);
+                setWordGroups([]);
+                setSections([]);
+                applyChordProEdits(text, t, k);
+                setStep('export');
+              }}
+              onSubmit={(t, k, l) => {
+                setTitle(t);
+                setKey(k);
+                setLyrics(l);
+                const { groups, sections: parsedSections } = parseLyricsToWordGroups(l);
+                setWordGroups(groups);
+                setSections(parsedSections);
+                setStep('edit-syllables');
+              }}
+            />
+          )}
+
+          {step === 'edit-syllables' && (
+            <SyllableEditor
+              initialGroups={wordGroups}
+              sections={sections}
+              onBack={() => setStep('input')}
+              onSubmit={(groups) => {
+                setWordGroups(groups);
+                const { blocks: newBlocks, arrangement: newArrangement } = wordGroupsToBlocks(groups, sections, key);
+                setBlocks(Object.fromEntries(newBlocks.map((b) => [b.id, b])));
+                setArrangement(newArrangement);
+                setStep('chords');
+              }}
+            />
+          )}
+
+          {step === 'chords' && (
+            <ChordTapper
+              syllables={flatSyllables}
+              songKey={key}
+              palette={palette}
+              onPaletteChange={setPalette}
+              onUpdateBlocks={setBlocks}
+              onBack={() => setStep('edit-syllables')}
+              onSubmit={() => setStep('export')}
+            />
+          )}
+
+          {step === 'export' && (
+            <ExportView
+              // The ChordPro text is generated once and then freely editable, so remount on a key
+              // change to regenerate it with the transposed chords instead of leaving it stale.
+              key={key}
+              song={{ title, key, syllables: flatSyllables }}
+              blocks={blocks}
+              arrangement={arrangement}
+              fontId={chartFontId}
+              onFontIdChange={setChartFontId}
+              lineSpacing={chartLineSpacing}
+              onLineSpacingChange={setChartLineSpacing}
+              onApplyChordPro={applyChordProEdits}
+              onBack={() => setStep('chords')}
+              onStartOver={startOver}
+            />
+          )}
+        </div>
       )}
     </div>
   );
