@@ -2,7 +2,8 @@ import type { Paragraph } from 'docx';
 import type { KeyName } from '../types';
 import type { BlockMap } from './arrangement';
 import { buildChartRows, groupIntoSections, placeChords } from './chordChart';
-import { getChordFontOption } from './chordFonts';
+import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
+import { embedFontStyles } from './docxFonts';
 import {
   CHORD_LINE_PT,
   CHORD_SIZE_PT,
@@ -20,6 +21,7 @@ import {
   TITLE_GAP_PT,
   TITLE_SIZE_PT,
   labelColumnTwips,
+  measureInFont,
 } from './pageLayout';
 
 const halfPt = (pt: number) => pt * 2; // docx run sizes are in half-points
@@ -39,8 +41,10 @@ export async function generateWordDoc(
   // Loaded on demand — the docx package is sizable and most sessions never export a Word doc.
   const { AlignmentType, Document, Header, LineRuleType, Packer, Paragraph, Tab, TabStopType, TextRun } = await import('docx');
   const font = getChordFontOption(fontId);
+  await loadChordFont(font); // measuring chord positions needs the real font loaded
   const sections = groupIntoSections(buildChartRows(blocks, arrangement, key));
-  const labelCol = labelColumnTwips(sections.map((s) => s.label), font.wordFont);
+  const measure = measureInFont(font.wordFont);
+  const labelCol = labelColumnTwips(sections.map((s) => s.label), measure);
 
   const exactLine = (pt: number, afterPt = 0) => ({
     before: 0,
@@ -57,6 +61,7 @@ export async function generateWordDoc(
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: twips(TITLE_GAP_PT) },
+      keepNext: true,
       children: [
         new TextRun({ text: title || 'Untitled', bold: true, allCaps: true, size: halfPt(TITLE_SIZE_PT), font: font.wordFont }),
       ],
@@ -65,15 +70,19 @@ export async function generateWordDoc(
 
   sections.forEach((section) => {
     if (section.lineRows.length === 0) {
-      if (section.label) body.push(new Paragraph({ spacing: exactLine(LYRIC_LINE_PT, SECTION_GAP_PT), children: [labelRun(section.label)] }));
+      if (section.label) body.push(new Paragraph({ spacing: exactLine(LYRIC_LINE_PT, SECTION_GAP_PT), keepNext: true, children: [labelRun(section.label)] }));
       return;
     }
     section.lineRows.forEach((row, i) => {
-      const { lyricLine, chords } = placeChords(row.tokens, font.wordFont);
+      const { lyricLine, chords } = placeChords(row.tokens, measure);
       if (chords.length > 0) {
         body.push(
           new Paragraph({
             spacing: exactLine(CHORD_LINE_PT),
+            // Every line of a section keeps with the next one, so Word never splits a section
+            // across pages (matching the preview's pagination).
+            keepNext: true,
+            keepLines: true,
             // Word measures tab stops from the left margin, so offset by the label column.
             tabStops: chords.map((c) => ({ type: TabStopType.LEFT, position: labelCol + twips(c.offsetPt) })),
             children: chords.map(
@@ -88,6 +97,8 @@ export async function generateWordDoc(
       body.push(
         new Paragraph({
           spacing: exactLine(LYRIC_LINE_PT, isLast ? SECTION_GAP_PT : 0),
+          keepNext: !isLast,
+          keepLines: true,
           // Hanging indent: the label sits at the margin on the first line, and the lyrics (plus
           // any wrapped continuation) start at the label column.
           indent: withLabel ? { left: labelCol, hanging: labelCol } : { left: labelCol },
@@ -98,7 +109,14 @@ export async function generateWordDoc(
     });
   });
 
+  // A bundled font travels inside the file so the chart looks right on computers without it.
+  const fontFiles = font.files
+    ? await Promise.all([font.files.regular, font.files.bold, font.files.italic, font.files.boldItalic].map(fetchFontFile))
+    : null;
+
   const doc = new Document({
+    // docx types this as a Node Buffer, but only reads it as bytes, so a Uint8Array works.
+    fonts: fontFiles ? [{ name: font.wordFont, data: fontFiles[0] as unknown as Buffer }] : [],
     styles: { default: { document: { run: { font: font.wordFont } } } },
     sections: [
       {
@@ -127,5 +145,8 @@ export async function generateWordDoc(
       },
     ],
   });
-  return Packer.toBlob(doc);
+  const blob = await Packer.toBlob(doc);
+  if (!fontFiles) return blob;
+  const [, bold, italic, boldItalic] = fontFiles;
+  return embedFontStyles(blob, font.wordFont, { Bold: bold, Italic: italic, BoldItalic: boldItalic });
 }

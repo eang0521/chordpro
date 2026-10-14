@@ -840,3 +840,7 @@ button.secondary {
   font-size: 0.9rem;
   line-height: 2;
 }
+
+.chart-fit-message {
+  margin: 8px 0 0;
+}

@@ -51,6 +51,10 @@ export const HEADER_TOP_PX = twipsToPreviewPx(HEADER_TOP_TWIPS);
 export const CONTENT_WIDTH_PX = twipsToPreviewPx(CONTENT_WIDTH_TWIPS);
 export const CONTENT_HEIGHT_PX = PAGE_HEIGHT_PX - MARGIN_TOP_PX - MARGIN_BOTTOM_PX;
 
+/** Measures text width (in points) at a size and style. The browser preview and Word export
+ * measure with the canvas (`measureInFont`); the PDF export measures with the PDF's own fonts. */
+export type TextMeasure = (text: string, sizePt: number, style: '' | 'bold' | 'italic') => number;
+
 /** Measures text width (in points) in a given CSS font via an offscreen canvas — the only
  * reliable way to know how wide text will render in a proportional font. */
 export function measureTextPt(text: string, fontFamily: string, sizePt: number, style = ''): number {
@@ -60,8 +64,12 @@ export function measureTextPt(text: string, fontFamily: string, sizePt: number, 
   return (ctx.measureText(text).width / 100) * sizePt;
 }
 
+export function measureInFont(fontFamily: string): TextMeasure {
+  return (text, sizePt, style) => measureTextPt(text, fontFamily, sizePt, style);
+}
+
 /** Width of the section-label column for a song: at least 1in, wider if a label needs it. */
-export function labelColumnTwips(labels: string[], fontFamily: string): number {
-  const widest = Math.max(0, ...labels.map((l) => measureTextPt(l.toUpperCase(), fontFamily, LABEL_SIZE_PT, 'bold')));
+export function labelColumnTwips(labels: string[], measure: TextMeasure): number {
+  const widest = Math.max(0, ...labels.map((l) => measure(l.toUpperCase(), LABEL_SIZE_PT, 'bold')));
   return Math.max(MIN_LABEL_COLUMN_TWIPS, Math.ceil(widest * 20) + LABEL_GAP_TWIPS);
 }

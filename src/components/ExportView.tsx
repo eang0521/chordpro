@@ -3,6 +3,7 @@ import type { Song } from '../types';
 import { songToChordPro } from '../lib/chordpro';
 import type { BlockMap } from '../lib/arrangement';
 import { generateWordDoc } from '../lib/wordDoc';
+import { generatePdf } from '../lib/pdfDoc';
 import { downloadBlob, slugifyFilename } from '../lib/download';
 import { CHORD_FONT_OPTIONS } from '../lib/chordFonts';
 
@@ -33,6 +34,7 @@ export function ExportView({
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [generatingDocx, setGeneratingDocx] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [applied, setApplied] = useState(false);
   const [text, setText] = useState(() => songToChordPro(song));
 
@@ -68,6 +70,16 @@ export function ExportView({
       downloadBlob(blob, `${slugifyFilename(song.title)}.docx`);
     } finally {
       setGeneratingDocx(false);
+    }
+  }
+
+  async function downloadPdf() {
+    setGeneratingPdf(true);
+    try {
+      const blob = await generatePdf(song.title, song.key, blocks, arrangement, fontId, lineSpacing);
+      downloadBlob(blob, `${slugifyFilename(song.title)}.pdf`);
+    } finally {
+      setGeneratingPdf(false);
     }
   }
 
@@ -121,6 +133,9 @@ export function ExportView({
         </label>
         <button className="secondary" disabled={generatingDocx} onClick={downloadDocx}>
           {generatingDocx ? 'Generating…' : 'Download .docx'}
+        </button>
+        <button className="secondary" disabled={generatingPdf} onClick={downloadPdf}>
+          {generatingPdf ? 'Generating…' : 'Download PDF'}
         </button>
         <button className="secondary" onClick={onStartOver}>
           Start a new song
