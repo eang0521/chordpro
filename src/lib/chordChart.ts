@@ -112,6 +112,18 @@ export interface SectionDisplayRow {
   isLastInSection: boolean;
 }
 
+/**
+ * The page header's key: "Key of C", or every key the song is played in, in order, when it
+ * changes key partway ("Key: F-G"). Key changes print only here, not in the chart itself.
+ */
+export function keyHeaderText(sections: DocSection[], songKey: KeyName): string {
+  const keys: KeyName[] = [songKey];
+  sections.forEach((s) => {
+    if (s.keyChange && s.keyChange !== keys[keys.length - 1]) keys.push(s.keyChange);
+  });
+  return keys.length === 1 ? `Key of ${songKey}` : `Key: ${keys.join('-')}`;
+}
+
 /** Flattens sections into one entry per line-row (or a single blank entry for a label-only
  * section), so a renderer can lay out a fixed-width label column beside the lyrics/chords —
  * showing the label only on the section's first row, so it visually spans the section the same

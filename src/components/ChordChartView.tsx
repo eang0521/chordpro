@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { ArrangementEntry, KeyName } from '../types';
 import type { BlockMap } from '../lib/arrangement';
 import type { ChartLineRow, SectionDisplayRow } from '../lib/chordChart';
-import { buildChartRows, flattenSections, groupIntoSections, isChordOnly, placeChords } from '../lib/chordChart';
+import { buildChartRows, flattenSections, groupIntoSections, isChordOnly, keyHeaderText, placeChords } from '../lib/chordChart';
 import { generateWordDoc } from '../lib/wordDoc';
 import { generatePdf } from '../lib/pdfDoc';
 import { downloadBlob, slugifyFilename } from '../lib/download';
@@ -100,8 +100,7 @@ function renderDisplayRow(display: SectionDisplayRow, labelColEm: number, fontFa
   // lyric line itself, so its label needs no spacer.
   const tokens = display.row?.tokens ?? [];
   const hasChords = tokens.some((t) => t.chordLabel) && tokens.some((t) => !t.isSlot && t.text.trim());
-  const keyChange = display.isFirstInSection ? display.section.keyChange : undefined;
-  const row = (
+  return (
     <div className={`chart-section-row ${gapClass}`} key={display.key}>
       <div className="chart-label-col" style={{ width: `${labelColEm}em` }}>
         {display.isFirstInSection && display.section.label && (
@@ -114,16 +113,6 @@ function renderDisplayRow(display: SectionDisplayRow, labelColEm: number, fontFa
         )}
       </div>
       <div className="chart-content-col">{display.row ? renderLinePair(display.row, fontFamily) : <>&nbsp;</>}</div>
-    </div>
-  );
-  if (!keyChange) return row;
-  // Part of the section's first row, so pagination never strands it at the bottom of a page.
-  return (
-    <div key={display.key}>
-      <div className="chart-key-change">
-        <span className="chart-key-change-label">Key change to</span> {keyChange}
-      </div>
-      {row}
     </div>
   );
 }
@@ -156,10 +145,12 @@ export function ChordChartView({
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pageMode, setPageMode] = useState(false);
   const [fitMessage, setFitMessage] = useState<string | null>(null);
-  const displayRows = useMemo(
-    () => flattenSections(groupIntoSections(buildChartRows(blocks, arrangement, songKey))),
+  const sections = useMemo(
+    () => groupIntoSections(buildChartRows(blocks, arrangement, songKey)),
     [blocks, arrangement, songKey],
   );
+  const displayRows = useMemo(() => flattenSections(sections), [sections]);
+  const keyHeader = keyHeaderText(sections, songKey);
   const pageItems = useMemo<PageItem[]>(
     () => [{ kind: 'header' }, ...displayRows.map((display) => ({ kind: 'row' as const, display }))],
     [displayRows],
@@ -341,9 +332,12 @@ export function ChordChartView({
                     ...lineSpacingVar(lineSpacing),
                   }}
                 >
-                  <div className="chart-page-header" style={{ top: HEADER_TOP_PX, left: MARGIN_SIDE_PX }}>
-                    Key of {songKey}
-                  </div>
+                  {/* Only the first page has the header, like the Word and PDF exports. */}
+                  {pageIndex === 0 && (
+                    <div className="chart-page-header" style={{ top: HEADER_TOP_PX, left: MARGIN_SIDE_PX }}>
+                      {keyHeader}
+                    </div>
+                  )}
                   {indices.map((i) => (
                     <div key={i}>{renderPageItem(pageItems[i], title, labelColEm, font.wordFont)}</div>
                   ))}
@@ -356,7 +350,7 @@ export function ChordChartView({
           </div>
         ) : (
           <div className="chord-chart" style={{ fontFamily: font.cssFont, ...lineSpacingVar(lineSpacing) }}>
-            <div className="chart-page-header">Key of {songKey}</div>
+            <div className="chart-page-header">{keyHeader}</div>
             {renderTitle(title)}
             {displayRows.map((display) => renderDisplayRow(display, labelColEm, font.wordFont))}
           </div>

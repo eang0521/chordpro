@@ -2,7 +2,7 @@ import type { PDFFont } from 'pdf-lib';
 import type { ArrangementEntry, KeyName } from '../types';
 import type { BlockMap } from './arrangement';
 import type { ChartToken } from './chordChart';
-import { buildChartRows, groupIntoSections, isChordOnly, placeChords } from './chordChart';
+import { buildChartRows, groupIntoSections, isChordOnly, keyHeaderText, placeChords } from './chordChart';
 import { fetchFontFile, getChordFontOption } from './chordFonts';
 import type { TextMeasure } from './pageLayout';
 import {
@@ -59,8 +59,7 @@ interface PrintedLine {
  * lines) of a section. */
 type LayoutItem =
   | { kind: 'title'; height: number }
-  | { kind: 'row'; height: number; label: string | null; lines: PrintedLine[] }
-  | { kind: 'keyChange'; height: number; key: string };
+  | { kind: 'row'; height: number; label: string | null; lines: PrintedLine[] };
 
 /** Breaks a line's tokens at word boundaries so each piece fits `width`, so long lines wrap
  * instead of running off the page. A single word wider than the line stays whole. */
@@ -138,11 +137,6 @@ export async function generatePdf(
   const groups: number[][] = [[0]];
   sections.forEach((section) => {
     const group: number[] = [];
-    if (section.keyChange) {
-      // In the section's group, so it stays on the same page as the section it starts.
-      group.push(items.length);
-      items.push({ kind: 'keyChange', height: lyricLine, key: section.keyChange });
-    }
     if (section.lineRows.length === 0) {
       group.push(items.length);
       items.push({ kind: 'row', height: lyricLine + sectionGap, label: section.label, lines: [] });
@@ -173,9 +167,12 @@ export async function generatePdf(
     items.map((item) => item.height),
     groups,
     CONTENT_HEIGHT,
-  ).forEach((indices) => {
+  ).forEach((indices, pageIndex) => {
     const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    draw(page, `Key of ${key}`, MARGIN_SIDE, pt(HEADER_TOP_TWIPS) + KEY_SIZE_PT * 0.8, KEY_SIZE_PT, 'italic');
+    // The key header goes on the first page only.
+    if (pageIndex === 0) {
+      draw(page, keyHeaderText(sections, key), MARGIN_SIDE, pt(HEADER_TOP_TWIPS) + KEY_SIZE_PT * 0.8, KEY_SIZE_PT, 'italic');
+    }
 
     let top = MARGIN_TOP;
     indices.forEach((index) => {
@@ -186,14 +183,6 @@ export async function generatePdf(
         draw(page, text, x, baselineIn(top, TITLE_LINE_PT, TITLE_SIZE_PT), TITLE_SIZE_PT, 'bold');
       } else {
         let lineTop = top;
-        if (item.kind === 'keyChange') {
-          const words = 'KEY CHANGE TO ';
-          const baseline = baselineIn(lineTop, lyricLine, LABEL_SIZE_PT);
-          draw(page, words, MARGIN_SIDE, baseline, LABEL_SIZE_PT, 'bold');
-          draw(page, item.key, MARGIN_SIDE + measure(words, LABEL_SIZE_PT, 'bold'), baseline, LABEL_SIZE_PT, 'bold');
-          top += item.height;
-          return;
-        }
         if (item.lines.length === 0 && item.label) {
           draw(page, item.label.toUpperCase(), MARGIN_SIDE, baselineIn(lineTop, lyricLine, LABEL_SIZE_PT), LABEL_SIZE_PT, 'bold');
         }

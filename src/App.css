@@ -896,20 +896,6 @@ button.secondary {
   color: var(--accent);
 }
 
-/* "KEY CHANGE TO D" above the section a modulation starts: label-size bold type on a line the
-   height of a lyric line (12pt type in a 17pt line = 1.4167em). The key itself isn't uppercased,
-   so flats stay lowercase ("Bb", not "BB"). */
-.chart-key-change {
-  font-size: 0.857em;
-  font-weight: 700;
-  line-height: calc(1.4167 * var(--line-spacing, 1));
-  white-space: nowrap;
-}
-
-.chart-key-change-label {
-  text-transform: uppercase;
-}
-
 .key-change-heading {
   display: block;
   margin-top: 1rem;

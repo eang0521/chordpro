@@ -1,7 +1,7 @@
 import type { Paragraph } from 'docx';
 import type { ArrangementEntry, KeyName } from '../types';
 import type { BlockMap } from './arrangement';
-import { buildChartRows, groupIntoSections, isChordOnly, placeChords } from './chordChart';
+import { buildChartRows, groupIntoSections, isChordOnly, keyHeaderText, placeChords } from './chordChart';
 import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
 import { embedFontStyles } from './docxFonts';
 import {
@@ -69,19 +69,6 @@ export async function generateWordDoc(
   ];
 
   sections.forEach((section) => {
-    if (section.keyChange) {
-      // "KEY CHANGE TO D", kept with the section it starts. Only the words are capitalized, so a
-      // flat key keeps its lowercase b.
-      const run = (text: string, allCaps: boolean) =>
-        new TextRun({ text, bold: true, allCaps, size: halfPt(LABEL_SIZE_PT), font: font.wordFont });
-      body.push(
-        new Paragraph({
-          spacing: exactLine(LYRIC_LINE_PT),
-          keepNext: true,
-          children: [run('Key change to ', true), run(section.keyChange, false)],
-        }),
-      );
-    }
     if (section.lineRows.length === 0) {
       if (section.label) body.push(new Paragraph({ spacing: exactLine(LYRIC_LINE_PT, SECTION_GAP_PT), keepNext: true, children: [labelRun(section.label)] }));
       return;
@@ -152,6 +139,8 @@ export async function generateWordDoc(
     sections: [
       {
         properties: {
+          // A separate first-page header, so the key header shows on page 1 only.
+          titlePage: true,
           page: {
             size: { width: PAGE_WIDTH_TWIPS, height: PAGE_HEIGHT_TWIPS },
             margin: {
@@ -164,13 +153,16 @@ export async function generateWordDoc(
           },
         },
         headers: {
-          default: new Header({
+          first: new Header({
             children: [
               new Paragraph({
-                children: [new TextRun({ text: `Key of ${key}`, italics: true, size: halfPt(KEY_SIZE_PT), font: font.wordFont })],
+                children: [
+                  new TextRun({ text: keyHeaderText(sections, key), italics: true, size: halfPt(KEY_SIZE_PT), font: font.wordFont }),
+                ],
               }),
             ],
           }),
+          default: new Header({ children: [new Paragraph({ children: [] })] }),
         },
         children: body,
       },
