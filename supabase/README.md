@@ -14,8 +14,7 @@ Everything here is done by hand in the Vercel and Supabase dashboards. It's all 
    (allow Vercel access to it when GitHub asks).
 2. Vercel detects **Vite**. Leave the defaults (build `npm run build`, output `dist`) and
    click **Deploy**. No environment variables are needed.
-3. Note the production address it gives you, e.g. `https://chordpro.vercel.app` (yours may
-   differ; it's under the project's **Domains**). Below it's called `<vercel-url>`.
+3. The production address is `https://r4e-chordpro.vercel.app` (under the project's **Domains**).
 
 From then on every push to `main` deploys to that address, and every other branch gets its own
 preview address. The site is served from the root there (`/`), while GitHub Pages serves it
@@ -54,9 +53,9 @@ fine for you and a few friends; if more people use it, set up your own SMTP unde
 
 **Authentication → URL Configuration**:
 
-- **Site URL**: `<vercel-url>/` (e.g. `https://chordpro.vercel.app/`)
+- **Site URL**: `https://r4e-chordpro.vercel.app/`
 - **Redirect URLs**: add
-  - `<vercel-url>/`
+  - `https://r4e-chordpro.vercel.app/`
   - `http://localhost:5173/chordpro/`
   - optionally `http://localhost:4173/chordpro/` for `npm run preview`
   - optionally `https://eang0521.github.io/chordpro/`, while GitHub Pages is still up
