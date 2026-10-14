@@ -844,3 +844,54 @@ button.secondary {
 .chart-fit-message {
   margin: 8px 0 0;
 }
+
+/* A chord-only line (turn, intro...) sits where the lyric line would, at the lyric line's
+   height, with chords at chord size: 17pt line / 11pt type = 1.5455em. */
+.chart-chord-only {
+  position: relative;
+  line-height: calc(1.2143 * var(--line-spacing, 1));
+  white-space: nowrap;
+}
+
+.chart-chord-only .chart-chord-label {
+  font-size: 0.7857em;
+  line-height: calc(1.5455 * var(--line-spacing, 1));
+}
+
+.arrangement-add {
+  margin-top: 8px;
+}
+
+.section-heading.section-instrumental {
+  color: #4fd1a5;
+}
+
+.section-heading-note {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-dim);
+}
+
+/* Chord slots: a chord with no lyric under it, shown as an empty box to place a chord on. */
+.syllable.syllable-slot {
+  display: inline-block;
+  min-width: 1.6em;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.syllable.syllable-slot.current {
+  border-color: var(--accent);
+}
+
+/* Syllables highlighted for copy, cut or paste. */
+.syllable.selected {
+  color: var(--text);
+  background: var(--accent-dim);
+}
+
+.recorder-status .notice {
+  color: var(--accent);
+}

@@ -23,7 +23,8 @@ export type KeyName =
   | 'C' | 'G' | 'D' | 'A' | 'E' | 'B' | 'F#'
   | 'Db' | 'Ab' | 'Eb' | 'Bb' | 'F';
 
-export type SectionType = 'verse' | 'chorus' | 'bridge' | 'other';
+/** 'instrumental' covers chord-only parts: intro, turn, midtro, tag, interlude, outro, ... */
+export type SectionType = 'verse' | 'chorus' | 'bridge' | 'instrumental' | 'other';
 
 export interface SectionLabel {
   type: SectionType;
@@ -38,6 +39,11 @@ export interface SyllableToken {
   isLineStart: boolean;
   /** The chord placed on this syllable, or null for none. */
   chord: Chord | null;
+  /** A bar line before this syllable's chord, as in "G C | Csus | C". */
+  bar?: boolean;
+  /** A chord slot with no lyric under it (text is ''), for instrumental chords: a turnaround
+   * after a line's last word, or a whole chord-only line such as a turn or intro. */
+  isChordSlot?: boolean;
   /** Set on the first syllable of a section occurrence to mark where a heading goes when rendered. */
   section?: SectionLabel;
   /** Which block this token canonically belongs to, and its index within that block's syllable list. */

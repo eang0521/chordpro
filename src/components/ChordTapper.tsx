@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Chord, KeyName, ScaleDegree, SyllableToken } from '../types';
+import type { BlockMap } from '../lib/arrangement';
+import { updateBlockToken } from '../lib/arrangement';
+import { insertTokens, lineEnd, makeChordLine, makeChordSlot, removeToken } from '../lib/chordSlots';
 import { chordsEqual, diatonicChord, formatChord, isDiatonicChord, parseChord } from '../lib/musicTheory';
 import { LyricFlow } from './LyricFlow';
 
@@ -9,13 +12,20 @@ interface Props {
   /** The song's extra (non 1-7) chords, each bound to one of PALETTE_KEYS by position. */
   palette: Chord[];
   onPaletteChange: (palette: Chord[]) => void;
-  onUpdateToken: (blockId: string, localIndex: number, updater: (tok: SyllableToken) => SyllableToken) => void;
+  onUpdateBlocks: (updater: (prev: BlockMap) => BlockMap) => void;
   onBack: () => void;
   onSubmit: () => void;
 }
 
+/** A copied chord, kept with its bar line. */
+interface ChordMark {
+  chord: Chord | null;
+  bar: boolean;
+}
+
 const DEGREES: ScaleDegree[] = [1, 2, 3, 4, 5, 6, 7];
 const PALETTE_KEYS = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'];
+const UNDO_LIMIT = 100;
 
 /** Prefer `code` (layout-independent) but fall back to `key` since some input sources don't populate `code`. */
 function resolveDegree(e: KeyboardEvent): ScaleDegree | null {
@@ -28,49 +38,195 @@ function resolvePaletteSlot(e: KeyboardEvent): number {
   return PALETTE_KEYS.indexOf(letter);
 }
 
+function pluralize(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
 export function ChordTapper({
   syllables,
   songKey,
   palette,
   onPaletteChange,
-  onUpdateToken,
+  onUpdateBlocks,
   onBack,
   onSubmit,
 }: Props) {
-  const [index, setIndex] = useState(-1);
+  // The cursor, plus the other end of the highlighted range (equal to it when nothing extra is
+  // highlighted). Clamped in case an undo or a removed slot leaves them past the end.
+  const [rawIndex, setIndex] = useState(-1);
+  const [rawAnchor, setAnchor] = useState(-1);
+  const index = Math.min(rawIndex, syllables.length - 1);
+  const anchor = Math.min(rawAnchor, syllables.length - 1);
+  const selStart = Math.min(index, anchor);
+  const selEnd = Math.max(index, anchor);
+  const selCount = index < 0 ? 0 : selEnd - selStart + 1;
+
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState('');
-  const [warning, setWarning] = useState<string | null>(null);
-  const warningTimerRef = useRef<number | null>(null);
+  const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  const messageTimerRef = useRef<number | null>(null);
+  const [clipboard, setClipboard] = useState<ChordMark[] | null>(null);
+  const undoRef = useRef<BlockMap[]>([]);
+  const draggingRef = useRef(false);
 
-  function flashWarning(message: string) {
-    setWarning(message);
-    if (warningTimerRef.current != null) window.clearTimeout(warningTimerRef.current);
-    warningTimerRef.current = window.setTimeout(() => setWarning(null), 2000);
+  function flash(text: string, isError = false) {
+    setMessage({ text, isError });
+    if (messageTimerRef.current != null) window.clearTimeout(messageTimerRef.current);
+    messageTimerRef.current = window.setTimeout(() => setMessage(null), isError ? 2000 : 2500);
   }
 
   useEffect(
     () => () => {
-      if (warningTimerRef.current != null) window.clearTimeout(warningTimerRef.current);
+      if (messageTimerRef.current != null) window.clearTimeout(messageTimerRef.current);
     },
     [],
   );
 
-  function advance() {
-    setIndex((i) => Math.min(i + 1, syllables.length - 1));
+  useEffect(() => {
+    const stopDragging = () => {
+      draggingRef.current = false;
+    };
+    window.addEventListener('mouseup', stopDragging);
+    return () => window.removeEventListener('mouseup', stopDragging);
+  }, []);
+
+  /** Moves the cursor; with `extend`, the highlighted range grows or shrinks to follow it. */
+  function moveTo(i: number, extend = false) {
+    const clamped = Math.max(0, Math.min(i, syllables.length - 1));
+    setIndex(clamped);
+    if (!extend || anchor < 0) setAnchor(clamped);
   }
 
-  function setChord(chord: Chord | null) {
-    if (index < 0) return;
-    const syl = syllables[index];
-    onUpdateToken(syl.blockId, syl.localIndex, (tok) => ({ ...tok, chord }));
+  function advance() {
+    moveTo(index + 1);
+  }
+
+  /** Every change on this screen goes through here, so Ctrl+Z can step back through them. */
+  function edit(change: (prev: BlockMap) => BlockMap) {
+    onUpdateBlocks((prev) => {
+      const next = change(prev);
+      // StrictMode runs updaters twice with the same `prev`, so only record it once.
+      if (next !== prev && undoRef.current[undoRef.current.length - 1] !== prev) {
+        undoRef.current.push(prev);
+        if (undoRef.current.length > UNDO_LIMIT) undoRef.current.shift();
+      }
+      return next;
+    });
+  }
+
+  function undo() {
+    const prev = undoRef.current.pop();
+    if (!prev) {
+      flash('Nothing to undo');
+      return;
+    }
+    onUpdateBlocks(() => prev);
+  }
+
+  /** Applies `update` to each syllable from `start` to `end` (flat indexes), as one undo step. */
+  function updateRange(start: number, end: number, update: (tok: SyllableToken, offset: number) => SyllableToken) {
+    edit((prev) => {
+      let next = prev;
+      for (let i = start; i <= end; i++) {
+        const syl = syllables[i];
+        if (syl) next = updateBlockToken(next, syl.blockId, syl.localIndex, (tok) => update(tok, i - start));
+      }
+      return next;
+    });
   }
 
   // Placing a chord doubles as "move on" — no separate Space needed.
-  function placeChord(chord: Chord) {
+  function placeChord(chord: Chord, bar?: boolean) {
     if (index < 0) return;
-    setChord(chord);
+    updateRange(index, index, (tok) => ({ ...tok, chord, bar: bar ?? tok.bar }));
     advance();
+  }
+
+  function copySelection(): ChordMark[] | null {
+    if (selCount === 0) return null;
+    const marks = syllables.slice(selStart, selEnd + 1).map((s) => ({ chord: s.chord, bar: !!s.bar }));
+    setClipboard(marks);
+    return marks;
+  }
+
+  function copy() {
+    const marks = copySelection();
+    if (marks) flash(`Copied ${pluralize(marks.filter((m) => m.chord).length, 'chord')} from ${pluralize(marks.length, 'syllable')}`);
+  }
+
+  function cut() {
+    const marks = copySelection();
+    if (!marks) return;
+    updateRange(selStart, selEnd, (tok) => ({ ...tok, chord: null, bar: false }));
+    flash(`Cut ${pluralize(marks.filter((m) => m.chord).length, 'chord')} from ${pluralize(marks.length, 'syllable')}`);
+  }
+
+  /** Lays the copied chords out from the start of the highlight, one per syllable, replacing
+   * what's there (including clearing syllables that had no chord when copied). */
+  function paste() {
+    if (!clipboard) {
+      flash('Highlight some syllables and press Ctrl+C or Ctrl+X first', true);
+      return;
+    }
+    if (index < 0) return;
+    const end = Math.min(selStart + clipboard.length, syllables.length) - 1;
+    updateRange(selStart, end, (tok, offset) => ({ ...tok, chord: clipboard[offset].chord, bar: clipboard[offset].bar }));
+    setAnchor(selStart);
+    setIndex(end);
+    const pasted = end - selStart + 1;
+    const notes: string[] = [];
+    if (pasted < clipboard.length) notes.push(`the last ${clipboard.length - pasted} ran past the end of the song`);
+    else if (selCount > 1 && selCount !== clipboard.length) notes.push(`you highlighted ${selCount}`);
+    flash(`Pasted onto ${pluralize(pasted, 'syllable')}${notes.length ? ` (${notes.join('; ')})` : ''}`);
+  }
+
+  /** Backspace/Delete: clears the highlighted chords; on a single empty chord slot, removes it. */
+  function clear() {
+    if (index < 0) return;
+    const syl = syllables[index];
+    if (selCount === 1 && syl.isChordSlot && !syl.chord) {
+      const sectionHasMore = syllables.some((s) => s.blockId === syl.blockId && s.localIndex !== syl.localIndex);
+      if (!sectionHasMore) {
+        flash('A section needs at least one slot', true);
+        return;
+      }
+      edit((prev) => removeToken(prev, syl.blockId, syl.localIndex));
+      moveTo(index - 1);
+      return;
+    }
+    updateRange(selStart, selEnd, (tok) => ({ ...tok, chord: null, bar: false }));
+  }
+
+  /** Adds an empty chord slot (a chord with no lyric under it) right after the cursor. */
+  function addSlot() {
+    if (index < 0) return;
+    const syl = syllables[index];
+    edit((prev) => insertTokens(prev, syl.blockId, syl.localIndex, [makeChordSlot(syl.blockId, false)]));
+    moveTo(index + 1);
+  }
+
+  /** Adds a line of empty chord slots after the cursor's line. */
+  function addChordLine() {
+    if (index < 0) return;
+    const syl = syllables[index];
+    let rest = 1; // syllables from the cursor to the end of its line
+    while (index + rest < syllables.length && !syllables[index + rest].isLineStart) rest++;
+    edit((prev) => {
+      const block = prev[syl.blockId];
+      if (!block) return prev;
+      return insertTokens(prev, syl.blockId, lineEnd(block, syl.localIndex) - 1, makeChordLine(syl.blockId));
+    });
+    moveTo(index + rest);
+  }
+
+  function toggleBar() {
+    if (index < 0) return;
+    const syl = syllables[index];
+    if (!syl.chord) {
+      flash('Bar lines go before a chord — place one here first', true);
+      return;
+    }
+    updateRange(index, index, (tok) => ({ ...tok, bar: !tok.bar }));
   }
 
   function openTyping() {
@@ -84,26 +240,48 @@ export function ChordTapper({
       setTyping(false);
       return;
     }
-    const chord = parseChord(songKey, typed);
+    // A leading "|" puts a bar line before the chord, as in "| Csus".
+    const bar = /^\s*\|/.test(typed);
+    const text = typed.replace(/^\s*\|\s*/, '');
+    const chord = parseChord(songKey, text);
     if (!chord) {
-      flashWarning(`Couldn't read "${typed}" as a chord`);
+      flash(`Couldn't read "${typed}" as a chord`, true);
       return;
     }
     const alreadyBound = isDiatonicChord(chord) || palette.some((c) => chordsEqual(c, chord));
     if (!alreadyBound && palette.length < PALETTE_KEYS.length) onPaletteChange([...palette, chord]);
     setTyping(false);
-    placeChord(chord);
+    placeChord(chord, bar);
   }
 
   useEffect(() => {
     if (typing) return;
     function handleKey(e: KeyboardEvent) {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      // Leave keys alone while a dialog (arrange sections, copy chords, ...) is open over the tapper.
-      if (e.target instanceof Element && e.target.closest('.arrangement-overlay')) return;
+      // Leave keys alone while a dialog (arrange sections, copy chords, ...) is open over the
+      // tapper, or while typing in a field such as the key picker.
+      if (e.target instanceof Element && e.target.closest('.arrangement-overlay, input, select, textarea')) return;
+      if (e.altKey) return;
+
+      if (e.ctrlKey || e.metaKey) {
+        const key = e.key.toLowerCase();
+        const action = { c: copy, x: cut, v: paste, z: undo }[key];
+        if (!action || e.shiftKey) return;
+        // Only take over copy/cut/paste once a syllable is selected, so they still work normally
+        // anywhere else.
+        if (key !== 'z' && index < 0) return;
+        e.preventDefault();
+        action();
+        return;
+      }
+
       if (e.code === 'Space' || e.key === ' ') {
         e.preventDefault();
         advance();
+        return;
+      }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        moveTo((index < 0 ? -1 : index) + (e.key === 'ArrowRight' ? 1 : -1), e.shiftKey);
         return;
       }
       if (index < 0) return;
@@ -114,10 +292,20 @@ export function ChordTapper({
       }
       if (e.key === 'Backspace' || e.key === 'Delete') {
         e.preventDefault();
-        setChord(null);
+        clear();
         return;
       }
       if (e.repeat) return;
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        addSlot();
+        return;
+      }
+      if (e.key === '|' || e.key === '\\') {
+        e.preventDefault();
+        toggleBar();
+        return;
+      }
       const degree = resolveDegree(e);
       if (degree != null) {
         e.preventDefault();
@@ -133,7 +321,7 @@ export function ChordTapper({
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, syllables, palette, typing, songKey]);
+  }, [index, anchor, syllables, palette, typing, songKey, clipboard]);
 
   const finished = index >= syllables.length - 1 && syllables.length > 0;
 
@@ -141,12 +329,20 @@ export function ChordTapper({
     <div className="panel">
       <h2>3. Place chords</h2>
       <p className="hint">
-        Press <kbd>Space</kbd> to move to the next syllable &mdash; skip any syllable that doesn't need a
-        chord. On a highlighted syllable, press <kbd>1</kbd>&ndash;<kbd>7</kbd> for a chord, or{' '}
-        <kbd>Enter</kbd> to type any chord (<code>Asus</code>, <code>D2</code>, <code>F#m/C#</code>, or
-        numbers like <code>5sus</code>, <code>1/3</code>). Typed chords get a letter key below so you can reuse
-        them. Placing a chord moves on automatically. <kbd>Backspace</kbd> clears the current syllable's
-        chord. Click any syllable to jump to it.
+        Press <kbd>Space</kbd> (or <kbd>&rarr;</kbd>) to move to the next syllable &mdash; skip any syllable that
+        doesn't need a chord. On a highlighted syllable, press <kbd>1</kbd>&ndash;<kbd>7</kbd> for a chord, or{' '}
+        <kbd>Enter</kbd> to type any chord (<code>Asus</code>, <code>D2</code>, <code>F#m/C#</code>, or numbers
+        like <code>5sus</code>, <code>1/3</code>). Typed chords get a letter key below so you can reuse them.
+        Placing a chord moves on automatically. <kbd>Backspace</kbd> clears a chord.
+      </p>
+      <p className="hint">
+        <strong>Instrumentals:</strong> <kbd>+</kbd> adds a chord slot (a chord with no lyric under it) after the
+        current syllable &mdash; use it for chords at the end of a line. <kbd>|</kbd> puts a bar line before the
+        current chord. <kbd>Backspace</kbd> on an empty slot removes it.{' '}
+        <strong>Copy and paste:</strong> drag across syllables (or <kbd>Shift</kbd>+click,{' '}
+        <kbd>Shift</kbd>+<kbd>&larr;</kbd>/<kbd>&rarr;</kbd>) to highlight them, then <kbd>Ctrl</kbd>+<kbd>C</kbd>{' '}
+        to copy their chords or <kbd>Ctrl</kbd>+<kbd>X</kbd> to cut them. Highlight where they should go and
+        press <kbd>Ctrl</kbd>+<kbd>V</kbd>. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.
       </p>
       <div className="chord-keys">
         {DEGREES.map((d) => (
@@ -168,6 +364,8 @@ export function ChordTapper({
         {index >= 0 && !typing && (
           <span>
             Syllable {index + 1} / {syllables.length}
+            {selCount > 1 && <> &middot; {selCount} highlighted</>}
+            {clipboard && <> &middot; {pluralize(clipboard.length, 'syllable')} of chords copied</>}
           </span>
         )}
         {index >= 0 && typing && (
@@ -179,11 +377,11 @@ export function ChordTapper({
             }}
           >
             <label>
-              Chord for &ldquo;{syllables[index].text}&rdquo;:{' '}
+              Chord for {syllables[index].isChordSlot ? 'this slot' : <>&ldquo;{syllables[index].text}&rdquo;</>}:{' '}
               <input
                 autoFocus
                 value={typed}
-                placeholder="e.g. Asus, F#m/C#, 5sus"
+                placeholder="e.g. Asus, F#m/C#, 5sus, | C"
                 onChange={(e) => setTyped(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') setTyping(false);
@@ -193,20 +391,46 @@ export function ChordTapper({
             <span className="chord-entry-help">Enter to place &middot; Esc to cancel</span>
           </form>
         )}
-        {warning && <span className="warning"> &mdash; {warning}</span>}
+        {message && <span className={message.isError ? 'warning' : 'notice'}> &mdash; {message.text}</span>}
       </div>
       <div className="lyric-display">
-        <LyricFlow syllables={syllables} currentIndex={index} songKey={songKey} showChords onSyllableClick={setIndex} />
+        <LyricFlow
+          syllables={syllables}
+          currentIndex={index}
+          selection={selCount > 1 ? [selStart, selEnd] : null}
+          songKey={songKey}
+          showChords
+          onSyllableMouseDown={(i, e) => {
+            e.preventDefault();
+            draggingRef.current = true;
+            moveTo(i, e.shiftKey);
+          }}
+          onSyllableMouseEnter={(i) => {
+            if (draggingRef.current) moveTo(i, true);
+          }}
+        />
       </div>
       <div className="actions">
         <button className="secondary" onClick={onBack}>
           &larr; Back
         </button>
-        <button className="secondary" onClick={() => setIndex(-1)}>
+        <button
+          className="secondary"
+          onClick={() => {
+            setIndex(-1);
+            setAnchor(-1);
+          }}
+        >
           Restart
         </button>
         <button className="secondary" onClick={openTyping} disabled={index < 0}>
           Type a chord&hellip;
+        </button>
+        <button className="secondary" onClick={addSlot} disabled={index < 0} title="Add a chord with no lyric under it after this syllable (+)">
+          + Chord slot
+        </button>
+        <button className="secondary" onClick={addChordLine} disabled={index < 0} title="Add a line of chord slots after this line">
+          + Chord line
         </button>
         <button onClick={advance} disabled={finished}>
           Next syllable &#9654;

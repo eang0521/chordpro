@@ -2,6 +2,7 @@ import type { Block, KeyName, SectionType } from '../types';
 import { hyphenateWord, normalizeApostrophes } from './syllables';
 import { KEY_NAMES, parseChord } from './musicTheory';
 import { makeId } from './id';
+import { makeChordLine } from './chordSlots';
 
 export interface ParsedChordProSong {
   title: string;
@@ -51,6 +52,7 @@ function splitLineIntoSyllableSpans(plain: string): SyllableSpan[] {
   const wordRe = /\S+/g;
   let match: RegExpExecArray | null;
   while ((match = wordRe.exec(plain))) {
+    if (match[0] === '|') continue; // a bar line, not a lyric
     let cursor = match.index;
     hyphenateWord(match[0]).forEach((syl, i) => {
       if (syl.length === 0) return;
@@ -67,8 +69,8 @@ function findSpanForOffset(spans: SyllableSpan[], offset: number): SyllableSpan 
 
 const TITLE_RE = /^\{title:\s*(.*)\}$/i;
 const KEY_RE = /^\{key:\s*(.*)\}$/i;
-const START_SECTION_RE = /^\{start_of_(verse|chorus|bridge):\s*(.*)\}$/i;
-const END_SECTION_RE = /^\{end_of_(?:verse|chorus|bridge)\}$/i;
+const START_SECTION_RE = /^\{start_of_(verse|chorus|bridge|instrumental):\s*(.*)\}$/i;
+const END_SECTION_RE = /^\{end_of_(?:verse|chorus|bridge|instrumental)\}$/i;
 const COMMENT_RE = /^\{comment:\s*(.*)\}$/i;
 const ANY_DIRECTIVE_RE = /^\{.*\}$/;
 
@@ -123,34 +125,74 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
       }
       if (ANY_DIRECTIVE_RE.test(trimmed)) return; // unrecognized directive — skip, not lyrics
 
-      // A real lyric line.
+      // A lyric line, a line of lyrics plus trailing chords, or a chord-only line like
+      // "[Am7] | [G/B] | [C] [C/E] | [F]".
       const { plain, chords } = stripChordsWithOffsets(rawLine);
-      if (plain.trim().length === 0) return;
+      if (plain.trim().length === 0 && chords.length === 0) return;
 
       if (!currentBlock) startBlock('other', '');
       const block = currentBlock!;
       const spans = splitLineIntoSyllableSpans(plain);
 
+      // A chord sitting on a letter goes on that syllable; one sitting on a space, a bar line or
+      // the end of the line has no lyric under it, so it becomes a chord slot.
+      type Item = { offset: number } & (
+        | { kind: 'span'; span: SyllableSpan }
+        | { kind: 'slot'; label: string }
+        | { kind: 'bar' }
+      );
+      const items: Item[] = spans.map((span) => ({ kind: 'span', span, offset: span.end - span.text.length }));
       const labelBySpan = new Map<SyllableSpan, string>();
       chords.forEach((chord) => {
-        const span = findSpanForOffset(spans, chord.offset);
-        if (span) labelBySpan.set(span, chord.label);
+        const under = plain[chord.offset];
+        if (under === undefined || /\s/.test(under) || under === '|') {
+          items.push({ kind: 'slot', label: chord.label, offset: chord.offset });
+        } else {
+          const span = findSpanForOffset(spans, chord.offset);
+          if (span) labelBySpan.set(span, chord.label);
+        }
       });
+      for (const m of plain.matchAll(/(?<=^|\s)\|(?=\s|$)/g)) items.push({ kind: 'bar', offset: m.index });
+      // By position; a bar sharing a slot's position was written after that slot's chord.
+      items.sort((a, b) => a.offset - b.offset || (a.kind === 'bar' ? 1 : 0) - (b.kind === 'bar' ? 1 : 0));
 
-      spans.forEach((span, i) => {
-        const label = labelBySpan.get(span);
+      let pendingBar = false;
+      let lineStart = true;
+      items.forEach((item) => {
+        if (item.kind === 'bar') {
+          pendingBar = true;
+          return;
+        }
+        let label = item.kind === 'slot' ? item.label : labelBySpan.get(item.span);
+        // "[|C]" is another way to write a bar line before a chord.
+        if (label?.startsWith('|')) {
+          pendingBar = true;
+          label = label.slice(1).trim();
+        }
         const chord = label ? parseChord(key, label) : null;
         block.syllables.push({
           id: makeId(),
-          text: span.text,
-          isWordStart: span.isWordStart,
-          isLineStart: i === 0,
+          text: item.kind === 'span' ? item.span.text : '',
+          isWordStart: item.kind === 'span' ? item.span.isWordStart : true,
+          isLineStart: lineStart,
           chord,
+          ...(pendingBar && chord ? { bar: true } : {}),
+          ...(item.kind === 'slot' ? { isChordSlot: true } : {}),
           blockId: block.id,
           localIndex: block.syllables.length,
         });
+        if (chord) pendingBar = false;
+        lineStart = false;
       });
     });
+
+  // An instrumental section whose chords haven't been filled in yet exports with no lines; give
+  // it back its empty chord slots rather than letting it drop out of the song.
+  blocks.forEach((block) => {
+    if (block.type === 'instrumental' && block.syllables.length === 0) {
+      block.syllables = makeChordLine(block.id).map((tok, i) => ({ ...tok, localIndex: i }));
+    }
+  });
 
   return { title, key, blocks };
 }

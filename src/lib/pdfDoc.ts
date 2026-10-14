@@ -2,7 +2,7 @@ import type { PDFFont } from 'pdf-lib';
 import type { KeyName } from '../types';
 import type { BlockMap } from './arrangement';
 import type { ChartToken } from './chordChart';
-import { buildChartRows, groupIntoSections, placeChords } from './chordChart';
+import { buildChartRows, groupIntoSections, isChordOnly, placeChords } from './chordChart';
 import { fetchFontFile, getChordFontOption } from './chordFonts';
 import type { TextMeasure } from './pageLayout';
 import {
@@ -145,7 +145,8 @@ export async function generatePdf(
       const lines = wrapTokens(row.tokens, lyricWidth, measure).map((piece) => placeChords(piece, measure));
       const isLast = i === section.lineRows.length - 1;
       const height =
-        lines.reduce((sum, line) => sum + (line.chords.length > 0 ? chordLine : 0) + lyricLine, 0) +
+        // A chord-only line takes just the lyric line's height (its chords sit on it).
+        lines.reduce((sum, line) => sum + (line.chords.length > 0 && !isChordOnly(line) ? chordLine : 0) + lyricLine, 0) +
         (isLast ? sectionGap : 0);
       group.push(items.length);
       items.push({ kind: 'row', height, label: i === 0 ? section.label : null, lines });
@@ -183,6 +184,15 @@ export async function generatePdf(
           draw(page, item.label.toUpperCase(), MARGIN_SIDE, baselineIn(lineTop, lyricLine, LABEL_SIZE_PT), LABEL_SIZE_PT, 'bold');
         }
         item.lines.forEach((line, li) => {
+          if (isChordOnly(line)) {
+            const baseline = baselineIn(lineTop, lyricLine, CHORD_SIZE_PT);
+            line.chords.forEach((c) => draw(page, c.label, MARGIN_SIDE + labelCol + c.offsetPt, baseline, CHORD_SIZE_PT, 'italic'));
+            if (li === 0 && item.label) {
+              draw(page, item.label.toUpperCase(), MARGIN_SIDE, baselineIn(lineTop, lyricLine, LABEL_SIZE_PT), LABEL_SIZE_PT, 'bold');
+            }
+            lineTop += lyricLine;
+            return;
+          }
           if (line.chords.length > 0) {
             const baseline = baselineIn(lineTop, chordLine, CHORD_SIZE_PT);
             line.chords.forEach((c) => draw(page, c.label, MARGIN_SIDE + labelCol + c.offsetPt, baseline, CHORD_SIZE_PT, 'italic'));

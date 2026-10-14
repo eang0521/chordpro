@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Chord, KeyName, Step, SyllableToken } from './types';
+import type { Chord, KeyName, Step } from './types';
 import type { Section, WordGroup } from './lib/syllables';
 import { parseLyricsToWordGroups, wordGroupsToBlocks } from './lib/syllables';
 import type { BlockMap } from './lib/arrangement';
-import { deriveFlatSyllables, updateBlockToken } from './lib/arrangement';
+import { deriveFlatSyllables } from './lib/arrangement';
 import { LyricsInput } from './components/LyricsInput';
 import { SyllableEditor } from './components/SyllableEditor';
 import { ChordTapper } from './components/ChordTapper';
@@ -97,10 +97,6 @@ function App() {
   }, [step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette]);
 
   const flatSyllables = useMemo(() => deriveFlatSyllables(blocks, arrangement), [blocks, arrangement]);
-
-  function updateToken(blockId: string, localIndex: number, updater: (tok: SyllableToken) => SyllableToken) {
-    setBlocks((prev) => updateBlockToken(prev, blockId, localIndex, updater));
-  }
 
   // Re-derives title/key/blocks/arrangement from hand-edited ChordPro text, so the visual chart
   // and Word doc export (both driven by blocks/arrangement, not the raw text) stay in sync with
@@ -238,7 +234,7 @@ function App() {
           songKey={key}
           palette={palette}
           onPaletteChange={setPalette}
-          onUpdateToken={updateToken}
+          onUpdateBlocks={setBlocks}
           onBack={() => setStep('edit-syllables')}
           onSubmit={() => setStep('export')}
         />

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { KeyName } from '../types';
 import type { BlockMap } from '../lib/arrangement';
 import type { ChartLineRow, SectionDisplayRow } from '../lib/chordChart';
-import { buildChartRows, flattenSections, groupIntoSections, placeChords } from '../lib/chordChart';
+import { buildChartRows, flattenSections, groupIntoSections, isChordOnly, placeChords } from '../lib/chordChart';
 import { generateWordDoc } from '../lib/wordDoc';
 import { generatePdf } from '../lib/pdfDoc';
 import { downloadBlob, slugifyFilename } from '../lib/download';
@@ -55,7 +55,23 @@ type PageItem = { kind: 'header' } | { kind: 'row'; display: SectionDisplayRow }
 /** Chords sit at the same measured offsets the Word export uses for its tab stops, absolutely
  * positioned over unspread lyric text, so the preview matches the doc letter for letter. */
 function renderLinePair(row: ChartLineRow, fontFamily: string): ReactNode {
-  const { lyricLine, chords } = placeChords(row.tokens, measureInFont(fontFamily));
+  const placed = placeChords(row.tokens, measureInFont(fontFamily));
+  const { lyricLine, chords } = placed;
+  if (isChordOnly(placed)) {
+    // A chord-only line (a turn, an intro...) takes the lyric line's place, in chord type.
+    return (
+      <div className="chart-line-row">
+        <div className="chart-chord-only">
+          &nbsp;
+          {chords.map((c, i) => (
+            <span className="chart-chord-label" key={i} style={{ left: `${c.offsetPt / CHORD_SIZE_PT}em` }}>
+              {c.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="chart-line-row">
       {chords.length > 0 && (
@@ -80,7 +96,10 @@ function renderLinePair(row: ChartLineRow, fontFamily: string): ReactNode {
  * physical width in page mode (where 1em = the lyric point size) and scales with the compact view. */
 function renderDisplayRow(display: SectionDisplayRow, labelColEm: number, fontFamily: string): ReactNode {
   const gapClass = display.isLastInSection ? 'chart-gap-section' : 'chart-gap-line';
-  const hasChords = display.row?.tokens.some((t) => t.chordLabel) ?? false;
+  // Only rows with lyrics get a chord line above them; a chord-only row draws its chords on the
+  // lyric line itself, so its label needs no spacer.
+  const tokens = display.row?.tokens ?? [];
+  const hasChords = tokens.some((t) => t.chordLabel) && tokens.some((t) => !t.isSlot && t.text.trim());
   return (
     <div className={`chart-section-row ${gapClass}`} key={display.key}>
       <div className="chart-label-col" style={{ width: `${labelColEm}em` }}>

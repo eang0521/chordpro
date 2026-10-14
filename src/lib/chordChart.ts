@@ -10,7 +10,10 @@ export interface ChartToken {
   key: string;
   text: string;
   isWordStart: boolean;
+  /** Includes a leading "| " when a bar line comes before the chord. */
   chordLabel: string | null;
+  /** A chord with no lyric under it. */
+  isSlot: boolean;
 }
 
 export interface ChartHeadingRow {
@@ -46,7 +49,8 @@ export function buildChartRows(blocks: BlockMap, arrangement: string[], key: Key
         key: syl.id,
         text: syl.text,
         isWordStart: syl.isWordStart,
-        chordLabel: syl.chord ? formatChord(key, syl.chord) : null,
+        chordLabel: syl.chord ? `${syl.bar ? '| ' : ''}${formatChord(key, syl.chord)}` : null,
+        isSlot: !!syl.isChordSlot,
       };
     });
     return { kind: 'line', key: row.key, tokens };
@@ -114,7 +118,15 @@ export interface PlacedLine {
   chords: { offsetPt: number; label: string }[];
 }
 
+/** True for a line of chords with no lyrics (a turn, an intro...), which prints as a single
+ * line of chords where the lyrics would go instead of chords over a blank lyric line. */
+export function isChordOnly(line: PlacedLine): boolean {
+  return line.lyricLine.trim() === '' && line.chords.length > 0;
+}
+
 const CHORD_MIN_GAP_PT = 4; // keeps a wide chord from running into the next one
+// Chords with no lyric under them are spaced out like counted beats ("G   C   | Csus   | C").
+const SLOT_GAP_PT = 14;
 
 /** Positions each chord at the true rendered width of the bold lyric text before its syllable,
  * so it lands above the right letter in any (proportional) font. The lyrics are never spread
@@ -125,7 +137,16 @@ export function placeChords(tokens: ChartToken[], measure: TextMeasure): PlacedL
   const chords: PlacedLine['chords'] = [];
   let nextFreePt = 0;
   tokens.forEach((tok, i) => {
-    if (tok.isWordStart && i !== 0) lyricLine += ' ';
+    if (tok.isSlot) {
+      // Takes no room in the lyrics; its chord follows the last word (or the previous chord).
+      if (!tok.chordLabel) return;
+      const afterWords = lyricLine ? measure(lyricLine, LYRIC_SIZE_PT, 'bold') + SLOT_GAP_PT : 0;
+      const at = Math.max(afterWords, nextFreePt);
+      chords.push({ offsetPt: at, label: tok.chordLabel });
+      nextFreePt = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic') + SLOT_GAP_PT;
+      return;
+    }
+    if (tok.isWordStart && i !== 0 && lyricLine) lyricLine += ' ';
     if (tok.chordLabel) {
       const at = Math.max(measure(lyricLine, LYRIC_SIZE_PT, 'bold'), nextFreePt);
       chords.push({ offsetPt: at, label: tok.chordLabel });

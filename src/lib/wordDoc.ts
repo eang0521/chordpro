@@ -1,7 +1,7 @@
 import type { Paragraph } from 'docx';
 import type { KeyName } from '../types';
 import type { BlockMap } from './arrangement';
-import { buildChartRows, groupIntoSections, placeChords } from './chordChart';
+import { buildChartRows, groupIntoSections, isChordOnly, placeChords } from './chordChart';
 import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
 import { embedFontStyles } from './docxFonts';
 import {
@@ -74,7 +74,31 @@ export async function generateWordDoc(
       return;
     }
     section.lineRows.forEach((row, i) => {
-      const { lyricLine, chords } = placeChords(row.tokens, measure);
+      const placed = placeChords(row.tokens, measure);
+      const { lyricLine, chords } = placed;
+      const isLast = i === section.lineRows.length - 1;
+      const withLabel = i === 0 && section.label;
+      // Word measures tab stops from the left margin, so offset by the label column.
+      const chordTabStops = chords.map((c) => ({ type: TabStopType.LEFT, position: labelCol + twips(c.offsetPt) }));
+      const chordRuns = chords.map(
+        (c) => new TextRun({ children: [new Tab(), c.label], italics: true, size: halfPt(CHORD_SIZE_PT), font: font.wordFont }),
+      );
+
+      if (isChordOnly(placed)) {
+        // A chord-only line (a turn, an intro...) takes the lyric line's place: one line, with
+        // the label (which is narrower than its column) followed by tabs to each chord.
+        body.push(
+          new Paragraph({
+            spacing: exactLine(LYRIC_LINE_PT, isLast ? SECTION_GAP_PT : 0),
+            keepNext: !isLast,
+            keepLines: true,
+            tabStops: chordTabStops,
+            children: withLabel ? [labelRun(section.label), ...chordRuns] : chordRuns,
+          }),
+        );
+        return;
+      }
+
       if (chords.length > 0) {
         body.push(
           new Paragraph({
@@ -83,17 +107,11 @@ export async function generateWordDoc(
             // across pages (matching the preview's pagination).
             keepNext: true,
             keepLines: true,
-            // Word measures tab stops from the left margin, so offset by the label column.
-            tabStops: chords.map((c) => ({ type: TabStopType.LEFT, position: labelCol + twips(c.offsetPt) })),
-            children: chords.map(
-              (c) =>
-                new TextRun({ children: [new Tab(), c.label], italics: true, size: halfPt(CHORD_SIZE_PT), font: font.wordFont }),
-            ),
+            tabStops: chordTabStops,
+            children: chordRuns,
           }),
         );
       }
-      const isLast = i === section.lineRows.length - 1;
-      const withLabel = i === 0 && section.label;
       body.push(
         new Paragraph({
           spacing: exactLine(LYRIC_LINE_PT, isLast ? SECTION_GAP_PT : 0),

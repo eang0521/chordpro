@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Section, WordGroup } from '../lib/syllables';
-import { joinSyllablesForEditing, splitEditedWord } from '../lib/syllables';
+import { groupSectionsByLine, joinSyllablesForEditing, splitEditedWord } from '../lib/syllables';
 
 interface Props {
   initialGroups: WordGroup[];
@@ -18,11 +18,9 @@ export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Pr
     return Array.from(seen).sort((a, b) => a - b);
   }, [groups]);
 
-  const sectionByLine = useMemo(() => {
-    const map = new Map<number, Section>();
-    sections.forEach((s) => map.set(s.beforeLineIndex, s));
-    return map;
-  }, [sections]);
+  const sectionsByLine = useMemo(() => groupSectionsByLine(sections), [sections]);
+  const lastLine = lineIndexes[lineIndexes.length - 1] ?? -1;
+  const trailingSections = sections.filter((s) => s.beforeLineIndex > lastLine);
 
   function updateWord(id: string, value: string) {
     setGroups((prev) =>
@@ -38,16 +36,16 @@ export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Pr
       <p className="hint">
         Each word was auto-split with a &middot; between syllables. Click into a word to fix it &mdash;
         add or remove &middot; marks to change where it breaks. Section headings (Verse, Chorus,
-        Bridge, etc.) are detected automatically and aren't tapped or charted.
+        Bridge, etc.) are detected automatically and aren't tapped or charted. An instrumental heading
+        (Intro, Turn, Midtro, Tag, Outro, ...) with no lyrics under it becomes a line of empty chord
+        slots to fill in on the next step.
       </p>
       <div className="syllable-editor">
         {lineIndexes.map((lineIndex) => (
           <div key={lineIndex}>
-            {sectionByLine.has(lineIndex) && (
-              <div className={`section-heading section-${sectionByLine.get(lineIndex)!.type}`}>
-                {sectionByLine.get(lineIndex)!.label}
-              </div>
-            )}
+            {(sectionsByLine.get(lineIndex) ?? []).map((s, i, all) => (
+              <SectionHeading key={i} section={s} empty={i < all.length - 1} />
+            ))}
             <div className="syllable-line">
               {groups
                 .filter((g) => g.lineIndex === lineIndex)
@@ -66,6 +64,9 @@ export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Pr
             </div>
           </div>
         ))}
+        {trailingSections.map((s, i) => (
+          <SectionHeading key={`trailing-${i}`} section={s} empty />
+        ))}
       </div>
       <div className="actions">
         <button className="secondary" onClick={onBack}>
@@ -75,6 +76,20 @@ export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Pr
           Continue to chords &rarr;
         </button>
       </div>
+    </div>
+  );
+}
+
+/** A detected heading. `empty` means no lyrics follow it before the next heading. */
+function SectionHeading({ section, empty }: { section: Section; empty: boolean }) {
+  return (
+    <div className={`section-heading section-${section.type}`}>
+      {section.label}
+      {empty && (
+        <span className="section-heading-note">
+          {section.type === 'instrumental' ? ' — chord slots' : ' — no lyrics, skipped'}
+        </span>
+      )}
     </div>
   );
 }

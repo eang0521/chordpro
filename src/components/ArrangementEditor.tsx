@@ -7,6 +7,7 @@ import {
   removeArrangementItem,
   unlinkArrangementItem,
 } from '../lib/arrangement';
+import { makeInstrumentalBlock } from '../lib/chordSlots';
 
 interface Props {
   blocks: BlockMap;
@@ -19,10 +20,12 @@ const TYPE_OPTIONS: { value: SectionType; label: string }[] = [
   { value: 'verse', label: 'Verse' },
   { value: 'chorus', label: 'Chorus' },
   { value: 'bridge', label: 'Bridge' },
+  { value: 'instrumental', label: 'Instrumental' },
   { value: 'other', label: 'Other' },
 ];
 
 function previewText(block: Block): string {
+  if (block.syllables.every((s) => s.isChordSlot)) return '(chords only)';
   let text = '';
   block.syllables.forEach((s, i) => {
     if (s.isWordStart && i !== 0) text += ' ';
@@ -53,6 +56,12 @@ export function ArrangementEditor({ blocks, arrangement, onChange, onClose }: Pr
     onChange(result.blocks, result.arrangement);
   }
 
+  /** Adds a chord-only section (intro, turn, tag...) at the end; drag it where it belongs. */
+  function addInstrumental() {
+    const block = makeInstrumentalBlock();
+    onChange({ ...blocks, [block.id]: block }, [...arrangement, block.id]);
+  }
+
   function renameBlock(blockId: string, label: string) {
     onChange({ ...blocks, [blockId]: { ...blocks[blockId], label } }, arrangement);
   }
@@ -80,6 +89,9 @@ export function ArrangementEditor({ blocks, arrangement, onChange, onClose }: Pr
           of its occurrences. Need one copy to differ (e.g. a final chorus with a small change)? Click{' '}
           <strong>Unlink</strong> on it to give it its own independent content first.
         </p>
+        <button className="secondary arrangement-add" onClick={addInstrumental}>
+          + Add instrumental section
+        </button>
         <div className="arrangement-list">
           {arrangement.map((blockId, i) => {
             const block = blocks[blockId];

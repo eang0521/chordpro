@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import type { KeyName, SyllableToken } from '../types';
 import { formatChord } from '../lib/musicTheory';
 import { buildRows } from '../lib/lyricRows';
@@ -7,9 +7,12 @@ import { buildRows } from '../lib/lyricRows';
 interface Props {
   syllables: SyllableToken[];
   currentIndex: number;
+  /** First and last index of a highlighted range, if more than the current syllable is highlighted. */
+  selection?: [number, number] | null;
   songKey?: KeyName;
   showChords?: boolean;
-  onSyllableClick?: (index: number) => void;
+  onSyllableMouseDown?: (index: number, e: MouseEvent) => void;
+  onSyllableMouseEnter?: (index: number) => void;
 }
 
 /** Walks up from an element to find its nearest vertically-scrollable ancestor. */
@@ -23,7 +26,15 @@ function findScrollParent(el: HTMLElement | null): HTMLElement | null {
 }
 
 /** Shared flowing lyric renderer used by the chord tapper. */
-export function LyricFlow({ syllables, currentIndex, songKey, showChords = false, onSyllableClick }: Props) {
+export function LyricFlow({
+  syllables,
+  currentIndex,
+  selection,
+  songKey,
+  showChords = false,
+  onSyllableMouseDown,
+  onSyllableMouseEnter,
+}: Props) {
   const currentLineRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -49,28 +60,33 @@ export function LyricFlow({ syllables, currentIndex, songKey, showChords = false
 
   const rows = buildRows(syllables);
   const currentRowIndex = rows.findIndex((row) => row.kind === 'line' && row.indexes.includes(currentIndex));
+  const interactive = !!onSyllableMouseDown;
 
   function renderSyllable(i: number, isLineFirst: boolean): ReactNode {
     const syl = syllables[i];
     const nodes: ReactNode[] = [];
     if (!isLineFirst && syl.isWordStart) nodes.push(' ');
 
-    const chordLabel = showChords && songKey && syl.chord ? formatChord(songKey, syl.chord) : null;
+    const chordLabel =
+      showChords && songKey && syl.chord ? `${syl.bar ? '| ' : ''}${formatChord(songKey, syl.chord)}` : null;
 
     const classes = ['syllable'];
+    if (syl.isChordSlot) classes.push('syllable-slot');
     if (i === currentIndex) classes.push('current');
+    else if (selection && i >= selection[0] && i <= selection[1]) classes.push('selected');
     else if (i < currentIndex) classes.push('past');
 
     nodes.push(
       <span
-        className={`syl-wrap ${onSyllableClick ? 'syl-wrap-clickable' : ''}`}
+        className={`syl-wrap ${interactive ? 'syl-wrap-clickable' : ''}`}
         key={syl.id}
-        onClick={onSyllableClick ? () => onSyllableClick(i) : undefined}
+        onMouseDown={onSyllableMouseDown ? (e) => onSyllableMouseDown(i, e) : undefined}
+        onMouseEnter={onSyllableMouseEnter ? () => onSyllableMouseEnter(i) : undefined}
       >
         {showChords && (
           <span className={`chord-label ${chordLabel ? '' : 'chord-label-empty'}`}>{chordLabel ?? ''}</span>
         )}
-        <span className={classes.join(' ')}>{syl.text}</span>
+        <span className={classes.join(' ')}>{syl.isChordSlot ? ' ' : syl.text}</span>
       </span>,
     );
     return nodes;

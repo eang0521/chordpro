@@ -1,5 +1,6 @@
 import type { Block, SectionType } from '../types';
 import { makeId } from './id';
+import { makeChordLine } from './chordSlots';
 import { syllabifyCore } from './syllabify';
 
 /** A word's editable syllable breakdown, grouped by the line it appears on. */
@@ -23,7 +24,9 @@ const SECTION_KEYWORDS = [
   'chorus',
   'bridge',
   'intro',
+  'midtro',
   'outro',
+  'turn(?:around)?',
   'tag',
   'interlude',
   'instrumental',
@@ -39,11 +42,16 @@ const SECTION_KEYWORDS = [
 // never a normal lyric line, since any other trailing word fails the charset.
 const SECTION_HEADER_RE = new RegExp(`^(${SECTION_KEYWORDS.join('|')})[\\s0-9ivxIVX.\\-:]*$`, 'i');
 
+// Headings for chord-only parts of a song. One with no lyrics under it (like "Turn" right
+// before "Verse 4") still becomes a section, made of empty chord slots to fill in.
+const INSTRUMENTAL_KEYWORDS = new Set(['intro', 'midtro', 'outro', 'turn', 'turnaround', 'tag', 'interlude', 'instrumental', 'ending']);
+
 function classifySectionType(keyword: string): SectionType {
   const normalized = keyword.toLowerCase().replace(/[\s-]/g, '');
   if (normalized === 'verse') return 'verse';
   if (normalized === 'chorus') return 'chorus';
   if (normalized === 'bridge') return 'bridge';
+  if (INSTRUMENTAL_KEYWORDS.has(normalized)) return 'instrumental';
   return 'other';
 }
 
@@ -118,8 +126,7 @@ export function parseLyricsToWordGroups(text: string): { groups: WordGroup[]; se
  * unlabeled "other" block, so every syllable always belongs to exactly one block.
  */
 export function wordGroupsToBlocks(groups: WordGroup[], sections: Section[] = []): Block[] {
-  const sectionByLine = new Map<number, Section>();
-  sections.forEach((s) => sectionByLine.set(s.beforeLineIndex, s));
+  const sectionsByLine = groupSectionsByLine(sections);
 
   const blocks: Block[] = [];
   let currentBlock: Block | null = null;
@@ -130,11 +137,22 @@ export function wordGroupsToBlocks(groups: WordGroup[], sections: Section[] = []
     blocks.push(currentBlock);
   }
 
+  // A heading with no lyrics before the next heading: an instrumental one becomes a line of empty
+  // chord slots; any other kind is dropped, as before.
+  function addEmptySection(section: Section) {
+    if (section.type !== 'instrumental') return;
+    const id = makeId();
+    const syllables = makeChordLine(id).map((tok, i) => ({ ...tok, localIndex: i }));
+    blocks.push({ id, type: section.type, label: section.label, syllables });
+  }
+
   groups.forEach((group) => {
     const isNewLine = group.lineIndex !== prevLineIndex;
     prevLineIndex = group.lineIndex;
 
-    const section = isNewLine ? sectionByLine.get(group.lineIndex) : undefined;
+    const lineSections = isNewLine ? sectionsByLine.get(group.lineIndex) ?? [] : [];
+    lineSections.slice(0, -1).forEach(addEmptySection);
+    const section = lineSections[lineSections.length - 1];
     if (section) {
       startBlock(section.type, section.label);
     } else if (!currentBlock) {
@@ -158,7 +176,19 @@ export function wordGroupsToBlocks(groups: WordGroup[], sections: Section[] = []
       });
   });
 
+  // Headings after the last lyric line (e.g. an outro).
+  const lastLine = groups.length > 0 ? groups[groups.length - 1].lineIndex : -1;
+  sections.filter((s) => s.beforeLineIndex > lastLine).forEach(addEmptySection);
+
   return blocks;
+}
+
+/** Sections keyed by the lyric line they precede, in order — several headings can share a line
+ * when all but the last have no lyrics of their own. */
+export function groupSectionsByLine(sections: Section[]): Map<number, Section[]> {
+  const byLine = new Map<number, Section[]>();
+  sections.forEach((s) => byLine.set(s.beforeLineIndex, [...(byLine.get(s.beforeLineIndex) ?? []), s]));
+  return byLine;
 }
 
 /** Splits a manually-edited "syl·la·ble" string back into an array of syllable strings. */

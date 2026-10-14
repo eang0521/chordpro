@@ -13,7 +13,7 @@ interface Props {
   onClose: () => void;
 }
 
-const TYPE_NAMES = { verse: 'Verse', chorus: 'Chorus', bridge: 'Bridge', other: 'Section' };
+const TYPE_NAMES = { verse: 'Verse', chorus: 'Chorus', bridge: 'Bridge', instrumental: 'Instrumental', other: 'Section' };
 
 function hasChords(block: Block): boolean {
   return block.syllables.some((s) => s.chord);
@@ -29,15 +29,15 @@ function defaultPair(ids: string[], blocks: BlockMap): [string, string] {
   return [source, target];
 }
 
-function renderLine(tokens: SyllableToken[], chords: (Chord | null)[], songKey: KeyName) {
+function renderLine(tokens: SyllableToken[], chords: (Chord | null)[], bars: boolean[], songKey: KeyName) {
   return tokens.map((tok, i) => (
     <span key={tok.id}>
       {i > 0 && tok.isWordStart ? ' ' : null}
       <span className="syl-wrap">
         <span className={`chord-label ${chords[i] ? '' : 'chord-label-empty'}`}>
-          {chords[i] ? formatChord(songKey, chords[i]) : ''}
+          {chords[i] ? `${bars[i] ? '| ' : ''}${formatChord(songKey, chords[i])}` : ''}
         </span>
-        <span className="syllable past">{tok.text}</span>
+        <span className={`syllable past ${tok.isChordSlot ? 'syllable-slot' : ''}`}>{tok.text}</span>
       </span>
     </span>
   ));
@@ -246,11 +246,13 @@ export function CopyChordsDialog({ blocks, arrangement, songKey, onApply, onClos
                     </div>
                     {from && (
                       <div className="copy-lyrics copy-lyrics-source">
-                        {renderLine(from, from.map((t) => t.chord), songKey)}
+                        {renderLine(from, from.map((t) => t.chord), from.map((t) => !!t.bar), songKey)}
                       </div>
                     )}
                     <div className="copy-lyrics">
-                      {renderLine(line, preview ? preview.chords : line.map((t) => t.chord), songKey)}
+                      {preview
+                        ? renderLine(line, preview.chords, preview.bars, songKey)
+                        : renderLine(line, line.map((t) => t.chord), line.map((t) => !!t.bar), songKey)}
                     </div>
                   </div>
                 );

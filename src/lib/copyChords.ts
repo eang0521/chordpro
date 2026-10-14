@@ -11,6 +11,8 @@ export interface LineMapping {
 export interface LinePreview {
   /** The chord each target syllable will end up with. */
   chords: (Chord | null)[];
+  /** Whether each target syllable's chord has a bar line before it. */
+  bars: boolean[];
   /** Source chords that land before the start or past the end of the target line and are lost. */
   dropped: number;
   /** True if the source and target lines have different syllable counts. */
@@ -38,14 +40,19 @@ export function defaultMappings(sourceLineCount: number, targetLineCount: number
 /** Copies chords syllable-for-syllable from one line onto another, offset by `shift`. */
 export function previewLine(source: SyllableToken[], target: SyllableToken[], shift: number): LinePreview {
   const chords: (Chord | null)[] = target.map(() => null);
+  const bars = target.map(() => false);
   let dropped = 0;
   source.forEach((tok, i) => {
     if (!tok.chord) return;
     const j = i + shift;
-    if (j < 0 || j >= target.length) dropped += 1;
-    else chords[j] = tok.chord;
+    if (j < 0 || j >= target.length) {
+      dropped += 1;
+    } else {
+      chords[j] = tok.chord;
+      bars[j] = !!tok.bar;
+    }
   });
-  return { chords, dropped, mismatch: source.length !== target.length };
+  return { chords, bars, dropped, mismatch: source.length !== target.length };
 }
 
 /** Returns the target block with every mapped line's chords replaced by the copied ones. */
@@ -55,8 +62,8 @@ export function applyCopy(source: Block, target: Block, mappings: LineMapping[])
     const mapping = mappings[li];
     const sourceLine = mapping?.sourceLine != null ? sourceLines[mapping.sourceLine] : undefined;
     if (!sourceLine) return line;
-    const { chords } = previewLine(sourceLine, line, mapping.shift);
-    return line.map((tok, i) => ({ ...tok, chord: chords[i] }));
+    const { chords, bars } = previewLine(sourceLine, line, mapping.shift);
+    return line.map((tok, i) => ({ ...tok, chord: chords[i], bar: bars[i] }));
   });
   return { ...target, syllables };
 }
