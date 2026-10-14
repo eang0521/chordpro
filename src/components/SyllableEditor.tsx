@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Section, WordGroup } from '../lib/syllables';
 import { groupSectionsByLine, joinSyllablesForEditing, splitEditedWord } from '../lib/syllables';
+import { overrideKind, rememberSyllableEdits, spellingSplit, wordCore } from '../lib/syllableOverrides';
 
 interface Props {
   initialGroups: WordGroup[];
@@ -11,6 +12,16 @@ interface Props {
 
 export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Props) {
   const [groups, setGroups] = useState<WordGroup[]>(initialGroups);
+
+  function submit() {
+    // Remember words the user re-split, so the next song starts with their version.
+    const before = new Map(initialGroups.map((g) => [g.id, g.syllables]));
+    rememberSyllableEdits(
+      groups.map((g) => before.get(g.id) ?? g.syllables),
+      groups.map((g) => g.syllables),
+    );
+    onSubmit(groups);
+  }
 
   const lineIndexes = useMemo(() => {
     const seen = new Set<number>();
@@ -35,7 +46,10 @@ export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Pr
       <h2>2. Review syllables</h2>
       <p className="hint">
         Each word was auto-split with a &middot; between syllables. Click into a word to fix it &mdash;
-        add or remove &middot; marks to change where it breaks. Section headings (Verse, Chorus,
+        add or remove &middot; marks to change where it breaks. Highlighted words are often sung
+        differently from how they&rsquo;re spelled (eve&middot;ry, not ev&middot;e&middot;ry) or are ones you
+        re-split before &mdash; hover one to see the other way, and check it fits the melody. Words you
+        re-split here are remembered for your next song. Section headings (Verse, Chorus,
         Bridge, etc.) are detected automatically and aren't tapped or charted. An instrumental heading
         (Intro, Turn, Midtro, Tag, Outro, ...) with no lyrics under it becomes a line of empty chord
         slots to fill in on the next step. A line like &ldquo;Key change to D&rdquo; becomes a key change.
@@ -51,13 +65,23 @@ export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Pr
                 .filter((g) => g.lineIndex === lineIndex)
                 .map((g) => {
                   const value = joinSyllablesForEditing(g.syllables);
+                  const { core } = wordCore(g.syllables);
+                  const kind = overrideKind(core);
+                  const bySpelling = kind ? joinSyllablesForEditing(spellingSplit(core)) : '';
                   return (
                     <input
                       key={g.id}
-                      className="syllable-word-input"
+                      className={`syllable-word-input ${kind ? 'syllable-word-common' : ''}`}
                       value={value}
                       onChange={(e) => updateWord(g.id, e.target.value)}
                       style={{ width: `${Math.max(value.length, 2) + 1}ch` }}
+                      title={
+                        kind === 'learned'
+                          ? `Split the way you split it before (by spelling: ${bySpelling}). Check it fits the melody.`
+                          : kind === 'common'
+                            ? `Often sung this way (by spelling: ${bySpelling}). Check it fits the melody.`
+                            : undefined
+                      }
                     />
                   );
                 })}
@@ -72,7 +96,7 @@ export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Pr
         <button className="secondary" onClick={onBack}>
           &larr; Back
         </button>
-        <button disabled={!canContinue} onClick={() => onSubmit(groups)}>
+        <button disabled={!canContinue} onClick={submit}>
           Continue to chords &rarr;
         </button>
       </div>

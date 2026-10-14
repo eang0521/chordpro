@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SongStore, SongSummary } from '../lib/songStore';
 import { newSongId } from '../lib/songDocument';
+import { KEY_NAMES, semitonesBetween } from '../lib/musicTheory';
 
 interface Props {
   store: SongStore;
@@ -11,6 +12,43 @@ interface Props {
 }
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+
+type SortOrder = 'edited' | 'title' | 'title-desc' | 'key';
+
+const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
+  { value: 'edited', label: 'Last edited' },
+  { value: 'title', label: 'Title (A–Z)' },
+  { value: 'title-desc', label: 'Title (Z–A)' },
+  { value: 'key', label: 'Key' },
+];
+
+const SORT_KEY = 'chordpro-library-sort';
+
+/** The remembered sort order for this browser (just a convenience — it's fine if it's lost). */
+function loadSort(): SortOrder {
+  try {
+    const saved = localStorage.getItem(SORT_KEY);
+    return SORT_OPTIONS.some((o) => o.value === saved) ? (saved as SortOrder) : 'edited';
+  } catch {
+    return 'edited';
+  }
+}
+
+const titleOf = (song: SongSummary) => song.title.trim() || 'Untitled';
+// Numbers sort as numbers ("Psalm 9" before "Psalm 150"), and case and accents are ignored.
+const compareTitles = (a: SongSummary, b: SongSummary) =>
+  titleOf(a).localeCompare(titleOf(b), undefined, { numeric: true, sensitivity: 'base' });
+// Keys in pitch order from C (C, Db, D, ... B), going by the key each song starts in.
+const keyRank = (song: SongSummary) => (song.keys[0] ? semitonesBetween(KEY_NAMES[0], song.keys[0]) : 12);
+
+function sortSongs(songs: SongSummary[], order: SortOrder): SongSummary[] {
+  const sorted = [...songs];
+  if (order === 'edited') sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  else if (order === 'title') sorted.sort(compareTitles);
+  else if (order === 'title-desc') sorted.sort((a, b) => compareTitles(b, a));
+  else sorted.sort((a, b) => keyRank(a) - keyRank(b) || compareTitles(a, b));
+  return sorted;
+}
 
 function formatEdited(iso: string): string {
   const date = new Date(iso);
@@ -28,6 +66,17 @@ export function SongLibrary({ store, message, onOpen, onNew }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SongSummary | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>(loadSort);
+  const sortedSongs = useMemo(() => (songs ? sortSongs(songs, sortOrder) : null), [songs, sortOrder]);
+
+  function changeSort(order: SortOrder) {
+    setSortOrder(order);
+    try {
+      localStorage.setItem(SORT_KEY, order);
+    } catch {
+      // Storage unavailable — the order just won't be remembered next time.
+    }
+  }
 
   const refresh = useCallback(async () => {
     try {
@@ -75,7 +124,21 @@ export function SongLibrary({ store, message, onOpen, onNew }: Props) {
     <div className="panel library">
       <div className="library-header">
         <h2>Your songs</h2>
-        <button onClick={onNew}>New song</button>
+        <div className="library-header-actions">
+          {songs && songs.length > 1 && (
+            <label className="library-sort">
+              <span>Sort by</span>
+              <select value={sortOrder} onChange={(e) => changeSort(e.target.value as SortOrder)}>
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <button onClick={onNew}>New song</button>
+        </div>
       </div>
 
       {message && <p className="hint library-error">{message}</p>}
@@ -91,9 +154,9 @@ export function SongLibrary({ store, message, onOpen, onNew }: Props) {
       {songs === null && !error && <p className="hint">Loading your songs&hellip;</p>}
       {songs?.length === 0 && <p className="hint">No songs yet. Start one with New song.</p>}
 
-      {songs && songs.length > 0 && (
+      {sortedSongs && sortedSongs.length > 0 && (
         <ul className="library-list">
-          {songs.map((song) => (
+          {sortedSongs.map((song) => (
             <li key={song.id} className="library-item">
               <button className="library-open" disabled={busyId === song.id} onClick={() => onOpen(song.id)}>
                 <span className="library-title">{song.title || 'Untitled'}</span>

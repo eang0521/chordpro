@@ -205,14 +205,18 @@ export function placeChords(tokens: ChartToken[], measure: TextMeasure): PlacedL
       // word it's a trailing chord, spaced out like counted beats.
       if (!tok.chordLabel) return;
       const trailing = i > lastLyric;
+      // Before the line's first word: a pickup chord, which the lyrics will make room for.
+      const leading = lyricLine === '' && !trailing;
       const wordsEnd = lyricLine ? measure(lyricLine, LYRIC_SIZE_PT, 'bold') : 0;
       const at = Math.max(trailing && lyricLine ? wordsEnd + SLOT_GAP_PT : wordsEnd, nextFreePt);
       chords.push({ offsetPt: at, label: tok.chordLabel });
-      nextFreePt = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic') + (trailing ? SLOT_GAP_PT : CHORD_MIN_GAP_PT);
+      nextFreePt = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic') + (trailing || leading ? SLOT_GAP_PT : CHORD_MIN_GAP_PT);
       return;
     }
     const withinWord = !tok.isWordStart && lyricLine !== '';
     if (tok.isWordStart && i !== 0 && lyricLine) lyricLine += ' ';
+    // Chords placed before the first word push the lyrics right, so they stand clear of it.
+    if (lyricLine === '' && nextFreePt > 0) lyricLine = spreadTo('', nextFreePt, false, measure);
     if (tok.chordLabel) {
       let at = measure(lyricLine, LYRIC_SIZE_PT, 'bold');
       if (at < nextFreePt && lyricLine) {

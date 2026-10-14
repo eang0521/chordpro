@@ -1,4 +1,5 @@
-import type { Block, Chord, SyllableToken } from '../types';
+import type { Block, SyllableToken } from '../types';
+import { makeId } from './id';
 
 /** How one target line gets its chords: from which source line, nudged by how many syllables. */
 export interface LineMapping {
@@ -9,13 +10,15 @@ export interface LineMapping {
 }
 
 export interface LinePreview {
-  /** The chord each target syllable will end up with. */
-  chords: (Chord | null)[];
-  /** Whether each target syllable's chord has a bar line before it. */
-  bars: boolean[];
+  /** The target line as it will be after copying: its lyrics with the copied chords, plus the
+   * source line's chord slots. */
+  tokens: SyllableToken[];
   /** Source chords that land before the start or past the end of the target line and are lost. */
   dropped: number;
-  /** True if the source and target lines have different syllable counts. */
+  /** Lyric syllables (not counting chord slots) in each line. */
+  sourceLyricCount: number;
+  targetLyricCount: number;
+  /** True if the source and target lines have different numbers of lyric syllables. */
   mismatch: boolean;
 }
 
@@ -37,33 +40,75 @@ export function defaultMappings(sourceLineCount: number, targetLineCount: number
   }));
 }
 
-/** Copies chords syllable-for-syllable from one line onto another, offset by `shift`. */
+/** Marks chord slots copied in by a preview, so applyCopy can give them real ids. */
+const COPIED_SLOT_PREFIX = 'copied-slot-';
+
+/**
+ * Copies one line's chords onto another. Lyric syllables are paired up in order (offset by
+ * `shift`), ignoring chord slots on both sides; then the source line's chord slots — and the
+ * chords on them — are rebuilt in the target at the same place among its lyrics: before the
+ * first word, between words (moving with `shift`), or after the last word. Any slots the target
+ * line had are replaced, just like its chords.
+ */
 export function previewLine(source: SyllableToken[], target: SyllableToken[], shift: number): LinePreview {
-  const chords: (Chord | null)[] = target.map(() => null);
-  const bars = target.map(() => false);
+  const sourceLyrics = source.filter((t) => !t.isChordSlot);
+  const lyrics: SyllableToken[] = target.filter((t) => !t.isChordSlot).map((t) => ({ ...t, chord: null, bar: false }));
+
   let dropped = 0;
-  source.forEach((tok, i) => {
+  sourceLyrics.forEach((tok, i) => {
     if (!tok.chord) return;
     const j = i + shift;
-    if (j < 0 || j >= target.length) {
-      dropped += 1;
-    } else {
-      chords[j] = tok.chord;
-      bars[j] = !!tok.bar;
-    }
+    if (j < 0 || j >= lyrics.length) dropped += 1;
+    else lyrics[j] = { ...lyrics[j], chord: tok.chord, bar: !!tok.bar };
   });
-  return { chords, bars, dropped, mismatch: source.length !== target.length };
+
+  // Each source slot's place: how many lyric syllables come before it. Slots at either end of
+  // the line stay at that end; ones between words move with the shift but stay between words.
+  const slotsAt = new Map<number, SyllableToken[]>();
+  let lyricsBefore = 0;
+  source.forEach((tok) => {
+    if (!tok.isChordSlot) {
+      lyricsBefore += 1;
+      return;
+    }
+    let at: number;
+    if (lyricsBefore === 0) at = 0;
+    else if (lyricsBefore === sourceLyrics.length) at = lyrics.length;
+    else at = Math.min(Math.max(lyricsBefore + shift, Math.min(1, lyrics.length)), Math.max(lyrics.length - 1, 0));
+    const copy: SyllableToken = { ...tok, id: `${COPIED_SLOT_PREFIX}${tok.id}`, blockId: target[0]?.blockId ?? tok.blockId };
+    slotsAt.set(at, [...(slotsAt.get(at) ?? []), copy]);
+  });
+
+  const tokens: SyllableToken[] = [];
+  for (let k = 0; k <= lyrics.length; k++) {
+    tokens.push(...(slotsAt.get(k) ?? []));
+    if (k < lyrics.length) tokens.push(lyrics[k]);
+  }
+  tokens.forEach((tok, i) => (tokens[i] = { ...tok, isLineStart: i === 0 }));
+
+  return {
+    tokens,
+    dropped,
+    sourceLyricCount: sourceLyrics.length,
+    targetLyricCount: lyrics.length,
+    mismatch: sourceLyrics.length !== lyrics.length,
+  };
 }
 
-/** Returns the target block with every mapped line's chords replaced by the copied ones. */
+/** Returns the target block with every mapped line replaced by its copied version. */
 export function applyCopy(source: Block, target: Block, mappings: LineMapping[]): Block {
   const sourceLines = splitLines(source);
-  const syllables = splitLines(target).flatMap((line, li) => {
-    const mapping = mappings[li];
-    const sourceLine = mapping?.sourceLine != null ? sourceLines[mapping.sourceLine] : undefined;
-    if (!sourceLine) return line;
-    const { chords, bars } = previewLine(sourceLine, line, mapping.shift);
-    return line.map((tok, i) => ({ ...tok, chord: chords[i], bar: bars[i] }));
-  });
+  const syllables = splitLines(target)
+    .flatMap((line, li) => {
+      const mapping = mappings[li];
+      const sourceLine = mapping?.sourceLine != null ? sourceLines[mapping.sourceLine] : undefined;
+      return sourceLine ? previewLine(sourceLine, line, mapping.shift).tokens : line;
+    })
+    .map((tok, i) => ({
+      ...tok,
+      id: tok.id.startsWith(COPIED_SLOT_PREFIX) ? makeId() : tok.id,
+      blockId: target.id,
+      localIndex: i,
+    }));
   return { ...target, syllables };
 }

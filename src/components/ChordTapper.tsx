@@ -208,6 +208,21 @@ export function ChordTapper({
     moveTo(index + 1);
   }
 
+  /** Adds an empty chord slot before the first syllable of the cursor's line, for a chord that
+   * comes before the first word (a pickup or a turnaround leading in). */
+  function addSlotAtLineStart() {
+    if (index < 0) return;
+    let start = index;
+    while (start > 0 && !syllables[start].isLineStart) start--;
+    const first = syllables[start];
+    edit((prev) => {
+      const withSlot = insertTokens(prev, first.blockId, first.localIndex - 1, [makeChordSlot(first.blockId, true)]);
+      // The old first syllable no longer starts the line.
+      return updateBlockToken(withSlot, first.blockId, first.localIndex + 1, (tok) => ({ ...tok, isLineStart: false }));
+    });
+    moveTo(start);
+  }
+
   /** Adds a line of empty chord slots after the cursor's line. */
   function addChordLine() {
     if (index < 0) return;
@@ -304,6 +319,11 @@ export function ChordTapper({
         addSlot();
         return;
       }
+      if (e.key === '[') {
+        e.preventDefault();
+        addSlotAtLineStart();
+        return;
+      }
       if (e.key === '|' || e.key === '\\') {
         e.preventDefault();
         toggleBar();
@@ -340,7 +360,8 @@ export function ChordTapper({
       </p>
       <p className="hint">
         <strong>Instrumentals:</strong> <kbd>+</kbd> adds a chord slot (a chord with no lyric under it) after the
-        current syllable &mdash; use it for chords at the end of a line. <kbd>|</kbd> puts a bar line before the
+        current syllable &mdash; use it for chords at the end of a line &mdash; and <kbd>[</kbd> adds one at the
+        start of the line, for a chord before the first word. <kbd>|</kbd> puts a bar line before the
         current chord. <kbd>Backspace</kbd> on an empty slot removes it.{' '}
         <strong>Copy and paste:</strong> drag across syllables (or <kbd>Shift</kbd>+click,{' '}
         <kbd>Shift</kbd>+<kbd>&larr;</kbd>/<kbd>&rarr;</kbd>) to highlight them, then <kbd>Ctrl</kbd>+<kbd>C</kbd>{' '}
@@ -433,13 +454,22 @@ export function ChordTapper({
         <button className="secondary" onClick={addSlot} disabled={index < 0} title="Add a chord with no lyric under it after this syllable (+)">
           + Chord slot
         </button>
+        <button
+          className="secondary"
+          onClick={addSlotAtLineStart}
+          disabled={index < 0}
+          title="Add a chord slot before this line's first word ([)"
+        >
+          + Slot at line start
+        </button>
         <button className="secondary" onClick={addChordLine} disabled={index < 0} title="Add a line of chord slots after this line">
           + Chord line
         </button>
         <button onClick={advance} disabled={finished}>
           Next syllable &#9654;
         </button>
-        <button disabled={!finished} onClick={onSubmit}>
+        {/* Always available, so a quick fix to one chord doesn't mean stepping through the rest. */}
+        <button disabled={syllables.length === 0} onClick={onSubmit}>
           Continue to export &rarr;
         </button>
       </div>

@@ -32,6 +32,45 @@ const RETAINS_ED_SYLLABLE = new Set([
   'naked', 'wicked', 'ragged', 'rugged', 'jagged', 'crooked', 'sacred', 'wretched', 'dogged',
 ]);
 
+// Suffixes that keep their own syllables after a stem ending in a silent "e" (sure+ly, like+ness,
+// hope+less+ly): the stem is split on its own, so its "e" stays silent instead of being read as a
+// vowel ("su-re-ly"). Longest first, so "lessly" wins over "ly".
+const SILENT_E_SUFFIXES: [suffix: string, syllables: string[]][] = [
+  ['lessness', ['less', 'ness']],
+  ['fulness', ['ful', 'ness']],
+  ['lessly', ['less', 'ly']],
+  ['liness', ['li', 'ness']],
+  ['fully', ['ful', 'ly']],
+  ['ments', ['ments']],
+  ['ness', ['ness']],
+  ['less', ['less']],
+  ['ment', ['ment']],
+  ['ful', ['ful']],
+  ['ly', ['ly']],
+];
+
+// Words that look like stem + suffix above but aren't (el-e-ment, not "ele" + "ment").
+const NOT_SILENT_E_STEMS = new Set(['element', 'elements']);
+
+/** The stem + suffix split for a word like "surely" or "hopelessly", or null if it isn't one. */
+function splitSilentESuffix(core: string): [stem: string, suffixSyllables: string[]] | null {
+  const lower = core.toLowerCase();
+  if (NOT_SILENT_E_STEMS.has(lower)) return null;
+  for (const [suffix, syllables] of SILENT_E_SUFFIXES) {
+    if (!lower.endsWith(suffix)) continue;
+    const stem = core.slice(0, core.length - suffix.length);
+    const s = stem.toLowerCase();
+    // A real silent-e stem: at least 3 letters, ending consonant + "e" ("sure", "gentle"), with a
+    // vowel earlier on to carry the syllable ("free"+"ly" and "re"+"ly" don't qualify).
+    if (s.length < 3 || !s.endsWith('e') || 'aeiou'.includes(s[s.length - 2])) continue;
+    if (!/[aeiouy]/.test(s.slice(0, -2))) continue;
+    // Cut the suffix's own syllables out of the original text, keeping its capitalization.
+    let at = stem.length;
+    return [stem, syllables.map((syl) => core.slice(at, (at += syl.length)))];
+  }
+  return null;
+}
+
 type Span = [start: number, end: number];
 
 function splitCluster(cluster: string): [staysWithPrev: string, movesToNext: string] {
@@ -69,6 +108,9 @@ export function syllabifyCore(core: string): string[] {
     if (!/[aeiouy]/i.test(remainder)) continue;
     return [...syllabifyCore(core.slice(0, prefix.length)), ...syllabifyCore(remainder)];
   }
+
+  const silentESplit = splitSilentESuffix(core);
+  if (silentESplit) return [...syllabifyCore(silentESplit[0]), ...silentESplit[1]];
 
   const letters = core.split('');
   const n = letters.length;
@@ -135,6 +177,19 @@ export function syllabifyCore(core: string): string[] {
     // would otherwise be unpronounceable.
     const stemFinal = letters[last[0] - 1].toLowerCase();
     if (stemFinal !== 't' && stemFinal !== 'd') groups.pop();
+  } else if (
+    last[0] === last[1] &&
+    last[1] === n - 2 &&
+    last[0] >= 1 &&
+    letters[last[1]].toLowerCase() === 'e' &&
+    letters[n - 1].toLowerCase() === 's'
+  ) {
+    // Likewise "-es" after a silent-e stem adds no syllable (likes, lives, times) except after a
+    // hissing sound, where it does (places, roses, judges, boxes, churches, wishes).
+    const stemFinal = letters[last[0] - 1].toLowerCase();
+    const beforeFinal = last[0] >= 2 ? letters[last[0] - 2].toLowerCase() : '';
+    const hissing = 'cgszx'.includes(stemFinal) || (stemFinal === 'h' && 'cs'.includes(beforeFinal));
+    if (!hissing) groups.pop();
   }
 
   if (groups.length <= 1) return [core];

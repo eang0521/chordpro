@@ -4,6 +4,7 @@ import { makeChordLine } from './chordSlots';
 import { makeKeyChange } from './arrangement';
 import { keyFromName, semitonesBetween } from './musicTheory';
 import { syllabifyCore } from './syllabify';
+import { applyOverride } from './syllableOverrides';
 
 /** A word's editable syllable breakdown, grouped by the line it appears on. */
 export interface WordGroup {
@@ -94,7 +95,9 @@ export function hyphenateWord(word: string): string[] {
   const [, lead, core, trail] = match;
   if (!core) return [word];
 
-  const parts = syllabifyCore(core);
+  // A commonly re-split word ("every" → eve·ry) or one the user re-split before wins over the
+  // spelling-based split.
+  const parts = applyOverride(core) ?? syllabifyCore(core);
   if (parts.length === 0) return [word];
 
   const result = [...parts];

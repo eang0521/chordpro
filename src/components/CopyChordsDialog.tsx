@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { ArrangementEntry, Block, Chord, KeyName, SyllableToken } from '../types';
+import type { ArrangementEntry, Block, KeyName, SyllableToken } from '../types';
 import type { BlockMap } from '../lib/arrangement';
 import { blockIdsOf } from '../lib/arrangement';
 import type { LineMapping } from '../lib/copyChords';
@@ -30,13 +30,13 @@ function defaultPair(ids: string[], blocks: BlockMap): [string, string] {
   return [source, target];
 }
 
-function renderLine(tokens: SyllableToken[], chords: (Chord | null)[], bars: boolean[], songKey: KeyName) {
+function renderLine(tokens: SyllableToken[], songKey: KeyName) {
   return tokens.map((tok, i) => (
     <span key={tok.id}>
       {i > 0 && tok.isWordStart ? ' ' : null}
       <span className="syl-wrap">
-        <span className={`chord-label ${chords[i] ? '' : 'chord-label-empty'}`}>
-          {chords[i] ? `${bars[i] ? '| ' : ''}${formatChord(songKey, chords[i])}` : ''}
+        <span className={`chord-label ${tok.chord ? '' : 'chord-label-empty'}`}>
+          {tok.chord ? `${tok.bar ? '| ' : ''}${formatChord(songKey, tok.chord)}` : ''}
         </span>
         <span className={`syllable past ${tok.isChordSlot ? 'syllable-slot' : ''}`}>{tok.text}</span>
       </span>
@@ -115,7 +115,8 @@ export function CopyChordsDialog({ blocks, arrangement, songKey, onApply, onClos
           </button>
         </div>
         <p className="hint">
-          Copies chords syllable-for-syllable from one section onto another. If a line has a different number of
+          Copies chords syllable-for-syllable from one section onto another, along with its chord slots
+          (chords with no lyric under them, like a turnaround at the end of a line). If a line has a different number of
           syllables, pick which source line it takes chords from, or shift its chords earlier or later until they
           line up. Copied lines replace the chords already on them.
         </p>
@@ -216,7 +217,7 @@ export function CopyChordsDialog({ blocks, arrangement, songKey, onApply, onClos
                           <button
                             className="secondary"
                             onClick={() => updateMapping(i, { shift: m.shift - 1 })}
-                            disabled={m.shift <= -from.length + 1}
+                            disabled={!preview || m.shift <= -preview.sourceLyricCount + 1}
                             aria-label="Shift chords one syllable earlier"
                             title="Shift chords one syllable earlier"
                           >
@@ -228,7 +229,7 @@ export function CopyChordsDialog({ blocks, arrangement, songKey, onApply, onClos
                           <button
                             className="secondary"
                             onClick={() => updateMapping(i, { shift: m.shift + 1 })}
-                            disabled={m.shift >= line.length - 1}
+                            disabled={!preview || m.shift >= preview.targetLyricCount - 1}
                             aria-label="Shift chords one syllable later"
                             title="Shift chords one syllable later"
                           >
@@ -239,21 +240,19 @@ export function CopyChordsDialog({ blocks, arrangement, songKey, onApply, onClos
                       {preview && (
                         <span className="copy-line-status">
                           {preview.mismatch
-                            ? `${from!.length} → ${line.length} syllables`
-                            : `${line.length} syllables`}
+                            ? `${preview.sourceLyricCount} → ${preview.targetLyricCount} syllables`
+                            : `${preview.targetLyricCount} syllables`}
                           {preview.dropped > 0 && ` · ${pluralize(preview.dropped, 'chord')} left out`}
                         </span>
                       )}
                     </div>
                     {from && (
                       <div className="copy-lyrics copy-lyrics-source">
-                        {renderLine(from, from.map((t) => t.chord), from.map((t) => !!t.bar), songKey)}
+                        {renderLine(from, songKey)}
                       </div>
                     )}
                     <div className="copy-lyrics">
-                      {preview
-                        ? renderLine(line, preview.chords, preview.bars, songKey)
-                        : renderLine(line, line.map((t) => t.chord), line.map((t) => !!t.bar), songKey)}
+                      {renderLine(preview ? preview.tokens : line, songKey)}
                     </div>
                   </div>
                 );

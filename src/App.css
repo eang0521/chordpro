@@ -153,6 +153,13 @@ button.secondary {
   outline: 2px solid var(--accent);
 }
 
+/* A commonly re-split word (or one the user re-split before): worth a second look. */
+.syllable-word-input.syllable-word-common {
+  border-color: #b8913a;
+  background: #2a2618;
+  color: #f0d080;
+}
+
 /* Lyric flow */
 .recorder-status {
   margin-bottom: 12px;
@@ -1015,6 +1022,31 @@ button.danger-solid {
 
 .library-header h2 {
   margin: 0;
+}
+
+.library-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.library-sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.library-sort select {
+  background: #1e222c;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 0.9rem;
 }
 
 .library-error {
