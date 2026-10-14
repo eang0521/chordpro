@@ -3,8 +3,22 @@ import { formatChord, transposeKey } from './musicTheory';
 
 type WrappedSectionType = 'verse' | 'chorus' | 'bridge' | 'instrumental';
 
+/** ChordPro's standard credit directives. Words and music by the same people sets both. */
+function creditDirectives(song: Song): string[] {
+  const c = song.credits;
+  if (!c) return [];
+  const words = c.wordsBy.trim();
+  const music = c.separateMusic ? c.musicBy.trim() : words;
+  const copyright = c.copyright.trim();
+  return [
+    ...(words ? [`{lyricist: ${words}}`] : []),
+    ...(music ? [`{composer: ${music}}`] : []),
+    ...(copyright ? [`{copyright: ${copyright}}`] : []),
+  ];
+}
+
 export function songToChordPro(song: Song): string {
-  const lines: string[] = [`{title: ${song.title || 'Untitled'}}`, `{key: ${song.key}}`, ''];
+  const lines: string[] = [`{title: ${song.title || 'Untitled'}}`, `{key: ${song.key}}`, ...creditDirectives(song), ''];
 
   let currentLine = '';
   let openSection: WrappedSectionType | null = null;

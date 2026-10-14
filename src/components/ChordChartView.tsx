@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { ArrangementEntry, KeyName } from '../types';
+import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from '../lib/arrangement';
 import type { ChartLineRow, SectionDisplayRow } from '../lib/chordChart';
 import { buildChartRows, flattenSections, groupIntoSections, isChordOnly, keyHeaderText, placeChords, songKeys } from '../lib/chordChart';
@@ -8,19 +8,23 @@ import { generateWordDoc } from '../lib/wordDoc';
 import { generatePdf } from '../lib/pdfDoc';
 import { chartFilename, downloadBlob } from '../lib/download';
 import { CHORD_FONT_OPTIONS, getChordFontOption, loadChordFont } from '../lib/chordFonts';
+import { creditLines } from '../lib/credits';
 import {
   CHORD_SIZE_PT,
-  CONTENT_HEIGHT_PX,
   CONTENT_WIDTH_PX,
+  CREDIT_BOTTOM_TWIPS,
+  CREDIT_LINE_PT,
+  CREDIT_SIZE_PT,
   HEADER_TOP_PX,
   LYRIC_SIZE_PT,
-  MARGIN_BOTTOM_PX,
   MARGIN_SIDE_PX,
   MARGIN_TOP_PX,
   PAGE_HEIGHT_PX,
   PAGE_WIDTH_PX,
+  creditFooter,
   labelColumnTwips,
   measureInFont,
+  twipsToPreviewPx,
 } from '../lib/pageLayout';
 import { fitLineSpacing, paginateByHeight } from '../lib/pagination';
 import { KeyControl } from './KeyControl';
@@ -35,6 +39,7 @@ interface Props {
   onFontIdChange: (id: string) => void;
   lineSpacing: number;
   onLineSpacingChange: (value: number) => void;
+  credits: SongCredits;
   onClose: () => void;
 }
 
@@ -139,6 +144,7 @@ export function ChordChartView({
   onFontIdChange,
   lineSpacing,
   onLineSpacingChange,
+  credits,
   onClose,
 }: Props) {
   const [generating, setGenerating] = useState(false);
@@ -174,6 +180,15 @@ export function ChordChartView({
     // fontLoads: the same font measures differently once it has actually loaded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayRows, font.wordFont, fontLoads]);
+  // The credits footer, and the page height left for the song above it.
+  const footer = useMemo(
+    () => creditFooter(creditLines(credits), measureInFont(font.wordFont)),
+    // fontLoads: as above, measure again once the font has loaded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [credits, font.wordFont, fontLoads],
+  );
+  const marginBottomPx = twipsToPreviewPx(footer.marginBottomTwips);
+  const contentHeightPx = PAGE_HEIGHT_PX - MARGIN_TOP_PX - marginBottomPx;
 
   // Measure each page item's real rendered height (in a hidden, page-content-width container) so
   // we can greedily pack them into US-Letter pages, matching the margins the Word export uses.
@@ -206,10 +221,10 @@ export function ChordChartView({
   }
 
   useLayoutEffect(() => {
-    setPages(paginateByHeight(measureHeights(), groups, CONTENT_HEIGHT_PX));
+    setPages(paginateByHeight(measureHeights(), groups, contentHeightPx));
     // measureHeights only reads the DOM rendered from these.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageItems, groups, font.cssFont, lineSpacing, fontLoads]);
+  }, [pageItems, groups, font.cssFont, lineSpacing, fontLoads, contentHeightPx]);
 
   /** Picks the roomiest line spacing that still fits the song on one page (or two if it must),
    * by re-measuring the hidden layout at each candidate spacing. */
@@ -220,7 +235,7 @@ export function ChordChartView({
       container.style.setProperty('--line-spacing', String(spacing));
       return measureHeights();
     };
-    const fit = fitLineSpacing(measureAt, groups, CONTENT_HEIGHT_PX, FIT_MAX_PAGES, MIN_LINE_SPACING, MAX_LINE_SPACING);
+    const fit = fitLineSpacing(measureAt, groups, contentHeightPx, FIT_MAX_PAGES, MIN_LINE_SPACING, MAX_LINE_SPACING);
     container.style.setProperty('--line-spacing', String(lineSpacing));
     if (fit) {
       onLineSpacingChange(fit.spacing);
@@ -235,7 +250,7 @@ export function ChordChartView({
   async function downloadDocx() {
     setGenerating(true);
     try {
-      const blob = await generateWordDoc(title, songKey, blocks, arrangement, fontId, lineSpacing);
+      const blob = await generateWordDoc(title, songKey, blocks, arrangement, fontId, lineSpacing, credits);
       downloadBlob(blob, chartFilename(title, songKeys(sections, songKey), 'docx'));
     } finally {
       setGenerating(false);
@@ -245,7 +260,7 @@ export function ChordChartView({
   async function downloadPdf() {
     setGeneratingPdf(true);
     try {
-      const blob = await generatePdf(title, songKey, blocks, arrangement, fontId, lineSpacing);
+      const blob = await generatePdf(title, songKey, blocks, arrangement, fontId, lineSpacing, credits);
       downloadBlob(blob, chartFilename(title, songKeys(sections, songKey), 'pdf'));
     } finally {
       setGeneratingPdf(false);
@@ -328,7 +343,7 @@ export function ChordChartView({
                   style={{
                     fontFamily: font.cssFont,
                     fontSize: LYRIC_SIZE_PT,
-                    padding: `${MARGIN_TOP_PX}px ${MARGIN_SIDE_PX}px ${MARGIN_BOTTOM_PX}px`,
+                    padding: `${MARGIN_TOP_PX}px ${MARGIN_SIDE_PX}px ${marginBottomPx}px`,
                     ...lineSpacingVar(lineSpacing),
                   }}
                 >
@@ -342,7 +357,27 @@ export function ChordChartView({
                     <div key={i}>{renderPageItem(pageItems[i], title, labelColEm, font.wordFont)}</div>
                   ))}
                 </div>
-                <div className="chart-page-footer">
+                {footer.lines.length > 0 && (
+                  // Wrapped exactly where the Word doc and PDF wrap it, so the line count (and
+                  // so the room left for the song) matches.
+                  <div
+                    className="chart-page-credits"
+                    style={{
+                      fontFamily: font.cssFont,
+                      fontSize: CREDIT_SIZE_PT,
+                      lineHeight: `${CREDIT_LINE_PT}px`,
+                      bottom: twipsToPreviewPx(CREDIT_BOTTOM_TWIPS),
+                      left: MARGIN_SIDE_PX,
+                      right: MARGIN_SIDE_PX,
+                    }}
+                  >
+                    {footer.lines.map((line, i) => (
+                      <div key={i}>{line}</div>
+                    ))}
+                  </div>
+                )}
+                {/* On screen only — the downloaded charts have no page numbers. */}
+                <div className="chart-page-number">
                   Page {pageIndex + 1} of {pages.length}
                 </div>
               </div>
@@ -353,6 +388,13 @@ export function ChordChartView({
             <div className="chart-page-header">{keyHeader}</div>
             {renderTitle(title)}
             {displayRows.map((display) => renderDisplayRow(display, labelColEm, font.wordFont))}
+            {footer.lines.length > 0 && (
+              <div className="chart-compact-credits">
+                {creditLines(credits).map((line) => (
+                  <div key={line}>{line}</div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

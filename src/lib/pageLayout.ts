@@ -33,6 +33,12 @@ export const LABEL_GAP_TWIPS = 200;
 
 export const CONTENT_WIDTH_TWIPS = PAGE_WIDTH_TWIPS - 2 * MARGIN_SIDE_TWIPS;
 
+// Credits footer (writers and copyright), small and centered at the foot of every page.
+export const CREDIT_SIZE_PT = 8;
+export const CREDIT_LINE_PT = 10;
+export const CREDIT_BOTTOM_TWIPS = 432; // 0.3in from the page bottom to the footer's last line
+const CREDIT_GAP_TWIPS = 160; // 8pt between the song and the footer
+
 const TWIPS_PER_INCH = 1440;
 // On-screen preview scale — 72px/in means 1pt of text is exactly 1px, so the preview's font
 // sizes can use the pt constants above directly without a separate conversion.
@@ -72,4 +78,31 @@ export function measureInFont(fontFamily: string): TextMeasure {
 export function labelColumnTwips(labels: string[], measure: TextMeasure): number {
   const widest = Math.max(0, ...labels.map((l) => measure(l.toUpperCase(), LABEL_SIZE_PT, 'bold')));
   return Math.max(MIN_LABEL_COLUMN_TWIPS, Math.ceil(widest * 20) + LABEL_GAP_TWIPS);
+}
+
+/** Breaks text at spaces so each line fits `widthPt`; a single word wider than that stays whole. */
+export function wrapText(text: string, widthPt: number, sizePt: number, measure: TextMeasure): string[] {
+  const lines: string[] = [];
+  let current = '';
+  text.split(/\s+/).filter(Boolean).forEach((word) => {
+    const candidate = current ? `${current} ${word}` : word;
+    if (current && measure(candidate, sizePt, '') > widthPt) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  });
+  if (current) lines.push(current);
+  return lines;
+}
+
+/** The credits as printed lines (each credit wrapped to the page width), and the bottom margin
+ * that leaves room for them — the same in the preview, the Word doc and the PDF, so all three
+ * paginate alike. With no credits the margin is the usual 0.5in. */
+export function creditFooter(credits: string[], measure: TextMeasure): { lines: string[]; marginBottomTwips: number } {
+  const lines = credits.flatMap((c) => wrapText(c, CONTENT_WIDTH_TWIPS / 20, CREDIT_SIZE_PT, measure));
+  if (lines.length === 0) return { lines, marginBottomTwips: MARGIN_BOTTOM_TWIPS };
+  const footerTop = CREDIT_BOTTOM_TWIPS + lines.length * CREDIT_LINE_PT * 20 + CREDIT_GAP_TWIPS;
+  return { lines, marginBottomTwips: Math.max(MARGIN_BOTTOM_TWIPS, footerTop) };
 }

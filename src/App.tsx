@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ArrangementEntry, Chord, KeyName, Step } from './types';
+import type { ArrangementEntry, Chord, KeyName, SongCredits, Step } from './types';
 import type { Section, WordGroup } from './lib/syllables';
 import { parseLyricsToWordGroups, wordGroupsToBlocks } from './lib/syllables';
 import type { BlockMap } from './lib/arrangement';
@@ -14,6 +14,7 @@ import { KeyControl } from './components/KeyControl';
 import { CopyChordsDialog } from './components/CopyChordsDialog';
 import { SongLibrary } from './components/SongLibrary';
 import { SignInDialog } from './components/SignInDialog';
+import { CreditsFields } from './components/CreditsFields';
 import { parseChordProText } from './lib/chordproParser';
 import { SONG_SCHEMA_VERSION, emptySongDocument, isBlankSong, type SongDocument } from './lib/songDocument';
 import {
@@ -80,6 +81,8 @@ function App() {
   const [blocks, setBlocks] = useState<BlockMap>(initialDraft.blocks);
   const [arrangement, setArrangement] = useState<ArrangementEntry[]>(initialDraft.arrangement);
   const [palette, setPalette] = useState<Chord[]>(initialDraft.palette);
+  const [credits, setCredits] = useState<SongCredits>(initialDraft.credits);
+  const [showCredits, setShowCredits] = useState(false);
   const [showArrangement, setShowArrangement] = useState(false);
   const [showChart, setShowChart] = useState(false);
   const [showCopyChords, setShowCopyChords] = useState(false);
@@ -104,8 +107,9 @@ function App() {
       palette,
       chartFontId,
       lineSpacing: chartLineSpacing,
+      credits,
     }),
-    [songId, step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette, chartFontId, chartLineSpacing],
+    [songId, step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette, chartFontId, chartLineSpacing, credits],
   );
 
   const editingLibrarySong = source === 'cloud' && screen === 'editor';
@@ -132,7 +136,9 @@ function App() {
     setPalette(next.palette);
     setChartFontId(next.chartFontId);
     setChartLineSpacing(next.lineSpacing);
+    setCredits(next.credits);
     setShowArrangement(false);
+    setShowCredits(false);
     setShowChart(false);
     setShowCopyChords(false);
   }
@@ -252,6 +258,7 @@ function App() {
     setKey(parsed.key);
     setBlocks(Object.fromEntries(parsed.blocks.map((b) => [b.id, b])));
     setArrangement(parsed.arrangement);
+    if (parsed.credits) setCredits(parsed.credits);
   }
 
   function startOver() {
@@ -362,6 +369,11 @@ function App() {
             >
               Copy chords
             </button>
+            {step !== 'input' && (
+              <button className="secondary" onClick={() => setShowCredits(true)}>
+                Credits
+              </button>
+            )}
             {step !== 'input' && <KeyControl songKey={key} onChange={setKey} />}
             {editingLibrarySong && (
               <span className={`save-status save-status-${autosave.status}`} role="status">
@@ -381,6 +393,21 @@ function App() {
 
           {showArrangement && (
             <ArrangementEditor blocks={blocks} arrangement={arrangement} songKey={key} onChange={(b, a) => { setBlocks(b); setArrangement(a); }} onClose={() => setShowArrangement(false)} />
+          )}
+
+          {showCredits && (
+            <div className="arrangement-overlay" onClick={() => setShowCredits(false)}>
+              <div className="arrangement-panel dialog-panel" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+                <div className="arrangement-panel-header">
+                  <h2>Credits</h2>
+                  <button className="secondary" onClick={() => setShowCredits(false)}>
+                    Done
+                  </button>
+                </div>
+                <p className="hint">Printed at the foot of every page of the chord chart.</p>
+                <CreditsFields credits={credits} onChange={setCredits} />
+              </div>
+            </div>
           )}
 
           {showCopyChords && (
@@ -404,6 +431,7 @@ function App() {
               onFontIdChange={setChartFontId}
               lineSpacing={chartLineSpacing}
               onLineSpacingChange={setChartLineSpacing}
+              credits={credits}
               onClose={() => setShowChart(false)}
             />
           )}
@@ -413,6 +441,8 @@ function App() {
               initialTitle={title}
               initialKey={key}
               initialLyrics={lyrics}
+              credits={credits}
+              onCreditsChange={setCredits}
               onChange={(t, k, l) => {
                 setTitle(t);
                 setKey(k);
@@ -470,7 +500,7 @@ function App() {
               // The ChordPro text is generated once and then freely editable, so remount on a key
               // change to regenerate it with the transposed chords instead of leaving it stale.
               key={key}
-              song={{ title, key, syllables: flatSyllables }}
+              song={{ title, key, syllables: flatSyllables, credits }}
               blocks={blocks}
               arrangement={arrangement}
               fontId={chartFontId}

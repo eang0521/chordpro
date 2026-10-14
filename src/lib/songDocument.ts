@@ -1,11 +1,12 @@
-import type { ArrangementEntry, Chord, KeyName, Step } from '../types';
+import type { ArrangementEntry, Chord, KeyName, SongCredits, Step } from '../types';
 import type { Section, WordGroup } from './syllables';
 import type { BlockMap } from './arrangement';
 import { DEFAULT_CHORD_FONT_ID } from './chordFonts';
+import { EMPTY_CREDITS } from './credits';
 
 /** Bump this, and add a step to upgradeSongDocument, whenever the saved shape changes — songs
  * saved by older versions are migrated on load instead of being thrown away. */
-export const SONG_SCHEMA_VERSION = 1;
+export const SONG_SCHEMA_VERSION = 2;
 
 /**
  * Everything needed to reopen a song exactly where it was left, in the format it is saved in
@@ -26,6 +27,8 @@ export interface SongDocument {
   palette: Chord[];
   chartFontId: string;
   lineSpacing: number;
+  /** Added in version 2. */
+  credits: SongCredits;
 }
 
 export type UpgradeResult =
@@ -60,6 +63,7 @@ export function emptySongDocument(id = newSongId()): SongDocument {
     palette: [],
     chartFontId: DEFAULT_CHORD_FONT_ID,
     lineSpacing: 1,
+    credits: EMPTY_CREDITS,
   };
 }
 
@@ -74,10 +78,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function readCredits(raw: unknown): SongCredits {
+  if (!isRecord(raw)) return EMPTY_CREDITS;
+  const text = (v: unknown) => (typeof v === 'string' ? v : '');
+  return {
+    wordsBy: text(raw.wordsBy),
+    musicBy: text(raw.musicBy),
+    separateMusic: raw.separateMusic === true,
+    copyright: text(raw.copyright),
+  };
+}
+
 /**
  * Turns anything previously saved into a current SongDocument, or says why it can't.
  * Version 0 is the single local draft from before the library existed ('chordpro-draft-v4'):
- * the same song fields with no id, no version and no chart settings.
+ * the same song fields with no id, no version and no chart settings. Version 2 added credits.
  */
 export function upgradeSongDocument(raw: unknown): UpgradeResult {
   if (!isRecord(raw)) return { ok: false, reason: 'invalid' };
@@ -100,6 +115,8 @@ export function upgradeSongDocument(raw: unknown): UpgradeResult {
     palette: Array.isArray(raw.palette) ? (raw.palette as Chord[]) : base.palette,
     chartFontId: typeof raw.chartFontId === 'string' ? raw.chartFontId : base.chartFontId,
     lineSpacing: typeof raw.lineSpacing === 'number' && raw.lineSpacing > 0 ? raw.lineSpacing : base.lineSpacing,
+    // Version 1 had no credits; they start blank.
+    credits: readCredits(raw.credits),
   };
   // Future migrations go here, one `if (version < N)` step each, oldest first.
   return { ok: true, doc };

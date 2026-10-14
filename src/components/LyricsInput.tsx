@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import type { KeyName } from '../types';
+import type { KeyName, SongCredits } from '../types';
 import { KEY_NAMES } from '../lib/musicTheory';
 import { looksLikeChordPro } from '../lib/chordproParser';
+import { CreditsFields } from './CreditsFields';
 
 interface Props {
   initialTitle: string;
@@ -12,9 +13,11 @@ interface Props {
   onImportChordPro: (title: string, key: KeyName, text: string) => void;
   /** Every edit, before Continue, so a song still on this step is autosaved too. */
   onChange: (title: string, key: KeyName, lyrics: string) => void;
+  credits: SongCredits;
+  onCreditsChange: (credits: SongCredits) => void;
 }
 
-export function LyricsInput({ initialTitle, initialKey, initialLyrics, onSubmit, onImportChordPro, onChange }: Props) {
+export function LyricsInput({ initialTitle, initialKey, initialLyrics, onSubmit, onImportChordPro, onChange, credits, onCreditsChange }: Props) {
   const [title, setTitle] = useState(initialTitle);
   const [key, setKey] = useState<KeyName>(initialKey);
   const [lyrics, setLyrics] = useState(initialLyrics);
@@ -70,6 +73,9 @@ export function LyricsInput({ initialTitle, initialKey, initialLyrics, onSubmit,
           straight to export. Its own <code>{'{title}'}</code> and <code>{'{key}'}</code> win over the fields above.
         </p>
       )}
+      <h3 className="credits-heading">Credits</h3>
+      <p className="hint">Printed at the foot of every page of the chord chart. You can change them later.</p>
+      <CreditsFields credits={credits} onChange={onCreditsChange} />
       <div className="actions">
         {isChordPro ? (
           <button disabled={!canContinue} onClick={() => onImportChordPro(title, key, lyrics)}>

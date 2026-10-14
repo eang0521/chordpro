@@ -85,10 +85,22 @@ export interface KeyChange {
 /** One entry in the song's arrangement: a block id (blocks may repeat) or a key change. */
 export type ArrangementEntry = string | KeyChange;
 
+/** Who wrote the song and who holds the copyright, printed in every chart page's footer. */
+export interface SongCredits {
+  /** Writers of the words — and of the music too, unless `separateMusic` is on. */
+  wordsBy: string;
+  /** Used only when `separateMusic` is on. */
+  musicBy: string;
+  separateMusic: boolean;
+  /** As typed, e.g. "2025 This Group Inc."; a © is added when printed if it has none. */
+  copyright: string;
+}
+
 export interface Song {
   title: string;
   key: KeyName;
   syllables: SyllableToken[];
+  credits?: SongCredits;
 }
 
 export type Step = 'input' | 'edit-syllables' | 'chords' | 'export';

@@ -1,4 +1,4 @@
-import type { ArrangementEntry, Block, KeyName, SectionType } from '../types';
+import type { ArrangementEntry, Block, KeyName, SectionType, SongCredits } from '../types';
 import { hyphenateWord, normalizeApostrophes } from './syllables';
 import { keyFromName, parseChord, semitonesBetween } from './musicTheory';
 import { makeKeyChange } from './arrangement';
@@ -11,6 +11,9 @@ export interface ParsedChordProSong {
   /** The blocks in order, with any key changes between them. */
   arrangement: ArrangementEntry[];
   blocks: Block[];
+  /** From {lyricist}, {composer} and {copyright}; null when the text has none of them, so
+   * credits typed into the app aren't wiped by text that never mentioned them. */
+  credits: SongCredits | null;
 }
 
 interface ChordSpan {
@@ -72,6 +75,7 @@ function findSpanForOffset(spans: SyllableSpan[], offset: number): SyllableSpan 
 
 const TITLE_RE = /^\{title:\s*(.*)\}$/i;
 const KEY_RE = /^\{key:\s*(.*)\}$/i;
+const CREDIT_RE = /^\{(lyricist|composer|copyright):\s*(.*)\}$/i;
 const START_SECTION_RE = /^\{start_of_(verse|chorus|bridge|instrumental):\s*(.*)\}$/i;
 const END_SECTION_RE = /^\{end_of_(?:verse|chorus|bridge|instrumental)\}$/i;
 const COMMENT_RE = /^\{comment:\s*(.*)\}$/i;
@@ -81,7 +85,7 @@ const ANY_DIRECTIVE_RE = /^\{.*\}$/;
 // a [chord] in brackets (a letter chord like [G] or [F#m7/C#], or a number chord like [5sus]).
 // Only chord-like text may follow the root, so bracketed headings like [Chorus] or [Bridge] in
 // plain lyrics don't count.
-const DIRECTIVE_LINE_RE = /^\s*\{\s*(?:title|t|subtitle|st|key|start_of_\w+|end_of_\w+|so[cvb]|eo[cvb]|comment|c|ci)\s*[:}]/im;
+const DIRECTIVE_LINE_RE = /^\s*\{\s*(?:title|t|subtitle|st|key|lyricist|composer|copyright|start_of_\w+|end_of_\w+|so[cvb]|eo[cvb]|comment|c|ci)\s*[:}]/im;
 const INLINE_CHORD_RE =
   /\[\s*\|?\s*(?:[A-G][#b]?|[#b]?[1-7])(?:maj|min|m|dim|aug|sus|add|M|\d|[#b+\-°ø()])*(?:\/(?:[A-G][#b]?|[#b]?[1-7]))?\s*\]/;
 
@@ -103,6 +107,7 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
   let key: KeyName = fallbackKey;
   // The key chords are being read in: the song's key until a later {key} changes it.
   let currentKey: KeyName = fallbackKey;
+  const creditFields: Partial<Record<'lyricist' | 'composer' | 'copyright', string>> = {};
 
   const blocks: Block[] = [];
   const arrangement: ArrangementEntry[] = [];
@@ -123,6 +128,11 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
       const titleMatch = TITLE_RE.exec(trimmed);
       if (titleMatch) {
         title = titleMatch[1].trim() || fallbackTitle;
+        return;
+      }
+      const creditMatch = CREDIT_RE.exec(trimmed);
+      if (creditMatch) {
+        creditFields[creditMatch[1].toLowerCase() as 'lyricist' | 'composer' | 'copyright'] = creditMatch[2].trim();
         return;
       }
       const keyMatch = KEY_RE.exec(trimmed);
@@ -221,5 +231,16 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
     }
   });
 
-  return { title, key, blocks, arrangement };
+  return { title, key, blocks, arrangement, credits: creditsFrom(creditFields) };
+}
+
+function creditsFrom(fields: Partial<Record<'lyricist' | 'composer' | 'copyright', string>>): SongCredits | null {
+  const { lyricist = '', composer = '', copyright = '' } = fields;
+  if (!lyricist && !composer && !copyright) return null;
+  // Only the same writers for both print as "Words and music by"; just one of the two is a
+  // "Words by" or "Music by" credit on its own.
+  const separate = (lyricist || composer) && lyricist.toLowerCase() !== composer.toLowerCase();
+  return !separate
+    ? { wordsBy: lyricist, musicBy: '', separateMusic: false, copyright }
+    : { wordsBy: lyricist, musicBy: composer, separateMusic: true, copyright };
 }

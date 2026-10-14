@@ -68,7 +68,7 @@ export function ExportView({
   async function downloadDocx() {
     setGeneratingDocx(true);
     try {
-      const blob = await generateWordDoc(song.title, song.key, blocks, arrangement, fontId, lineSpacing);
+      const blob = await generateWordDoc(song.title, song.key, blocks, arrangement, fontId, lineSpacing, song.credits);
       downloadBlob(blob, filename('docx'));
     } finally {
       setGeneratingDocx(false);
@@ -78,7 +78,7 @@ export function ExportView({
   async function downloadPdf() {
     setGeneratingPdf(true);
     try {
-      const blob = await generatePdf(song.title, song.key, blocks, arrangement, fontId, lineSpacing);
+      const blob = await generatePdf(song.title, song.key, blocks, arrangement, fontId, lineSpacing, song.credits);
       downloadBlob(blob, filename('pdf'));
     } finally {
       setGeneratingPdf(false);

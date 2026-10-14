@@ -1,20 +1,23 @@
 import type { PDFFont } from 'pdf-lib';
-import type { ArrangementEntry, KeyName } from '../types';
+import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from './arrangement';
 import type { ChartToken } from './chordChart';
 import { buildChartRows, groupIntoSections, isChordOnly, keyHeaderText, placeChords } from './chordChart';
 import { fetchFontFile, getChordFontOption } from './chordFonts';
+import { creditLines } from './credits';
 import type { TextMeasure } from './pageLayout';
 import {
   CHORD_LINE_PT,
   CHORD_SIZE_PT,
   CONTENT_WIDTH_TWIPS,
+  CREDIT_BOTTOM_TWIPS,
+  CREDIT_LINE_PT,
+  CREDIT_SIZE_PT,
   HEADER_TOP_TWIPS,
   KEY_SIZE_PT,
   LABEL_SIZE_PT,
   LYRIC_LINE_PT,
   LYRIC_SIZE_PT,
-  MARGIN_BOTTOM_TWIPS,
   MARGIN_SIDE_TWIPS,
   MARGIN_TOP_TWIPS,
   PAGE_HEIGHT_TWIPS,
@@ -22,6 +25,7 @@ import {
   SECTION_GAP_PT,
   TITLE_GAP_PT,
   TITLE_SIZE_PT,
+  creditFooter,
   labelColumnTwips,
 } from './pageLayout';
 import { paginateByHeight } from './pagination';
@@ -31,7 +35,6 @@ const PAGE_WIDTH = pt(PAGE_WIDTH_TWIPS);
 const PAGE_HEIGHT = pt(PAGE_HEIGHT_TWIPS);
 const MARGIN_SIDE = pt(MARGIN_SIDE_TWIPS);
 const MARGIN_TOP = pt(MARGIN_TOP_TWIPS);
-const CONTENT_HEIGHT = PAGE_HEIGHT - MARGIN_TOP - pt(MARGIN_BOTTOM_TWIPS);
 const TITLE_LINE_PT = TITLE_SIZE_PT * 1.15; // matches the preview's title line-height
 
 // For the system fonts, the PDF's built-in fonts with the same metrics (Helvetica = Arial,
@@ -91,7 +94,7 @@ function wrapTokens(tokens: ChartToken[], width: number, measure: TextMeasure): 
  * Builds a downloadable PDF chord chart with the same page size, margins, type sizes and line
  * heights as the Word export, keeping each song section together on a page. Unlike the .docx,
  * a PDF carries its fonts with it, so it prints the same on any device. `lineSpacing` scales
- * every line height and gap (1.0 = normal).
+ * every line height and gap (1.0 = normal). The writers and copyright go at the foot of every page.
  */
 export async function generatePdf(
   title: string,
@@ -100,6 +103,7 @@ export async function generatePdf(
   arrangement: ArrangementEntry[],
   fontId: string,
   lineSpacing = 1,
+  credits?: SongCredits,
 ): Promise<Blob> {
   // Loaded on demand, like the docx package — most sessions never export a PDF.
   const [{ PDFDocument, rgb }, { default: fontkit }] = await Promise.all([import('pdf-lib'), import('@pdf-lib/fontkit')]);
@@ -128,6 +132,9 @@ export async function generatePdf(
   const sections = groupIntoSections(buildChartRows(blocks, arrangement, key));
   const labelCol = pt(labelColumnTwips(sections.map((s) => s.label), measure));
   const lyricWidth = pt(CONTENT_WIDTH_TWIPS) - labelCol;
+  const footer = creditFooter(creditLines(credits), measure);
+  const contentHeight = PAGE_HEIGHT - MARGIN_TOP - pt(footer.marginBottomTwips);
+  const footerTop = PAGE_HEIGHT - pt(CREDIT_BOTTOM_TWIPS) - footer.lines.length * CREDIT_LINE_PT;
   const chordLine = CHORD_LINE_PT * lineSpacing;
   const lyricLine = LYRIC_LINE_PT * lineSpacing;
   const sectionGap = SECTION_GAP_PT * lineSpacing;
@@ -166,9 +173,13 @@ export async function generatePdf(
   paginateByHeight(
     items.map((item) => item.height),
     groups,
-    CONTENT_HEIGHT,
+    contentHeight,
   ).forEach((indices, pageIndex) => {
     const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    footer.lines.forEach((line, i) => {
+      const x = (PAGE_WIDTH - measure(line, CREDIT_SIZE_PT, '')) / 2;
+      draw(page, line, x, baselineIn(footerTop + i * CREDIT_LINE_PT, CREDIT_LINE_PT, CREDIT_SIZE_PT), CREDIT_SIZE_PT, '');
+    });
     // The key header goes on the first page only.
     if (pageIndex === 0) {
       draw(page, keyHeaderText(sections, key), MARGIN_SIDE, pt(HEADER_TOP_TWIPS) + KEY_SIZE_PT * 0.8, KEY_SIZE_PT, 'italic');

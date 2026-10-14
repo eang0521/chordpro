@@ -655,14 +655,19 @@ button.secondary {
   color: #1a1a1a;
 }
 
-.chart-page-footer {
+.chart-page-number {
   position: absolute;
-  bottom: 10px;
-  left: 0;
-  right: 0;
-  text-align: center;
+  top: 8px;
+  right: 12px;
   font-size: 0.7rem;
   color: #9aa0ae;
+}
+
+.chart-page-credits {
+  position: absolute;
+  text-align: center;
+  white-space: nowrap;
+  color: #1a1a1a;
 }
 
 /* Export */
@@ -1093,4 +1098,36 @@ button.library-open:hover:not(:disabled) {
   .library-actions {
     padding: 0 0 4px 10px;
   }
+}
+
+/* Song credits */
+.credits-heading {
+  margin: 24px 0 4px;
+  font-size: 1rem;
+}
+
+.credits-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -6px 0 16px;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.credits-preview {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.chart-compact-credits {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 0.75rem;
+  opacity: 0.75;
 }
