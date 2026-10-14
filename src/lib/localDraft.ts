@@ -22,8 +22,9 @@ export function loadLocalDraft(): SongDocument | null {
 }
 
 /** Drafts saved by older versions of the app are never read again once the current one exists,
- * so drop them — on GitHub Pages the whole eang0521.github.io origin (every project hosted
- * there) shares one ~5MB storage quota. Call after loadLocalDraft has had its chance to upgrade. */
+ * so drop them — storage is capped at ~5MB per site, and on GitHub Pages the whole
+ * eang0521.github.io origin (every project hosted there) shares it. Call after loadLocalDraft
+ * has had its chance to upgrade. */
 export function removeOldDrafts() {
   try {
     if (localStorage.getItem(STORAGE_KEY) === null) return;

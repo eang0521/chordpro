@@ -1,11 +1,26 @@
 # Setting up accounts and the song library (Supabase)
 
-ChordPro Tapper stays a static site on GitHub Pages. Signed-in users' songs live in a Supabase
-project that the browser talks to directly; row-level security keeps each person's songs private.
+ChordPro Tapper is a static site, hosted on Vercel (GitHub Pages still works too). Signed-in
+users' songs live in a Supabase project that the browser talks to directly; row-level security
+keeps each person's songs private.
 Until the project's URL and key are filled in (step 6), the app runs signed-out only, exactly as
 before.
 
-Everything here is done by hand in the Supabase and Google dashboards. It's all free tier.
+Everything here is done by hand in the Vercel, Supabase and Google dashboards. It's all free tier.
+
+## 0. Host the site on Vercel
+
+1. Go to <https://vercel.com/new>, sign in with GitHub, and import the `eang0521/chordpro` repo
+   (allow Vercel access to it when GitHub asks).
+2. Vercel detects **Vite**. Leave the defaults (build `npm run build`, output `dist`) and
+   click **Deploy**. No environment variables are needed.
+3. Note the production address it gives you, e.g. `https://chordpro.vercel.app` (yours may
+   differ; it's under the project's **Domains**). Below it's called `<vercel-url>`.
+
+From then on every push to `main` deploys to that address, and every other branch gets its own
+preview address. The site is served from the root there (`/`), while GitHub Pages serves it
+under `/chordpro/`; `vite.config.ts` picks the right one. Once you're happy with Vercel you can
+switch GitHub Pages off (**Settings → Pages**) and delete `.github/workflows/deploy.yml`.
 
 ## 1. Create the Supabase project
 
@@ -39,11 +54,14 @@ fine for you and a few friends; if more people use it, set up your own SMTP unde
 
 **Authentication → URL Configuration**:
 
-- **Site URL**: `https://eang0521.github.io/chordpro/`
+- **Site URL**: `<vercel-url>/` (e.g. `https://chordpro.vercel.app/`)
 - **Redirect URLs**: add
-  - `https://eang0521.github.io/chordpro/`
+  - `<vercel-url>/`
   - `http://localhost:5173/chordpro/`
   - optionally `http://localhost:4173/chordpro/` for `npm run preview`
+  - optionally `https://eang0521.github.io/chordpro/`, while GitHub Pages is still up
+  - optionally `https://*-eang0521s-projects.vercel.app/**` to sign in on branch previews (check
+    the exact team name in a preview address; Supabase allows the `*` and `**` wildcards)
 
 The app asks to come back to whichever of these it's running on, and Supabase refuses any
 address not on the list.
@@ -70,7 +88,10 @@ dashboard**, never into this repo or the app.
    verification.
 7. **Clients → Create client**:
    - Application type: **Web application**, name `ChordPro Tapper`.
-   - **Authorized JavaScript origins**: `https://eang0521.github.io` and `http://localhost:5173`.
+   - **Authorized JavaScript origins**: `<vercel-url>` and `http://localhost:5173` (plus
+     `https://eang0521.github.io` while GitHub Pages is still up). With no trailing slash.
+     Google only checks the redirect URI below for this sign-in flow, so these are a
+     precaution.
    - **Authorized redirect URIs**: the Supabase callback URL from step 1.
    - **Create**, then copy the **Client ID** and **Client secret**.
 8. Back in Supabase's **Google** provider: turn it on, paste the Client ID and Client secret,
