@@ -16,6 +16,12 @@ export interface PublicSongSummary {
   updatedAt: string;
 }
 
+/** Where a library song's public snapshot is, and when it was last published. */
+export interface PublishedCopy {
+  id: string;
+  updatedAt: string;
+}
+
 export interface PublicSong {
   doc: SongDocument;
   /** User id of whoever published it (null if that account was deleted). */
@@ -33,7 +39,9 @@ export interface PublicSongStore {
   /** Whether the signed-in user is on the publishers list. */
   isPublisher(): Promise<boolean>;
   /** The signed-in user's public copy of a library song, if they've published it. */
-  findPublished(sourceSongId: string): Promise<{ id: string; updatedAt: string } | null>;
+  findPublished(sourceSongId: string): Promise<PublishedCopy | null>;
+  /** Every library song the signed-in user has published, by library song id. */
+  listPublished(): Promise<Map<string, PublishedCopy>>;
   /** Publishes a library song, or updates its existing public copy. Returns the public id. */
   publish(doc: SongDocument): Promise<string>;
   unpublish(id: string): Promise<void>;
@@ -42,7 +50,7 @@ export interface PublicSongStore {
 export function createSupabasePublicSongStore(client: SupabaseClient): PublicSongStore {
   const table = () => client.from('public_songs');
 
-  async function findPublished(sourceSongId: string) {
+  async function findPublished(sourceSongId: string): Promise<PublishedCopy | null> {
     const { data: auth } = await client.auth.getUser();
     if (!auth.user) return null;
     const { data, error } = await table()
@@ -88,6 +96,21 @@ export function createSupabasePublicSongStore(client: SupabaseClient): PublicSon
     },
 
     findPublished,
+
+    async listPublished() {
+      const { data: auth } = await client.auth.getUser();
+      const published = new Map<string, PublishedCopy>();
+      if (!auth.user) return published;
+      const { data, error } = await table()
+        .select('id, source_song_id, updated_at')
+        .eq('publisher', auth.user.id)
+        .not('source_song_id', 'is', null);
+      if (error) throw error;
+      (data ?? []).forEach((row) =>
+        published.set(row.source_song_id as string, { id: row.id as string, updatedAt: row.updated_at as string }),
+      );
+      return published;
+    },
 
     async publish(doc) {
       const existing = await findPublished(doc.id);

@@ -1110,6 +1110,8 @@ button.library-open:hover:not(:disabled) {
 .library-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 @media (max-width: 560px) {
@@ -1207,4 +1209,8 @@ button.library-open:hover:not(:disabled) {
 button.link-button.publish-view {
   align-self: center;
   font-size: 0.85rem;
+}
+
+.library-public {
+  color: var(--accent);
 }

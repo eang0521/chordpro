@@ -429,7 +429,14 @@ function App() {
       )}
 
       {!route && songStore && userId && screen === 'library' && (
-        <SongLibrary store={songStore} message={libraryMessage} onOpen={(id) => void openSong(id)} onNew={() => void newLibrarySong()} />
+        <SongLibrary
+          store={songStore}
+          message={libraryMessage}
+          onOpen={(id) => void openSong(id)}
+          onNew={() => void newLibrarySong()}
+          publicStore={isPublisher ? publicStore : null}
+          onViewPublic={(id) => void goToPublic(id)}
+        />
       )}
 
       {showEditor && (

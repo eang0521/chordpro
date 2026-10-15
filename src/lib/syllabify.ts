@@ -154,6 +154,27 @@ export function syllabifyCore(core: string): string[] {
     }
   }
 
+  // "iu" is two vowel sounds, never one (tri-umph, sta-di-um, me-di-um), so it always splits.
+  for (let g = 0; g < groups.length; g++) {
+    const [start, end] = groups[g];
+    for (let k = start; k < end; k++) {
+      if (letters[k].toLowerCase() === 'i' && letters[k + 1].toLowerCase() === 'u') {
+        groups.splice(g, 1, [start, k], [k + 1, end]);
+        break;
+      }
+    }
+  }
+
+  // A final "-gue"/"-que" is silent after a vowel or "n" (league, vague, tongue, unique,
+  // technique): its "ue" belongs to the syllable before. After another consonant it's sung
+  // (ar-gue), so that stays as it is.
+  const silentUe = /[aeiouyn][gq](ue)s?$/i.exec(core);
+  if (silentUe) {
+    const ueStart = silentUe.index + 2;
+    const lastGroup = groups[groups.length - 1];
+    if (groups.length > 1 && lastGroup[0] === ueStart && lastGroup[1] === ueStart + 1) groups.pop();
+  }
+
   // "create"/"creation"/"creator"/"recreate"/"uncreated"/... have a genuine break between the
   // root's "e" and "a" (cre-ate) that the vowel scan can't see, since "ea" usually IS one vowel
   // sound (bread, eat, ahead). Two forms keep it merged instead: "creature(s)" — there "eat"+"ure"

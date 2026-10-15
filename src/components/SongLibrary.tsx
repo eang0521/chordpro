@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SongStore, SongSummary } from '../lib/songStore';
-import { newSongId } from '../lib/songDocument';
+import { newSongId, type SongDocument } from '../lib/songDocument';
+import type { PublicSongStore, PublishedCopy } from '../lib/publicSongStore';
+import { PublishDialog } from './PublishDialog';
 import { KEY_NAMES, semitonesBetween } from '../lib/musicTheory';
 
 interface Props {
@@ -9,6 +11,9 @@ interface Props {
   message: string | null;
   onOpen: (id: string) => void;
   onNew: () => void;
+  /** Given only to publishers: adds Publish / Update public buttons to each song. */
+  publicStore?: PublicSongStore | null;
+  onViewPublic?: (publicId: string) => void;
 }
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
@@ -61,12 +66,15 @@ function formatEdited(iso: string): string {
   });
 }
 
-export function SongLibrary({ store, message, onOpen, onNew }: Props) {
+export function SongLibrary({ store, message, onOpen, onNew, publicStore, onViewPublic }: Props) {
   const [songs, setSongs] = useState<SongSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SongSummary | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>(loadSort);
+  // Which of these songs are public, by library song id (empty for non-publishers).
+  const [published, setPublished] = useState<Map<string, PublishedCopy>>(new Map());
+  const [publishing, setPublishing] = useState<{ doc: SongDocument; update: boolean } | null>(null);
   const sortedSongs = useMemo(() => (songs ? sortSongs(songs, sortOrder) : null), [songs, sortOrder]);
 
   function changeSort(order: SortOrder) {
@@ -92,6 +100,33 @@ export function SongLibrary({ store, message, onOpen, onNew }: Props) {
     // oxlint-disable-next-line react/set-state-in-effect
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!publicStore) return;
+    let cancelled = false;
+    publicStore
+      .listPublished()
+      .then((found) => !cancelled && setPublished(found))
+      .catch(() => {
+        // Without it every song just offers Publish; publishing again updates the same copy.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicStore]);
+
+  async function startPublish(song: SongSummary) {
+    setBusyId(song.id);
+    try {
+      const doc = await store.get(song.id);
+      if (!doc) throw new Error('missing');
+      setPublishing({ doc, update: published.has(song.id) });
+    } catch {
+      setError(`Couldn't open "${song.title || 'Untitled'}" to publish it.`);
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   async function duplicate(song: SongSummary) {
     setBusyId(song.id);
@@ -163,9 +198,25 @@ export function SongLibrary({ store, message, onOpen, onNew }: Props) {
                 <span className="library-meta">
                   {song.keys.length > 0 && <span>Key {song.keys.join('-')}</span>}
                   <span>Edited {formatEdited(song.updatedAt)}</span>
+                  {published.has(song.id) && (
+                    <span className="library-public">
+                      Public
+                      {song.updatedAt > published.get(song.id)!.updatedAt && ' (edited since)'}
+                    </span>
+                  )}
                 </span>
               </button>
               <div className="library-actions">
+                {publicStore && published.has(song.id) && onViewPublic && (
+                  <button className="secondary" onClick={() => onViewPublic(published.get(song.id)!.id)}>
+                    View public
+                  </button>
+                )}
+                {publicStore && (
+                  <button className="secondary" disabled={busyId === song.id} onClick={() => void startPublish(song)}>
+                    {published.has(song.id) ? 'Update public' : 'Publish'}
+                  </button>
+                )}
                 <button className="secondary" disabled={busyId === song.id} onClick={() => void duplicate(song)}>
                   Duplicate
                 </button>
@@ -182,11 +233,28 @@ export function SongLibrary({ store, message, onOpen, onNew }: Props) {
         </ul>
       )}
 
+      {publishing && publicStore && (
+        <PublishDialog
+          store={publicStore}
+          doc={publishing.doc}
+          update={publishing.update}
+          onPublished={(id) => {
+            setPublished((prev) => new Map(prev).set(publishing.doc.id, { id, updatedAt: new Date().toISOString() }));
+            setPublishing(null);
+          }}
+          onClose={() => setPublishing(null)}
+        />
+      )}
+
       {confirmDelete && (
         <div className="arrangement-overlay" onClick={() => setConfirmDelete(null)}>
           <div className="arrangement-panel dialog-panel" role="alertdialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <h2>Delete &ldquo;{confirmDelete.title || 'Untitled'}&rdquo;?</h2>
-            <p className="hint">It will be removed from your library on every device. This can&rsquo;t be undone.</p>
+            <p className="hint">
+              It will be removed from your library on every device. This can&rsquo;t be undone.
+              {published.has(confirmDelete.id) &&
+                ' Its public version stays published; remove that from its public page if you want it gone too.'}
+            </p>
             <div className="actions">
               <button className="danger-solid" onClick={() => void remove(confirmDelete)}>
                 Delete song
