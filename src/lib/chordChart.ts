@@ -267,10 +267,19 @@ function placedWidth(line: PlacedLine, measure: TextMeasure): number {
  * so they wrap the same lines and Fit to page measures what actually prints. A section's repeat
  * mark goes on the last piece. A single word wider than the page stays whole.
  */
-export function layoutLine(tokens: ChartToken[], measure: TextMeasure, maxWidthPt: number, repeat?: number): PlacedLine[] {
+export function layoutLine(
+  tokens: ChartToken[],
+  measure: TextMeasure,
+  maxWidthPt: number,
+  repeat?: number,
+  // Decides where the line breaks, when that must match another output measured differently (the
+  // PDF breaks lines by the browser's measurements so it wraps exactly where the preview does).
+  breakMeasure: TextMeasure = measure,
+): PlacedLine[] {
+  const fits = (piece: ChartToken[]) =>
+    placedWidth(placeChords(piece, breakMeasure, repeat), breakMeasure) <= maxWidthPt;
   // Most lines fit as they are: lay them out once.
-  const whole = placeChords(tokens, measure, repeat);
-  if (placedWidth(whole, measure) <= maxWidthPt) return [whole];
+  if (fits(tokens)) return [placeChords(tokens, measure, repeat)];
 
   const words: ChartToken[][] = [];
   tokens.forEach((tok, i) => {
@@ -282,7 +291,7 @@ export function layoutLine(tokens: ChartToken[], measure: TextMeasure, maxWidthP
   let current: ChartToken[] = [];
   words.forEach((word) => {
     const candidate = [...current, ...word];
-    if (current.length > 0 && placedWidth(placeChords(candidate, measure), measure) > maxWidthPt) {
+    if (current.length > 0 && placedWidth(placeChords(candidate, breakMeasure), breakMeasure) > maxWidthPt) {
       pieces.push(current);
       current = word;
     } else {

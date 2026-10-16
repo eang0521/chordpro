@@ -2,7 +2,7 @@ import type { PDFFont } from 'pdf-lib';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from './arrangement';
 import { buildChartRows, groupIntoSections, isChordOnly, keyHeaderText, layoutLine } from './chordChart';
-import { fetchFontFile, getChordFontOption } from './chordFonts';
+import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
 import { creditLines } from './credits';
 import type { TextMeasure } from './pageLayout';
 import {
@@ -26,6 +26,7 @@ import {
   TITLE_SIZE_PT,
   creditFooter,
   labelColumnTwips,
+  measureInFont,
 } from './pageLayout';
 import { paginateByHeight } from './pagination';
 
@@ -103,9 +104,17 @@ export async function generatePdf(
   const measure: TextMeasure = (text, sizePt, style) => fonts[style].widthOfTextAtSize(clean(text), sizePt);
 
   const sections = groupIntoSections(buildChartRows(blocks, arrangement, key));
-  const labelCol = pt(labelColumnTwips(sections.map((s) => s.label), measure));
+  // Anything that decides how many lines the chart takes — where lyric lines wrap, the label
+  // column's width, how the credits break — is measured the way the on-screen chart (and the Word
+  // export) measure it: the browser's text widths include kerning, which the PDF font's don't, so
+  // the two can differ by a point or so per line. That's enough to wrap one more line in the PDF
+  // than Fit to page counted and spill onto another page. The PDF's own widths still place the
+  // chords and centre the text, so everything lines up with what's drawn.
+  await loadChordFont(option);
+  const pageMeasure = measureInFont(option.wordFont);
+  const labelCol = pt(labelColumnTwips(sections.map((s) => s.label), pageMeasure));
   const lyricWidth = pt(CONTENT_WIDTH_TWIPS) - labelCol;
-  const footer = creditFooter(creditLines(credits), measure);
+  const footer = creditFooter(creditLines(credits), pageMeasure);
   const contentHeight = PAGE_HEIGHT - MARGIN_TOP - pt(footer.marginBottomTwips);
   const footerTop = PAGE_HEIGHT - pt(CREDIT_BOTTOM_TWIPS) - footer.lines.length * CREDIT_LINE_PT;
   const chordLine = CHORD_LINE_PT * lineSpacing;
@@ -122,7 +131,7 @@ export async function generatePdf(
       items.push({ kind: 'row', height: lyricLine + sectionGap, label: section.label, lines: [] });
     }
     section.lineRows.forEach((row, i) => {
-      const lines = layoutLine(row.tokens, measure, lyricWidth, row.repeat);
+      const lines = layoutLine(row.tokens, measure, lyricWidth, row.repeat, pageMeasure);
       const isLast = i === section.lineRows.length - 1;
       const height =
         // A chord-only line takes just the lyric line's height (its chords sit on it).
