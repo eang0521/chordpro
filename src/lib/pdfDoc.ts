@@ -31,6 +31,7 @@ import {
 import { paginateByHeight } from './pagination';
 
 const pt = (twips: number) => twips / 20;
+const PAGE_FIT_SLACK_PT = 1;
 const PAGE_WIDTH = pt(PAGE_WIDTH_TWIPS);
 const PAGE_HEIGHT = pt(PAGE_HEIGHT_TWIPS);
 const MARGIN_SIDE = pt(MARGIN_SIDE_TWIPS);
@@ -152,10 +153,13 @@ export async function generatePdf(
   const draw = (page: ReturnType<typeof doc.addPage>, text: string, x: number, baseline: number, size: number, style: '' | 'bold' | 'italic') =>
     page.drawText(clean(text), { x, y: PAGE_HEIGHT - baseline, size, font: fonts[style], color: black });
 
+  // A point of slack past the page's content area (it lands in the bottom margin, invisibly): the
+  // preview measures rounded line heights, which can come out a fraction of a point shorter than
+  // these exact ones, and a chart that fits on screen shouldn't spill a section onto another page.
   paginateByHeight(
     items.map((item) => item.height),
     groups,
-    contentHeight,
+    contentHeight + PAGE_FIT_SLACK_PT,
   ).forEach((indices, pageIndex) => {
     const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     footer.lines.forEach((line, i) => {

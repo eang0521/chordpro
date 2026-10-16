@@ -47,6 +47,10 @@ interface Props {
 }
 
 const FIT_MAX_PAGES = 2;
+// Fit to page aims this far short of a full page. The browser rounds each line's height a hair as
+// it lays the chart out, so the preview can measure a fraction of a point less than the PDF's
+// exact arithmetic; a fit right at the edge could then fit on screen but not in the PDF.
+const FIT_SAFETY_PT = 1.5;
 
 /** Sets the --line-spacing CSS custom property (not a typed React.CSSProperties key). */
 function lineSpacingVar(value: number): Record<string, string> {
@@ -240,7 +244,7 @@ export function ChordChartView({
       container.style.setProperty('--line-spacing', String(spacing));
       return measureHeights();
     };
-    const fit = fitLineSpacing(measureAt, groups, contentHeightPx, FIT_MAX_PAGES, MIN_LINE_SPACING, MAX_LINE_SPACING);
+    const fit = fitLineSpacing(measureAt, groups, contentHeightPx - FIT_SAFETY_PT, FIT_MAX_PAGES, MIN_LINE_SPACING, MAX_LINE_SPACING);
     container.style.setProperty('--line-spacing', String(lineSpacing));
     if (fit) {
       onLineSpacingChange(fit.spacing);
