@@ -22,6 +22,7 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  white-space: nowrap;
   margin: 0;
 }
 
@@ -996,6 +997,34 @@ button.secondary:hover:not(:disabled) {
   gap: 16px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+/* Auto / Light / Dark, as one ink-outlined control with the current choice filled in ink. */
+.theme-switch {
+  display: inline-flex;
+  border: 1.5px solid var(--ink-line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.theme-switch button,
+.theme-switch button:hover:not(:disabled) {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--text);
+  padding: 5px 10px;
+  font-size: 0.8rem;
+}
+
+.theme-switch button:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+
+.theme-switch button.active,
+.theme-switch button.active:hover:not(:disabled) {
+  background: var(--ink-line);
+  color: var(--bg);
 }
 
 .account {

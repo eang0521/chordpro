@@ -32,6 +32,7 @@ import { createSupabasePublicSongStore } from './lib/publicSongStore';
 import { PublicSongList } from './components/PublicSongList';
 import { PublicSongPage } from './components/PublicSongPage';
 import { PublishControl } from './components/PublishControl';
+import { ThemeSwitch } from './components/ThemeSwitch';
 import { useAuth, signOut } from './hooks/useAuth';
 import { useAutosave } from './hooks/useAutosave';
 import './App.css';
@@ -389,6 +390,7 @@ function App() {
               </button>
             </div>
           )}
+          <ThemeSwitch />
         </div>
       </header>
 

@@ -3,8 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="theme-color" content="#efede6" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)" />
+    <script>
+      // The saved theme (see src/lib/theme.ts), or the device's, set before the page first draws.
+      (function () {
+        var saved;
+        try {
+          saved = localStorage.getItem('r4e-theme');
+        } catch (e) {}
+        var dark = saved === 'dark' || (saved !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="R4E ChordPro (Rehearsing for Eternity): turn lyrics into chord charts." />
     <title>R4E ChordPro</title>
