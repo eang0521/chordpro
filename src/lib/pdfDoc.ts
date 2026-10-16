@@ -50,6 +50,21 @@ function baselineIn(boxTop: number, boxHeight: number, size: number): number {
   return boxTop + (boxHeight - size) / 2 + size * 0.8;
 }
 
+/** One song's chart, as printed: its key, font and line spacing (1.0 = normal). */
+export interface PdfSong {
+  title: string;
+  key: KeyName;
+  blocks: BlockMap;
+  arrangement: ArrangementEntry[];
+  fontId: string;
+  lineSpacing: number;
+  credits?: SongCredits;
+}
+
+type PdfStyle = '' | 'bold' | 'italic';
+type PdfLib = typeof import('pdf-lib');
+type PdfDocument = Awaited<ReturnType<PdfLib['PDFDocument']['create']>>;
+
 /**
  * Builds a downloadable PDF chord chart with the same page size, margins, type sizes and line
  * heights as the Word export, keeping each song section together on a page. Unlike the .docx,
@@ -65,12 +80,35 @@ export async function generatePdf(
   lineSpacing = 1,
   credits?: SongCredits,
 ): Promise<Blob> {
-  // Loaded on demand, like the docx package — most sessions never export a PDF.
-  const [{ PDFDocument, rgb }, { default: fontkit }] = await Promise.all([import('pdf-lib'), import('@pdf-lib/fontkit')]);
-  const doc = await PDFDocument.create();
-  doc.registerFontkit(fontkit);
-  doc.setTitle(title || 'Untitled');
+  return generateSongsPdf(title, [{ title, key, blocks, arrangement, fontId, lineSpacing, credits }]);
+}
 
+/**
+ * Several songs' charts in one PDF (a set), one after another, each starting on a new page and
+ * laid out exactly as it would be on its own.
+ */
+export async function generateSongsPdf(documentTitle: string, songs: PdfSong[]): Promise<Blob> {
+  // Loaded on demand, like the docx package — most sessions never export a PDF.
+  const [pdfLib, { default: fontkit }] = await Promise.all([import('pdf-lib'), import('@pdf-lib/fontkit')]);
+  const doc = await pdfLib.PDFDocument.create();
+  doc.registerFontkit(fontkit);
+  doc.setTitle(documentTitle || 'Untitled');
+
+  // Each font is embedded once, however many songs use it.
+  const embedded = new Map<string, Promise<Record<PdfStyle, PDFFont>>>();
+  const fontsFor = (fontId: string) => {
+    if (!embedded.has(fontId)) embedded.set(fontId, embedFonts(doc, fontId));
+    return embedded.get(fontId)!;
+  };
+  for (const song of songs) {
+    await addSongPages(doc, pdfLib, await fontsFor(song.fontId), song);
+  }
+
+  const bytes = await doc.save();
+  return new Blob([bytes as BlobPart], { type: 'application/pdf' });
+}
+
+async function embedFonts(doc: PdfDocument, fontId: string): Promise<Record<PdfStyle, PDFFont>> {
   const option = getChordFontOption(fontId);
   const files = option.files;
   const sources = files
@@ -78,7 +116,17 @@ export async function generatePdf(
     : [PDF_FONTS[option.id].regular, PDF_FONTS[option.id].bold, PDF_FONTS[option.id].italic];
   // Subsetting keeps only the characters the chart uses, so embedding stays small.
   const [regular, bold, italic] = await Promise.all(sources.map((src) => doc.embedFont(src, { subset: true })));
-  const fonts: Record<'' | 'bold' | 'italic', PDFFont> = { '': regular, bold, italic };
+  return { '': regular, bold, italic };
+}
+
+/** Lays one song out and adds its pages to the end of `doc`. */
+async function addSongPages(
+  doc: PdfDocument,
+  { rgb }: PdfLib,
+  fonts: Record<PdfStyle, PDFFont>,
+  { title, key, blocks, arrangement, fontId, lineSpacing, credits }: PdfSong,
+): Promise<void> {
+  const option = getChordFontOption(fontId);
 
   // A font only covers some characters (the built-in ones just Western European), so swap
   // anything else for a close stand-in rather than failing the whole export.
@@ -109,7 +157,7 @@ export async function generatePdf(
 
   const black = rgb(0.1, 0.1, 0.1);
   // Positions are tracked down from the page top; PDF coordinates run up from the bottom.
-  const draw = (page: ReturnType<typeof doc.addPage>, text: string, x: number, baseline: number, size: number, style: '' | 'bold' | 'italic') =>
+  const draw = (page: ReturnType<typeof doc.addPage>, text: string, x: number, baseline: number, size: number, style: PdfStyle) =>
     page.drawText(clean(text), { x, y: PAGE_HEIGHT - baseline, size, font: fonts[style], color: black });
 
   const pages = paginateByHeight(
@@ -170,7 +218,4 @@ export async function generatePdf(
       top += item.height;
     });
   });
-
-  const bytes = await doc.save();
-  return new Blob([bytes as BlobPart], { type: 'application/pdf' });
 }

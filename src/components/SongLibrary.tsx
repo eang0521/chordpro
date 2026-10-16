@@ -4,6 +4,7 @@ import { newSongId, type SongDocument } from '../lib/songDocument';
 import type { PublicSongStore, PublishedCopy } from '../lib/publicSongStore';
 import { PublishDialog } from './PublishDialog';
 import { KEY_NAMES, semitonesBetween } from '../lib/musicTheory';
+import { formatEdited } from '../lib/dates';
 
 interface Props {
   store: SongStore;
@@ -16,7 +17,6 @@ interface Props {
   onViewPublic?: (publicId: string) => void;
 }
 
-const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
 type SortOrder = 'edited' | 'title' | 'title-desc' | 'key';
 
@@ -53,17 +53,6 @@ function sortSongs(songs: SongSummary[], order: SortOrder): SongSummary[] {
   else if (order === 'title-desc') sorted.sort((a, b) => compareTitles(b, a));
   else sorted.sort((a, b) => keyRank(a) - keyRank(b) || compareTitles(a, b));
   return sorted;
-}
-
-function formatEdited(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  if (sameDay(date, now)) return `Today, ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
-  return date.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric',
-  });
 }
 
 export function SongLibrary({ store, message, onOpen, onNew, publicStore, onViewPublic }: Props) {

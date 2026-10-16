@@ -93,6 +93,16 @@ only from this dashboard.
 To take down any public song (whoever published it), delete its row in **Table Editor →
 public_songs**.
 
+## 7. Sets
+
+**SQL Editor → New query**: paste all of [`migrations/0003_sets.sql`](migrations/0003_sets.sql)
+and **Run**. Until then, **Sets** in the menu says it couldn't load them.
+
+Each person's sets are private, like their songs. **Share link** on a set makes a link anyone
+can open, signed in or not, to see that set and print it; it shows the songs as they are now,
+so later edits come through. **Stop sharing** turns the link off, and sharing again makes a new
+one.
+
 ## Checking row-level security
 
 With two accounts (two email addresses, each signed in in its own browser), each sees only

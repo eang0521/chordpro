@@ -1,21 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { SongDocument } from '../lib/songDocument';
 
 export type SaveStatus = 'saved' | 'saving' | 'error';
 
 /**
- * Saves `doc` a moment after it stops changing. The first version seen for each song id counts
- * as already saved (it was just opened), so opening a song doesn't write it straight back.
+ * Saves `doc` (a song, or a set) a moment after it stops changing. The first version seen for
+ * each id counts as already saved (it was just opened), so opening it doesn't write it straight back.
  * Saves run one at a time, in order, so a slow early save can't land after a later one.
  * Pass null while no library song is open.
  *
  * `save` must be stable across renders (e.g. a method of a module-level store).
  */
-export function useAutosave(doc: SongDocument | null, save: (doc: SongDocument) => Promise<void>, delayMs = 1000) {
+export function useAutosave<T extends { id: string }>(doc: T | null, save: (doc: T) => Promise<void>, delayMs = 1000) {
   const [status, setStatus] = useState<SaveStatus>('saved');
   // JSON of the last version known to be saved, per song.
   const savedJson = useRef<{ id: string; json: string } | null>(null);
-  const pending = useRef<SongDocument | null>(null);
+  const pending = useRef<T | null>(null);
   const currentId = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const queue = useRef<Promise<void>>(Promise.resolve());

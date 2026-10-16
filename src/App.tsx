@@ -34,6 +34,11 @@ import { PublicSongPage } from './components/PublicSongPage';
 import { PublishControl } from './components/PublishControl';
 import { SideMenu, SideMenuToggle } from './components/SideMenu';
 import { SongSheet } from './components/SongSheet';
+import { SetList } from './components/SetList';
+import { SetEditor } from './components/SetEditor';
+import { SharedSetPage } from './components/SharedSetPage';
+import { createSupabaseSetStore, type SongSet } from './lib/setStore';
+import { makeId } from './lib/id';
 import type { CarryOverReport } from './lib/carryOver';
 import { carryOverBlocks, carryOverWordGroups } from './lib/carryOver';
 import { ThemeSwitch } from './components/ThemeSwitch';
@@ -43,6 +48,7 @@ import './App.css';
 
 const songStore = supabase ? createSupabaseSongStore(supabase) : null;
 const publicStore = supabase ? createSupabasePublicSongStore(supabase) : null;
+const setStore = supabase ? createSupabaseSetStore(supabase) : null;
 // Module-level so useAutosave gets the same function every render.
 const saveToLibrary = (doc: SongDocument) => songStore!.save(doc);
 
@@ -91,13 +97,16 @@ function rememberMenuOpen(open: boolean) {
 const initialDraft = loadLocalDraft() ?? emptySongDocument();
 removeOldDrafts();
 
-// The public songs have their own addresses (#/public, #/public/<id>), so a song can be shared
-// as a link. Anything else in the hash, like a sign-in link's token, isn't a route.
-type PublicRoute = { songId: string | null } | null;
+// Pages with their own addresses, so they can be shared as links: the public songs (#/public,
+// #/public/<id>) and a set shared by link (#/set/<share token>). Anything else in the hash, like
+// a sign-in link's token, isn't a route.
+type Route = { kind: 'public'; songId: string | null } | { kind: 'set'; token: string } | null;
 
-function parseRoute(hash: string): PublicRoute {
-  const match = /^#\/public(?:\/([0-9a-f-]{36}))?\/?$/i.exec(hash);
-  return match ? { songId: match[1] ?? null } : null;
+function parseRoute(hash: string): Route {
+  const publicMatch = /^#\/public(?:\/([0-9a-f-]{36}))?\/?$/i.exec(hash);
+  if (publicMatch) return { kind: 'public', songId: publicMatch[1] ?? null };
+  const setMatch = /^#\/set\/([0-9a-f-]{36})\/?$/i.exec(hash);
+  return setMatch ? { kind: 'set', token: setMatch[1] } : null;
 }
 
 function App() {
@@ -106,12 +115,14 @@ function App() {
   // 'local' is the single signed-out draft kept in this browser, 'cloud' a library song.
   const [source, setSource] = useState<'local' | 'cloud'>('local');
   // 'view' shows a library song's chart, as public songs are shown; Edit opens the editor.
-  const [screen, setScreen] = useState<'editor' | 'view' | 'library' | 'opening'>('editor');
+  // 'sets' and 'set' are the user's sets and one set being edited (openSet).
+  const [screen, setScreen] = useState<'editor' | 'view' | 'library' | 'opening' | 'sets' | 'set'>('editor');
+  const [openSet, setOpenSet] = useState<{ id: string; initial?: SongSet } | null>(null);
   const [libraryMessage, setLibraryMessage] = useState<string | null>(null);
   const [showSignIn, setShowSignIn] = useState(false);
   const [draftToUpload, setDraftToUpload] = useState<SongDocument | null>(null);
   const [uploadFailed, setUploadFailed] = useState(false);
-  const [route, setRoute] = useState<PublicRoute>(() => (publicStore ? parseRoute(window.location.hash) : null));
+  const [route, setRoute] = useState<Route>(() => (publicStore ? parseRoute(window.location.hash) : null));
   const [isPublisher, setIsPublisher] = useState(false);
   const [menuOpen, setMenuOpen] = useState(initialMenuOpen);
 
@@ -241,6 +252,19 @@ function App() {
     rememberOpenSong(null);
   }
 
+  async function showSets() {
+    if (!(await leaveLibrarySong())) return;
+    setScreen('sets');
+    rememberOpenSong(null);
+  }
+
+  function newSet() {
+    // Nothing is written until it's named or a song is added, so backing out leaves no empty set.
+    const id = makeId();
+    setOpenSet({ id, initial: { id, name: '', entries: [], shareToken: null } });
+    setScreen('set');
+  }
+
   async function handleSignOut() {
     if (!(await leaveLibrarySong())) return;
     rememberOpenSong(null);
@@ -350,7 +374,7 @@ function App() {
   async function goToPublic(songId: string | null = null) {
     if (!route && !(await leaveLibrarySong())) return;
     window.history.pushState(null, '', songId ? `#/public/${songId}` : '#/public');
-    setRoute({ songId });
+    setRoute({ kind: 'public', songId });
   }
 
   function leavePublic() {
@@ -384,13 +408,25 @@ function App() {
         items={[
           {
             label: userId ? 'My songs' : 'My song',
-            active: !route,
+            active: !route && screen !== 'sets' && screen !== 'set',
             onSelect: () => {
               if (route) leavePublic();
               if (userId) void showLibrary();
             },
           },
-          ...(publicStore ? [{ label: 'Public songs', active: !!route, onSelect: () => void goToPublic() }] : []),
+          ...(setStore && userId
+            ? [
+                {
+                  label: 'Sets',
+                  active: !route && (screen === 'sets' || screen === 'set'),
+                  onSelect: () => {
+                    if (route) leavePublic();
+                    void showSets();
+                  },
+                },
+              ]
+            : []),
+          ...(publicStore ? [{ label: 'Public songs', active: route?.kind === 'public', onSelect: () => void goToPublic() }] : []),
         ]}
       />
       <div className="app">
@@ -453,7 +489,30 @@ function App() {
 
         {!route && (auth.status === 'loading' || (userId && screen === 'opening')) && <p className="hint">Loading&hellip;</p>}
 
-        {route && publicStore && route.songId && (
+        {route?.kind === 'set' && setStore && <SharedSetPage key={route.token} store={setStore} token={route.token} />}
+
+        {!route && setStore && userId && screen === 'sets' && (
+          <SetList
+            store={setStore}
+            onOpen={(id) => {
+              setOpenSet({ id });
+              setScreen('set');
+            }}
+            onNew={newSet}
+          />
+        )}
+        {!route && setStore && songStore && userId && screen === 'set' && openSet && (
+          <SetEditor
+            key={openSet.id}
+            setStore={setStore}
+            songStore={songStore}
+            setId={openSet.id}
+            initialSet={openSet.initial}
+            onBack={() => setScreen('sets')}
+          />
+        )}
+
+        {route?.kind === 'public' && publicStore && route.songId && (
           <PublicSongPage
             key={route.songId}
             store={publicStore}
@@ -464,7 +523,7 @@ function App() {
             onSignIn={() => setShowSignIn(true)}
           />
         )}
-        {route && publicStore && !route.songId && (
+        {route?.kind === 'public' && publicStore && !route.songId && (
           <PublicSongList store={publicStore} onOpen={(id) => void goToPublic(id)} />
         )}
 
