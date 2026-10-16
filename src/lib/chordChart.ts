@@ -252,3 +252,44 @@ export function placeChords(tokens: ChartToken[], measure: TextMeasure, repeat?:
   }
   return { lyricLine, chords };
 }
+
+/** How far a placed line reaches: the end of its lyrics or of its last chord, whichever is further. */
+function placedWidth(line: PlacedLine, measure: TextMeasure): number {
+  const lyrics = line.lyricLine.trim() ? measure(line.lyricLine, LYRIC_SIZE_PT, 'bold') : 0;
+  const last = line.chords[line.chords.length - 1];
+  return Math.max(lyrics, last ? last.offsetPt + measure(last.label, CHORD_SIZE_PT, 'italic') : 0);
+}
+
+/**
+ * Lays out one chart line within `maxWidthPt` (the page width beside the label column). A line
+ * too wide for the page breaks at word boundaries into several, each with its own chords, judged
+ * by its width after chords are placed and lyrics spread. The preview, Word and PDF all use this,
+ * so they wrap the same lines and Fit to page measures what actually prints. A section's repeat
+ * mark goes on the last piece. A single word wider than the page stays whole.
+ */
+export function layoutLine(tokens: ChartToken[], measure: TextMeasure, maxWidthPt: number, repeat?: number): PlacedLine[] {
+  // Most lines fit as they are: lay them out once.
+  const whole = placeChords(tokens, measure, repeat);
+  if (placedWidth(whole, measure) <= maxWidthPt) return [whole];
+
+  const words: ChartToken[][] = [];
+  tokens.forEach((tok, i) => {
+    if (i === 0 || tok.isWordStart) words.push([tok]);
+    else words[words.length - 1].push(tok);
+  });
+
+  const pieces: ChartToken[][] = [];
+  let current: ChartToken[] = [];
+  words.forEach((word) => {
+    const candidate = [...current, ...word];
+    if (current.length > 0 && placedWidth(placeChords(candidate, measure), measure) > maxWidthPt) {
+      pieces.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  });
+  if (current.length > 0) pieces.push(current);
+  if (pieces.length === 0) return [placeChords([], measure, repeat)];
+  return pieces.map((piece, i) => placeChords(piece, measure, i === pieces.length - 1 ? repeat : undefined));
+}

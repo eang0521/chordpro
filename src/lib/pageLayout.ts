@@ -69,13 +69,28 @@ export const CONTENT_HEIGHT_PX = PAGE_HEIGHT_PX - MARGIN_TOP_PX - MARGIN_BOTTOM_
  * measure with the canvas (`measureInFont`); the PDF export measures with the PDF's own fonts. */
 export type TextMeasure = (text: string, sizePt: number, style: '' | 'bold' | 'italic') => number;
 
+// One canvas for every measurement, and a cache of results: laying out a chart measures the same
+// text many times over (each redraw, and while wrapping long lines).
+let measureContext: CanvasRenderingContext2D | null | undefined;
+const widthCache = new Map<string, number>();
+const MAX_CACHED_WIDTHS = 20000;
+// A font that finishes loading measures differently from the fallback used until then.
+if (typeof document !== 'undefined') document.fonts?.addEventListener?.('loadingdone', () => widthCache.clear());
+
 /** Measures text width (in points) in a given CSS font via an offscreen canvas — the only
  * reliable way to know how wide text will render in a proportional font. */
 export function measureTextPt(text: string, fontFamily: string, sizePt: number, style = ''): number {
-  const ctx = document.createElement('canvas').getContext('2d');
-  if (!ctx) return text.length * sizePt * 0.6;
-  ctx.font = `${style} 100px ${fontFamily}`;
-  return (ctx.measureText(text).width / 100) * sizePt;
+  const key = `${style}|${fontFamily}|${text}`;
+  let width = widthCache.get(key); // at 100px
+  if (width === undefined) {
+    if (measureContext === undefined) measureContext = document.createElement('canvas').getContext('2d');
+    if (!measureContext) return text.length * sizePt * 0.6;
+    measureContext.font = `${style} 100px ${fontFamily}`;
+    width = measureContext.measureText(text).width;
+    if (widthCache.size >= MAX_CACHED_WIDTHS) widthCache.clear();
+    widthCache.set(key, width);
+  }
+  return (width / 100) * sizePt;
 }
 
 export function measureInFont(fontFamily: string): TextMeasure {

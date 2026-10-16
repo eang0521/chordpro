@@ -1,8 +1,7 @@
 import type { PDFFont } from 'pdf-lib';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from './arrangement';
-import type { ChartToken } from './chordChart';
-import { buildChartRows, groupIntoSections, isChordOnly, keyHeaderText, placeChords } from './chordChart';
+import { buildChartRows, groupIntoSections, isChordOnly, keyHeaderText, layoutLine } from './chordChart';
 import { fetchFontFile, getChordFontOption } from './chordFonts';
 import { creditLines } from './credits';
 import type { TextMeasure } from './pageLayout';
@@ -64,32 +63,6 @@ type LayoutItem =
   | { kind: 'title'; height: number }
   | { kind: 'row'; height: number; label: string | null; lines: PrintedLine[] };
 
-/** Breaks a line's tokens at word boundaries so each piece fits `width`, so long lines wrap
- * instead of running off the page. A single word wider than the line stays whole. */
-function wrapTokens(tokens: ChartToken[], width: number, measure: TextMeasure): ChartToken[][] {
-  const words: ChartToken[][] = [];
-  tokens.forEach((tok, i) => {
-    if (i === 0 || tok.isWordStart) words.push([tok]);
-    else words[words.length - 1].push(tok);
-  });
-  const textOf = (toks: ChartToken[]) => toks.map((t, i) => (i > 0 && t.isWordStart ? ' ' : '') + t.text).join('');
-
-  const pieces: ChartToken[][] = [];
-  let current: ChartToken[] = [];
-  words.forEach((word) => {
-    const candidate = [...current, ...word];
-    if (current.length > 0 && measure(textOf(candidate), LYRIC_SIZE_PT, 'bold') > width) {
-      pieces.push(current);
-      current = word;
-    } else {
-      current = candidate;
-    }
-  });
-  if (current.length > 0) pieces.push(current);
-  // A wrapped piece starts its own line, so its first syllable shouldn't get a leading space.
-  return pieces.map((piece) => piece.map((t, i) => (i === 0 ? { ...t, isWordStart: false } : t)));
-}
-
 /**
  * Builds a downloadable PDF chord chart with the same page size, margins, type sizes and line
  * heights as the Word export, keeping each song section together on a page. Unlike the .docx,
@@ -149,9 +122,7 @@ export async function generatePdf(
       items.push({ kind: 'row', height: lyricLine + sectionGap, label: section.label, lines: [] });
     }
     section.lineRows.forEach((row, i) => {
-      // A wrapped line's repeat mark ("2x") goes at the end of its last piece.
-      const pieces = wrapTokens(row.tokens, lyricWidth, measure);
-      const lines = pieces.map((piece, p) => placeChords(piece, measure, p === pieces.length - 1 ? row.repeat : undefined));
+      const lines = layoutLine(row.tokens, measure, lyricWidth, row.repeat);
       const isLast = i === section.lineRows.length - 1;
       const height =
         // A chord-only line takes just the lyric line's height (its chords sit on it).

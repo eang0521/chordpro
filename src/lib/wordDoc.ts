@@ -1,12 +1,13 @@
 import type { Paragraph } from 'docx';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from './arrangement';
-import { buildChartRows, groupIntoSections, isChordOnly, keyHeaderText, placeChords } from './chordChart';
+import { buildChartRows, groupIntoSections, isChordOnly, keyHeaderText, layoutLine } from './chordChart';
 import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
 import { embedFontStyles } from './docxFonts';
 import { creditLines } from './credits';
 import {
   CHORD_LINE_PT,
+  CONTENT_WIDTH_TWIPS,
   CHORD_SIZE_PT,
   CREDIT_BOTTOM_TWIPS,
   CREDIT_LINE_PT,
@@ -51,6 +52,7 @@ export async function generateWordDoc(
   const sections = groupIntoSections(buildChartRows(blocks, arrangement, key));
   const measure = measureInFont(font.wordFont);
   const labelCol = labelColumnTwips(sections.map((s) => s.label), measure);
+  const lyricWidthPt = (CONTENT_WIDTH_TWIPS - labelCol) / 20;
   const footer = creditFooter(creditLines(credits), measure);
 
   const exactLine = (pt: number, afterPt = 0) => ({
@@ -80,10 +82,11 @@ export async function generateWordDoc(
       if (section.label) body.push(new Paragraph({ spacing: exactLine(LYRIC_LINE_PT, SECTION_GAP_PT), keepNext: true, children: [labelRun(section.label)] }));
       return;
     }
-    section.lineRows.forEach((row, i) => {
-      const placed = placeChords(row.tokens, measure, row.repeat);
+    // Each row laid out within the page width, wrapping exactly where the preview and PDF do.
+    const pieces = section.lineRows.flatMap((row) => layoutLine(row.tokens, measure, lyricWidthPt, row.repeat));
+    pieces.forEach((placed, i) => {
       const { lyricLine, chords } = placed;
-      const isLast = i === section.lineRows.length - 1;
+      const isLast = i === pieces.length - 1;
       const withLabel = i === 0 && section.label;
       // Word measures tab stops from the left margin, so offset by the label column.
       const chordTabStops = chords.map((c) => ({ type: TabStopType.LEFT, position: labelCol + twips(c.offsetPt) }));

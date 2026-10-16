@@ -2,8 +2,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from '../lib/arrangement';
-import type { ChartLineRow, SectionDisplayRow } from '../lib/chordChart';
-import { buildChartRows, flattenSections, groupIntoSections, isChordOnly, keyHeaderText, placeChords, songKeys } from '../lib/chordChart';
+import type { PlacedLine, SectionDisplayRow } from '../lib/chordChart';
+import { buildChartRows, flattenSections, groupIntoSections, isChordOnly, keyHeaderText, layoutLine, songKeys } from '../lib/chordChart';
 import { generateWordDoc } from '../lib/wordDoc';
 import { generatePdf } from '../lib/pdfDoc';
 import { chartFilename, downloadBlob } from '../lib/download';
@@ -60,13 +60,12 @@ type PageItem = { kind: 'header' } | { kind: 'row'; display: SectionDisplayRow }
 
 /** Chords sit at the same measured offsets the Word export uses for its tab stops, absolutely
  * positioned over unspread lyric text, so the preview matches the doc letter for letter. */
-function renderLinePair(row: ChartLineRow, fontFamily: string): ReactNode {
-  const placed = placeChords(row.tokens, measureInFont(fontFamily), row.repeat);
+function renderLinePair(placed: PlacedLine, key: number): ReactNode {
   const { lyricLine, chords } = placed;
   if (isChordOnly(placed)) {
     // A chord-only line (a turn, an intro...) takes the lyric line's place, in chord type.
     return (
-      <div className="chart-line-row">
+      <div className="chart-line-row" key={key}>
         <div className="chart-chord-only">
           &nbsp;
           {chords.map((c, i) => (
@@ -79,7 +78,7 @@ function renderLinePair(row: ChartLineRow, fontFamily: string): ReactNode {
     );
   }
   return (
-    <div className="chart-line-row">
+    <div className="chart-line-row" key={key}>
       {chords.length > 0 && (
         <div className="chart-chord-line">
           &nbsp;
@@ -102,11 +101,15 @@ function renderLinePair(row: ChartLineRow, fontFamily: string): ReactNode {
  * physical width in page mode (where 1em = the lyric point size) and scales with the compact view. */
 function renderDisplayRow(display: SectionDisplayRow, labelColEm: number, fontFamily: string): ReactNode {
   const gapClass = display.isLastInSection ? 'chart-gap-section' : 'chart-gap-line';
-  // Only rows with lyrics get a chord line above them; a chord-only row draws its chords on the
-  // lyric line itself, so its label needs no spacer.
-  const tokens = display.row?.tokens ?? [];
-  const hasChords =
-    (tokens.some((t) => t.chordLabel) || !!display.row?.repeat) && tokens.some((t) => !t.isSlot && t.text.trim());
+  // Laid out within the page width beside the label column, wrapping where the PDF and Word
+  // export do (1pt = 1px here), so the pages measured for Fit to page match what prints.
+  const lines = display.row
+    ? layoutLine(display.row.tokens, measureInFont(fontFamily), CONTENT_WIDTH_PX - labelColEm * LYRIC_SIZE_PT, display.row.repeat)
+    : [];
+  // Only lines with lyrics get a chord line above them; a chord-only line draws its chords on the
+  // lyric line itself, so the label beside it needs no spacer.
+  const first = lines[0];
+  const hasChords = !!first && first.chords.length > 0 && !isChordOnly(first);
   return (
     <div className={`chart-section-row ${gapClass}`} key={display.key}>
       <div className="chart-label-col" style={{ width: `${labelColEm}em` }}>
@@ -119,7 +122,7 @@ function renderDisplayRow(display: SectionDisplayRow, labelColEm: number, fontFa
           </>
         )}
       </div>
-      <div className="chart-content-col">{display.row ? renderLinePair(display.row, fontFamily) : <>&nbsp;</>}</div>
+      <div className="chart-content-col">{lines.length > 0 ? lines.map(renderLinePair) : <>&nbsp;</>}</div>
     </div>
   );
 }
