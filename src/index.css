@@ -33,18 +33,62 @@
 }
 
 :root {
-  color-scheme: light dark;
-  --bg: #12141a;
-  --panel-bg: #1b1e27;
-  --border: #2c303c;
-  --text: #eef0f4;
-  --text-dim: #9aa0ae;
-  --accent: #6ea8fe;
-  --accent-dim: #365a91;
-  --danger: #ff8080;
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  /* Paper and ink, like the chord charts: a warm desk behind cream paper, near-black ink and a
+     dark gold accent (chords, the main action, the current step). Light by default; dark mode
+     follows the system and keeps the gold readable on charcoal. */
+  color-scheme: light;
+  --bg: #efede6;
+  --panel-bg: #fdfdfa;
+  --field-bg: #f7f5ef;
+  --hover-bg: #e8e4d8;
+  --border: #dcd8cc;
+  --ink-line: #1a1a1a;
+  --text: #1a1a1a;
+  --text-dim: #66635c;
+  --accent: #8a6412;
+  --accent-hover: #74540f;
+  --accent-dim: #f3e9d2;
+  --on-accent: #ffffff;
+  --danger: #b3261e;
+  --danger-bg: #fbeae8;
+  --on-danger: #ffffff;
+  --section-bridge: #7a3b5e;
+  --section-instrumental: #2f6b57;
+  --overlay: rgba(26, 26, 26, 0.45);
+  --page-shadow: 0 2px 12px rgba(0, 0, 0, 0.14);
+  /* The chord chart is always printed paper, in either mode — so its own fixed colors. */
+  --paper: #fdfdfa;
+  --paper-ink: #1a1a1a;
+  --paper-chord: #8a6412;
+  --paper-dim: #8a877f;
+  font-family: 'Atkinson Hyperlegible', Arial, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #121211;
+    --panel-bg: #1c1c1a;
+    --field-bg: #161615;
+    --hover-bg: #2a2926;
+    --border: #34332f;
+    --ink-line: #edede6;
+    --text: #edede6;
+    --text-dim: #9c998f;
+    --accent: #c99a3a;
+    --accent-hover: #d6a948;
+    --accent-dim: #3a2f17;
+    --on-accent: #121211;
+    --danger: #ff8a7a;
+    --danger-bg: #3a1c19;
+    --on-danger: #121211;
+    --section-bridge: #d29ac0;
+    --section-instrumental: #7fc4a8;
+    --overlay: rgba(0, 0, 0, 0.6);
+    --page-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  }
 }
 
 * {
@@ -68,8 +112,8 @@ button {
 }
 
 kbd {
-  background: #2a2e3a;
-  border: 1px solid #3a3f4d;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 0.85em;

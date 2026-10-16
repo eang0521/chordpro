@@ -9,11 +9,25 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--ink-line);
 }
 
+/* Set like a chart title: bold capitals, with the R4E monogram beside it. */
 .app-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   margin: 0;
+}
+
+.app-logo {
+  width: 1.4em;
+  height: 1.4em;
 }
 
 .steps {
@@ -45,12 +59,13 @@
 .panel {
   background: var(--panel-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 4px;
   padding: 24px;
 }
 
 .panel h2 {
   margin-top: 0;
+  font-weight: 700;
 }
 
 .hint {
@@ -66,17 +81,21 @@
   margin-bottom: 16px;
 }
 
+/* Field labels read like the chart's section labels: small bold capitals. */
 .field span {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text-dim);
 }
 
 .field input,
 .field select,
 .field textarea {
-  background: #12141a;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   color: var(--text);
   padding: 10px 12px;
   font-size: 0.95rem;
@@ -98,19 +117,21 @@
   flex-wrap: wrap;
 }
 
+/* Gold fill for the main action; everything else is an ink outline (button.secondary). */
 button {
   background: var(--accent);
-  color: #0c1420;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 18px;
+  color: var(--on-accent);
+  border: 1.5px solid var(--accent);
+  border-radius: 4px;
+  padding: 9px 17px;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 
 button:hover:not(:disabled) {
-  filter: brightness(1.08);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 button:disabled {
@@ -121,14 +142,19 @@ button:disabled {
 button.secondary {
   background: transparent;
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--ink-line);
+}
+
+button.secondary:hover:not(:disabled) {
+  background: var(--hover-bg);
+  border-color: var(--ink-line);
 }
 
 /* Syllable editor */
 .syllable-editor {
-  background: #12141a;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 16px;
 }
 
@@ -140,9 +166,9 @@ button.secondary {
 }
 
 .syllable-word-input {
-  background: #1e222c;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text);
   padding: 4px 6px;
   font-family: 'Cascadia Code', Consolas, monospace;
@@ -155,9 +181,9 @@ button.secondary {
 
 /* A commonly re-split word (or one the user re-split before): worth a second look. */
 .syllable-word-input.syllable-word-common {
-  border-color: #b8913a;
-  background: #2a2618;
-  color: #f0d080;
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--text);
 }
 
 /* Lyric flow */
@@ -195,6 +221,7 @@ button.secondary {
 
 .chord-key-remove {
   background: none;
+  border: none;
   color: var(--text-dim);
   padding: 2px 6px;
   font-size: 1rem;
@@ -208,9 +235,9 @@ button.secondary {
 }
 
 .chord-entry input {
-  background: #12141a;
+  background: var(--field-bg);
   border: 1px solid var(--accent);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text);
   padding: 4px 8px;
   font-size: 0.95rem;
@@ -222,9 +249,9 @@ button.secondary {
 }
 
 .lyric-display {
-  background: #12141a;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 24px;
   user-select: none;
   max-height: 50vh;
@@ -258,7 +285,7 @@ button.secondary {
 }
 
 .syllable.current {
-  color: #0c1420;
+  color: var(--on-accent);
   background: var(--accent);
 }
 
@@ -268,6 +295,7 @@ button.secondary {
   left: 0;
   font-size: 0.75rem;
   font-weight: 700;
+  font-style: italic;
   color: var(--accent);
   white-space: nowrap;
 }
@@ -293,15 +321,15 @@ button.secondary {
 }
 
 .section-heading.section-verse {
-  color: var(--accent);
+  color: var(--text);
 }
 
 .section-heading.section-chorus {
-  color: #f5a623;
+  color: var(--accent);
 }
 
 .section-heading.section-bridge {
-  color: #c77dff;
+  color: var(--section-bridge);
 }
 
 .section-heading.section-other {
@@ -326,7 +354,7 @@ button.secondary {
 .arrangement-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(6, 8, 12, 0.7);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -337,7 +365,7 @@ button.secondary {
 .arrangement-panel {
   background: var(--panel-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 4px;
   padding: 24px;
   width: 100%;
   max-width: 720px;
@@ -367,9 +395,9 @@ button.secondary {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #12141a;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 10px 12px;
   cursor: grab;
 }
@@ -415,9 +443,10 @@ button.secondary {
 }
 
 .section-select {
-  background: #1e222c;
+  background: var(--field-bg);
+  color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 4px 6px;
   font-size: 0.8rem;
   font-weight: 700;
@@ -428,9 +457,9 @@ button.secondary {
 .arrangement-label-input {
   flex: 1 1 160px;
   min-width: 100px;
-  background: #1e222c;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text);
   padding: 5px 8px;
   font-size: 0.9rem;
@@ -503,9 +532,9 @@ button.secondary {
 }
 
 .chart-font-select {
-  background: #1e222c;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text);
   padding: 8px 10px;
   font-size: 0.9rem;
@@ -523,20 +552,22 @@ button.secondary {
   /* Wider than the text alone needs — the browser's native up/down spinner arrows eat into the
      box's width, so a tight ch-based width still clips the second decimal place (e.g. "0.85"). */
   width: 10ch;
-  background: #1e222c;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text);
   padding: 6px 8px;
   font-size: 0.9rem;
   text-align: center;
 }
 
+/* The chart is printed paper in both modes. Chords are gold on screen only; exports stay black. */
 .chord-chart {
   margin-top: 16px;
-  background: #12141a;
+  background: var(--paper);
+  color: var(--paper-ink);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 2px;
   padding: 20px;
   font-size: 1.05rem;
   overflow-x: auto;
@@ -609,10 +640,11 @@ button.secondary {
   position: absolute;
   top: 0;
   font-style: italic;
+  color: var(--paper-chord);
 }
 
 .chart-syllable {
-  color: var(--text);
+  color: var(--paper-ink);
   font-weight: 700;
   line-height: calc(1.2143 * var(--line-spacing, 1));
   /* pre, not nowrap: lyrics spread apart to fit chords use runs of spaces ("e   -   ter"). */
@@ -645,21 +677,21 @@ button.secondary {
 .chart-page {
   position: relative;
   flex-shrink: 0;
-  background: #fdfdfa;
+  background: var(--paper);
   border-radius: 2px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--page-shadow);
   overflow: hidden;
 }
 
 .chart-page-content {
   box-sizing: border-box;
   height: 100%;
-  color: #1a1a1a;
+  color: var(--paper-ink);
   overflow: hidden;
 }
 
 .chart-page-content .chart-syllable {
-  color: #1a1a1a;
+  color: var(--paper-ink);
 }
 
 .chart-page-number {
@@ -667,14 +699,14 @@ button.secondary {
   top: 8px;
   right: 12px;
   font-size: 0.7rem;
-  color: #9aa0ae;
+  color: var(--paper-dim);
 }
 
 .chart-page-credits {
   position: absolute;
   text-align: center;
   white-space: nowrap;
-  color: #1a1a1a;
+  color: var(--paper-ink);
 }
 
 /* Export */
@@ -682,9 +714,9 @@ button.secondary {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  background: #12141a;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 16px;
   color: var(--text);
   font-family: 'Cascadia Code', Consolas, monospace;
@@ -710,9 +742,9 @@ button.secondary {
 }
 
 .key-control select {
-  background: #1e222c;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text);
   padding: 8px 10px;
   font-size: 0.9rem;
@@ -747,9 +779,9 @@ button.secondary {
 
 .copy-chords-pickers select,
 .copy-line-controls select {
-  background: #1e222c;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text);
   padding: 8px 10px;
   font-size: 0.9rem;
@@ -767,9 +799,9 @@ button.secondary {
 
 .copy-chords-alert {
   border: 1px solid var(--danger);
-  background: rgba(255, 128, 128, 0.08);
+  background: var(--danger-bg);
   color: var(--danger);
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 10px 12px;
   font-size: 0.9rem;
   line-height: 1.5;
@@ -788,10 +820,10 @@ button.secondary {
 }
 
 .copy-line {
-  background: #12141a;
+  background: var(--field-bg);
   border: 1px solid var(--border);
   border-left-width: 4px;
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 10px 12px;
 }
 
@@ -876,7 +908,7 @@ button.secondary {
 }
 
 .section-heading.section-instrumental {
-  color: #4fd1a5;
+  color: var(--section-instrumental);
 }
 
 .section-heading-note {
@@ -916,13 +948,13 @@ button.secondary {
   font-weight: 700;
   font-style: italic;
   letter-spacing: 0.05em;
-  color: #f0c060;
+  color: var(--accent);
   line-height: 1.5;
 }
 
 .arrangement-card.arrangement-key-change {
   border-style: dashed;
-  border-color: #8a6d2a;
+  border-color: var(--accent);
 }
 
 .arrangement-key-change-title {
@@ -930,13 +962,13 @@ button.secondary {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #f0c060;
+  color: var(--accent);
 }
 
 .arrangement-key-change select {
-  background: #1e222c;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text);
   padding: 4px 6px;
   font-size: 0.85rem;
@@ -983,10 +1015,19 @@ button.link-button {
 
 button.secondary.danger {
   color: var(--danger);
+  border-color: var(--danger);
 }
 
 button.danger-solid {
   background: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-danger);
+}
+
+button.danger-solid:hover:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+  filter: brightness(0.92);
 }
 
 .dialog-panel {
@@ -1041,9 +1082,9 @@ button.danger-solid {
 }
 
 .library-sort select {
-  background: #1e222c;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text);
   padding: 6px 8px;
   font-size: 0.9rem;
@@ -1066,9 +1107,9 @@ button.danger-solid {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--bg);
+  background: var(--panel-bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 6px 10px 6px 6px;
 }
 
@@ -1080,18 +1121,19 @@ button.library-open {
   align-items: flex-start;
   gap: 4px;
   background: transparent;
+  border: none;
   color: var(--text);
   text-align: left;
   padding: 8px 10px;
 }
 
 button.library-open:hover:not(:disabled) {
-  background: var(--panel-bg);
-  filter: none;
+  background: var(--hover-bg);
 }
 
 .library-title {
   font-size: 1rem;
+  font-weight: 700;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1167,9 +1209,9 @@ button.library-open:hover:not(:disabled) {
 }
 
 .arrangement-repeat {
-  background: #1e222c;
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text);
   padding: 4px 6px;
   font-size: 0.8rem;
@@ -1187,9 +1229,9 @@ button.library-open:hover:not(:disabled) {
 }
 
 .public-search {
-  background: var(--bg);
+  background: var(--field-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   color: var(--text);
   padding: 8px 12px;
   font: inherit;

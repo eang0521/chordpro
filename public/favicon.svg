@@ -1,6 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="7" fill="#12141a"/>
-  <circle cx="12" cy="23" r="4" fill="#6ea8fe"/>
-  <circle cx="24" cy="20" r="4" fill="#6ea8fe"/>
-  <path d="M16 23V8l12 -3v15" stroke="#6ea8fe" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- R4E in Atkinson Hyperlegible Bold, the 4 in Bold Italic like a chord over a lyric. -->
+  <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" fill="#fdfdfa" stroke="#cfcabc"/>
+  <g transform="translate(2.5 20.947) scale(0.014811 -0.014811)">
+    <path transform="translate(-44 0)" fill="#1a1a1a" d="M44 0L44 668L301 668Q388 668 456.5 651Q525 634 564.5 589Q604 544 604 461Q604 423 590 385.5Q576 348 541.5 317Q507 286 443 269L637 0L454 0L273 252L202 252L202 0ZM202 384L306 384Q362 384 399.5 398.5Q437 413 437 459Q437 506 399.5 520.5Q362 535 306 535L202 535Z"/>
+    <path transform="translate(679 0)" fill="#8a6412" d="M294 0L324 141L-16 141L7 252L421 668L592 668L508 275L600 275L572 141L480 141L450 0ZM193 275L352 275L394 469Z"/>
+    <path transform="translate(1305 0)" fill="#1a1a1a" d="M44 0L44 668L558 668L558 529L202 529L202 413L419 413L419 274L202 274L202 139L558 139L558 0Z"/>
+  </g>
 </svg>
