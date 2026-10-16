@@ -32,6 +32,7 @@ import { createSupabasePublicSongStore } from './lib/publicSongStore';
 import { PublicSongList } from './components/PublicSongList';
 import { PublicSongPage } from './components/PublicSongPage';
 import { PublishControl } from './components/PublishControl';
+import { SideMenu, SideMenuToggle } from './components/SideMenu';
 import { SongSheet } from './components/SongSheet';
 import type { CarryOverReport } from './lib/carryOver';
 import { carryOverBlocks, carryOverWordGroups } from './lib/carryOver';
@@ -66,6 +67,27 @@ function openSongOnReload(): string | null {
   }
 }
 
+// Whether the side menu is open, per browser. Until it's been toggled, open on a wide screen.
+const MENU_OPEN_KEY = 'r4e-menu-open';
+
+function initialMenuOpen(): boolean {
+  try {
+    const saved = localStorage.getItem(MENU_OPEN_KEY);
+    if (saved !== null) return saved === '1';
+  } catch {
+    // Storage unavailable: fall back to the screen width.
+  }
+  return window.matchMedia('(min-width: 1200px)').matches;
+}
+
+function rememberMenuOpen(open: boolean) {
+  try {
+    localStorage.setItem(MENU_OPEN_KEY, open ? '1' : '0');
+  } catch {
+    // Not remembered; it still opens and closes.
+  }
+}
+
 const initialDraft = loadLocalDraft() ?? emptySongDocument();
 removeOldDrafts();
 
@@ -91,6 +113,7 @@ function App() {
   const [uploadFailed, setUploadFailed] = useState(false);
   const [route, setRoute] = useState<PublicRoute>(() => (publicStore ? parseRoute(window.location.hash) : null));
   const [isPublisher, setIsPublisher] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(initialMenuOpen);
 
   const [songId, setSongId] = useState(initialDraft.id);
   const [step, setStep] = useState<Step>(initialDraft.step);
@@ -348,340 +371,342 @@ function App() {
   // moment while switching over, where an edit would end up in the wrong place.
   const showEditor = !route && auth.status !== 'loading' && (userId ? editingLibrarySong : source === 'local');
 
+  function toggleMenu(open = !menuOpen) {
+    setMenuOpen(open);
+    rememberMenuOpen(open);
+  }
+
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1 title="Rehearsing for Eternity">
-          <img className="app-logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" />
-          R4E ChordPro
-        </h1>
-        <div className="header-right">
-          {showEditor && (
-            <ol className="steps">
-              {(['input', 'edit-syllables', 'chords', 'export'] as Step[]).map((s, i) => (
-                <li key={s} className={s === step ? 'active' : undefined}>
-                  {i + 1}
-                </li>
-              ))}
-            </ol>
-          )}
-          {publicStore && !route && (
-            <button className="secondary" onClick={() => void goToPublic()}>
-              Public songs
-            </button>
-          )}
-          {route && auth.status !== 'signedIn' && (
-            <button className="secondary" onClick={leavePublic}>
-              My song
-            </button>
-          )}
-          {auth.status === 'signedOut' && (
-            <button className="secondary" onClick={() => setShowSignIn(true)}>
-              Sign in
-            </button>
-          )}
-          {auth.status === 'signedIn' && (
-            <div className="account">
-              {(route || screen === 'editor' || screen === 'view') && (
-                <button
-                  className="secondary"
-                  onClick={() => {
-                    if (route) leavePublic();
-                    void showLibrary();
-                  }}
-                >
-                  My songs
+    <div className={`layout ${menuOpen ? 'menu-open' : ''}`}>
+      <SideMenu
+        open={menuOpen}
+        onClose={() => toggleMenu(false)}
+        items={[
+          {
+            label: userId ? 'My songs' : 'My song',
+            active: !route,
+            onSelect: () => {
+              if (route) leavePublic();
+              if (userId) void showLibrary();
+            },
+          },
+          ...(publicStore ? [{ label: 'Public songs', active: !!route, onSelect: () => void goToPublic() }] : []),
+        ]}
+      />
+      <div className="app">
+        <header className="app-header">
+          <SideMenuToggle open={menuOpen} onToggle={() => toggleMenu()} />
+          <h1 title="Rehearsing for Eternity">
+            <img className="app-logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" />
+            R4E ChordPro
+          </h1>
+          <div className="header-right">
+            {showEditor && (
+              <ol className="steps">
+                {(['input', 'edit-syllables', 'chords', 'export'] as Step[]).map((s, i) => (
+                  <li key={s} className={s === step ? 'active' : undefined}>
+                    {i + 1}
+                  </li>
+                ))}
+              </ol>
+            )}
+            {auth.status === 'signedOut' && (
+              <button className="secondary" onClick={() => setShowSignIn(true)}>
+                Sign in
+              </button>
+            )}
+            {auth.status === 'signedIn' && (
+              <div className="account">
+                <span className="account-email" title={auth.user.email}>
+                  {auth.user.email}
+                </span>
+                <button className="secondary" onClick={() => void handleSignOut()}>
+                  Sign out
                 </button>
-              )}
-              <span className="account-email" title={auth.user.email}>
-                {auth.user.email}
-              </span>
-              <button className="secondary" onClick={() => void handleSignOut()}>
-                Sign out
-              </button>
-            </div>
-          )}
-          <ThemeSwitch />
-        </div>
-      </header>
+              </div>
+            )}
+            <ThemeSwitch />
+          </div>
+        </header>
 
-      {showSignIn && auth.status === 'signedOut' && <SignInDialog onClose={() => setShowSignIn(false)} />}
+        {showSignIn && auth.status === 'signedOut' && <SignInDialog onClose={() => setShowSignIn(false)} />}
 
-      {draftToUpload && (
-        <div className="arrangement-overlay">
-          <div className="arrangement-panel dialog-panel" role="dialog" aria-modal="true">
-            <h2>Add your song to your library?</h2>
-            <p className="hint">
-              &ldquo;{draftToUpload.title.trim() || 'Untitled'}&rdquo; was saved in this browser before you signed in.
-              Add it to your library so you can open it on any device. If you don&rsquo;t, it stays here and comes
-              back when you sign out.
-            </p>
-            {uploadFailed && <p className="hint library-error">Couldn&rsquo;t upload it. Check your connection and try again.</p>}
-            <div className="actions">
-              <button onClick={() => void uploadDraft(draftToUpload)}>Add to library</button>
-              <button className="secondary" onClick={() => skipUpload(draftToUpload)}>
-                Not now
-              </button>
+        {draftToUpload && (
+          <div className="arrangement-overlay">
+            <div className="arrangement-panel dialog-panel" role="dialog" aria-modal="true">
+              <h2>Add your song to your library?</h2>
+              <p className="hint">
+                &ldquo;{draftToUpload.title.trim() || 'Untitled'}&rdquo; was saved in this browser before you signed in.
+                Add it to your library so you can open it on any device. If you don&rsquo;t, it stays here and comes
+                back when you sign out.
+              </p>
+              {uploadFailed && <p className="hint library-error">Couldn&rsquo;t upload it. Check your connection and try again.</p>}
+              <div className="actions">
+                <button onClick={() => void uploadDraft(draftToUpload)}>Add to library</button>
+                <button className="secondary" onClick={() => skipUpload(draftToUpload)}>
+                  Not now
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {!route && (auth.status === 'loading' || (userId && screen === 'opening')) && <p className="hint">Loading&hellip;</p>}
+        {!route && (auth.status === 'loading' || (userId && screen === 'opening')) && <p className="hint">Loading&hellip;</p>}
 
-      {route && publicStore && route.songId && (
-        <PublicSongPage
-          key={route.songId}
-          store={publicStore}
-          id={route.songId}
-          userId={userId}
-          onBack={() => void goToPublic()}
-          onCopyToLibrary={copyPublicSong}
-          onSignIn={() => setShowSignIn(true)}
-        />
-      )}
-      {route && publicStore && !route.songId && (
-        <PublicSongList store={publicStore} onOpen={(id) => void goToPublic(id)} />
-      )}
+        {route && publicStore && route.songId && (
+          <PublicSongPage
+            key={route.songId}
+            store={publicStore}
+            id={route.songId}
+            userId={userId}
+            onBack={() => void goToPublic()}
+            onCopyToLibrary={copyPublicSong}
+            onSignIn={() => setShowSignIn(true)}
+          />
+        )}
+        {route && publicStore && !route.songId && (
+          <PublicSongList store={publicStore} onOpen={(id) => void goToPublic(id)} />
+        )}
 
-      {!route && songStore && userId && screen === 'library' && (
-        <SongLibrary
-          store={songStore}
-          message={libraryMessage}
-          onOpen={(id) => void openSong(id)}
-          onNew={() => void newLibrarySong()}
-          publicStore={isPublisher ? publicStore : null}
-          onViewPublic={(id) => void goToPublic(id)}
-        />
-      )}
+        {!route && songStore && userId && screen === 'library' && (
+          <SongLibrary
+            store={songStore}
+            message={libraryMessage}
+            onOpen={(id) => void openSong(id)}
+            onNew={() => void newLibrarySong()}
+            publicStore={isPublisher ? publicStore : null}
+            onViewPublic={(id) => void goToPublic(id)}
+          />
+        )}
 
-      {!route && userId && screen === 'view' && (
-        <SongSheet
-          key={songId}
-          title={title}
-          songKey={key}
-          onSongKeyChange={setKey}
-          blocks={blocks}
-          arrangement={arrangement}
-          credits={credits}
-          fontId={chartFontId}
-          onFontIdChange={setChartFontId}
-          lineSpacing={chartLineSpacing}
-          onLineSpacingChange={setChartLineSpacing}
-          back={
-            <button className="secondary" onClick={() => void showLibrary()}>
-              &larr; My songs
-            </button>
-          }
-          actions={
-            <>
-              {autosave.status === 'error' && (
-                <span className="save-status save-status-error" role="status">
-                  Couldn&rsquo;t save{' '}
-                  <button className="link-button" onClick={() => void autosave.flush()}>
-                    Retry
-                  </button>
-                </span>
-              )}
-              <button onClick={() => setScreen('editor')}>Edit</button>
-            </>
-          }
-        />
-      )}
-
-      {showEditor && (
-        // Keyed by song so each screen's own state (typed-but-unsubmitted text, scroll, selection)
-        // starts fresh when a different song is opened instead of carrying over.
-        <div key={songId}>
-          {draftSaveFailed && source === 'local' && (
-            <p className="hint draft-save-warning">
-              Your browser's storage for this site is full, so this song isn't being saved &mdash; it will be lost if you
-              reload or close the page. Export it before leaving.
-            </p>
-          )}
-
-          <div className="toolbar">
-            <button
-              className="secondary"
-              disabled={arrangement.length === 0}
-              onClick={() => setShowArrangement(true)}
-            >
-              Arrange sections
-            </button>
-            <button className="secondary" disabled={arrangement.length === 0} onClick={() => setShowChart(true)}>
-              View chart
-            </button>
-            <button
-              className="secondary"
-              disabled={new Set(blockIdsOf(arrangement)).size < 2}
-              onClick={() => setShowCopyChords(true)}
-            >
-              Copy chords
-            </button>
-            {step !== 'input' && (
-              <button className="secondary" onClick={() => setShowCredits(true)}>
-                Credits
+        {!route && userId && screen === 'view' && (
+          <SongSheet
+            key={songId}
+            title={title}
+            songKey={key}
+            onSongKeyChange={setKey}
+            blocks={blocks}
+            arrangement={arrangement}
+            credits={credits}
+            fontId={chartFontId}
+            onFontIdChange={setChartFontId}
+            lineSpacing={chartLineSpacing}
+            onLineSpacingChange={setChartLineSpacing}
+            back={
+              <button className="secondary" onClick={() => void showLibrary()}>
+                &larr; My songs
               </button>
-            )}
-            {step !== 'input' && <KeyControl songKey={key} onChange={setKey} />}
-            {editingLibrarySong && isPublisher && publicStore && (
-              <PublishControl store={publicStore} doc={doc} onViewPublic={(id) => void goToPublic(id)} />
-            )}
-            {editingLibrarySong && (
-              <span className={`save-status save-status-${autosave.status}`} role="status">
-                {autosave.status === 'saved' && 'Saved'}
-                {autosave.status === 'saving' && 'Saving…'}
+            }
+            actions={
+              <>
                 {autosave.status === 'error' && (
-                  <>
+                  <span className="save-status save-status-error" role="status">
                     Couldn&rsquo;t save{' '}
                     <button className="link-button" onClick={() => void autosave.flush()}>
                       Retry
                     </button>
-                  </>
+                  </span>
                 )}
-              </span>
+                <button onClick={() => setScreen('editor')}>Edit</button>
+              </>
+            }
+          />
+        )}
+
+        {showEditor && (
+          // Keyed by song so each screen's own state (typed-but-unsubmitted text, scroll, selection)
+          // starts fresh when a different song is opened instead of carrying over.
+          <div key={songId}>
+            {draftSaveFailed && source === 'local' && (
+              <p className="hint draft-save-warning">
+                Your browser's storage for this site is full, so this song isn't being saved &mdash; it will be lost if you
+                reload or close the page. Export it before leaving.
+              </p>
+            )}
+
+            <div className="toolbar">
+              <button
+                className="secondary"
+                disabled={arrangement.length === 0}
+                onClick={() => setShowArrangement(true)}
+              >
+                Arrange sections
+              </button>
+              <button className="secondary" disabled={arrangement.length === 0} onClick={() => setShowChart(true)}>
+                View chart
+              </button>
+              <button
+                className="secondary"
+                disabled={new Set(blockIdsOf(arrangement)).size < 2}
+                onClick={() => setShowCopyChords(true)}
+              >
+                Copy chords
+              </button>
+              {step !== 'input' && (
+                <button className="secondary" onClick={() => setShowCredits(true)}>
+                  Credits
+                </button>
+              )}
+              {step !== 'input' && <KeyControl songKey={key} onChange={setKey} />}
+              {editingLibrarySong && isPublisher && publicStore && (
+                <PublishControl store={publicStore} doc={doc} onViewPublic={(id) => void goToPublic(id)} />
+              )}
+              {editingLibrarySong && (
+                <span className={`save-status save-status-${autosave.status}`} role="status">
+                  {autosave.status === 'saved' && 'Saved'}
+                  {autosave.status === 'saving' && 'Saving…'}
+                  {autosave.status === 'error' && (
+                    <>
+                      Couldn&rsquo;t save{' '}
+                      <button className="link-button" onClick={() => void autosave.flush()}>
+                        Retry
+                      </button>
+                    </>
+                  )}
+                </span>
+              )}
+            </div>
+
+            {showArrangement && (
+              <ArrangementEditor blocks={blocks} arrangement={arrangement} songKey={key} onChange={(b, a) => { setBlocks(b); setArrangement(a); }} onClose={() => setShowArrangement(false)} />
+            )}
+
+            {showCredits && (
+              <div className="arrangement-overlay" onClick={() => setShowCredits(false)}>
+                <div className="arrangement-panel dialog-panel" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+                  <div className="arrangement-panel-header">
+                    <h2>Credits</h2>
+                    <button className="secondary" onClick={() => setShowCredits(false)}>
+                      Done
+                    </button>
+                  </div>
+                  <p className="hint">Printed at the foot of every page of the chord chart.</p>
+                  <CreditsFields credits={credits} onChange={setCredits} />
+                </div>
+              </div>
+            )}
+
+            {showCopyChords && (
+              <CopyChordsDialog
+                blocks={blocks}
+                arrangement={arrangement}
+                songKey={key}
+                onApply={(block) => setBlocks((prev) => ({ ...prev, [block.id]: block }))}
+                onClose={() => setShowCopyChords(false)}
+              />
+            )}
+
+            {showChart && (
+              <ChordChartView
+                title={title}
+                songKey={key}
+                onSongKeyChange={setKey}
+                blocks={blocks}
+                arrangement={arrangement}
+                fontId={chartFontId}
+                onFontIdChange={setChartFontId}
+                lineSpacing={chartLineSpacing}
+                onLineSpacingChange={setChartLineSpacing}
+                credits={credits}
+                onClose={() => setShowChart(false)}
+              />
+            )}
+
+            {step === 'input' && (
+              <LyricsInput
+                initialTitle={title}
+                initialKey={key}
+                initialLyrics={lyrics}
+                credits={credits}
+                onCreditsChange={setCredits}
+                onChange={(t, k, l) => {
+                  setTitle(t);
+                  setKey(k);
+                  setLyrics(l);
+                }}
+                onImportChordPro={(t, k, text) => {
+                  // Already a chart: keep the text as the lyrics (for Back) and go straight to export.
+                  setLyrics(text);
+                  setWordGroups([]);
+                  setSections([]);
+                  applyChordProEdits(text, t, k);
+                  setStep('export');
+                }}
+                onSubmit={(t, k, l) => {
+                  setTitle(t);
+                  setKey(k);
+                  setLyrics(l);
+                  const { groups, sections: parsedSections } = parseLyricsToWordGroups(l);
+                  // Unchanged words keep the syllable splits fixed on the next step last time.
+                  setWordGroups(carryOverWordGroups(wordGroups, groups));
+                  setSections(parsedSections);
+                  setStep('edit-syllables');
+                }}
+              />
+            )}
+
+            {step === 'edit-syllables' && (
+              <SyllableEditor
+                initialGroups={wordGroups}
+                sections={sections}
+                onBack={() => setStep('input')}
+                onSubmit={(groups) => {
+                  setWordGroups(groups);
+                  const built = wordGroupsToBlocks(groups, sections, key);
+                  // Chords, chord slots and the arrangement from before stay wherever the lyrics still match.
+                  const carried = carryOverBlocks(blocks, arrangement, built.blocks, built.arrangement);
+                  setBlocks(Object.fromEntries(carried.blocks.map((b) => [b.id, b])));
+                  setArrangement(carried.arrangement);
+                  setCarryReport(carried.report);
+                  setStep('chords');
+                }}
+              />
+            )}
+
+            {step === 'chords' && carryReport && carryReport.kept + carryReport.dropped > 0 && (
+              <p className="hint carry-report" role="status">
+                Kept {carryReport.kept} of {carryReport.kept + carryReport.dropped}{' '}
+                {carryReport.kept + carryReport.dropped === 1 ? 'chord' : 'chords'} from before.
+                {carryReport.dropped > 0 &&
+                  ` ${carryReport.dropped} ${carryReport.dropped === 1 ? 'was' : 'were'} on lyrics that are gone now.`}{' '}
+                <button className="link-button" onClick={() => setCarryReport(null)}>
+                  Dismiss
+                </button>
+              </p>
+            )}
+
+            {step === 'chords' && (
+              <ChordTapper
+                syllables={flatSyllables}
+                songKey={key}
+                palette={palette}
+                onPaletteChange={setPalette}
+                onUpdateBlocks={setBlocks}
+                onBack={() => setStep('edit-syllables')}
+                onSubmit={() => setStep('export')}
+              />
+            )}
+
+            {step === 'export' && (
+              <ExportView
+                // The ChordPro text is generated once and then freely editable, so remount on a key
+                // change to regenerate it with the transposed chords instead of leaving it stale.
+                key={key}
+                song={{ title, key, syllables: flatSyllables, credits }}
+                blocks={blocks}
+                arrangement={arrangement}
+                fontId={chartFontId}
+                onFontIdChange={setChartFontId}
+                lineSpacing={chartLineSpacing}
+                onLineSpacingChange={setChartLineSpacing}
+                onApplyChordPro={applyChordProEdits}
+                onBack={() => setStep('chords')}
+                onStartOver={startOver}
+              />
             )}
           </div>
-
-          {showArrangement && (
-            <ArrangementEditor blocks={blocks} arrangement={arrangement} songKey={key} onChange={(b, a) => { setBlocks(b); setArrangement(a); }} onClose={() => setShowArrangement(false)} />
-          )}
-
-          {showCredits && (
-            <div className="arrangement-overlay" onClick={() => setShowCredits(false)}>
-              <div className="arrangement-panel dialog-panel" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-                <div className="arrangement-panel-header">
-                  <h2>Credits</h2>
-                  <button className="secondary" onClick={() => setShowCredits(false)}>
-                    Done
-                  </button>
-                </div>
-                <p className="hint">Printed at the foot of every page of the chord chart.</p>
-                <CreditsFields credits={credits} onChange={setCredits} />
-              </div>
-            </div>
-          )}
-
-          {showCopyChords && (
-            <CopyChordsDialog
-              blocks={blocks}
-              arrangement={arrangement}
-              songKey={key}
-              onApply={(block) => setBlocks((prev) => ({ ...prev, [block.id]: block }))}
-              onClose={() => setShowCopyChords(false)}
-            />
-          )}
-
-          {showChart && (
-            <ChordChartView
-              title={title}
-              songKey={key}
-              onSongKeyChange={setKey}
-              blocks={blocks}
-              arrangement={arrangement}
-              fontId={chartFontId}
-              onFontIdChange={setChartFontId}
-              lineSpacing={chartLineSpacing}
-              onLineSpacingChange={setChartLineSpacing}
-              credits={credits}
-              onClose={() => setShowChart(false)}
-            />
-          )}
-
-          {step === 'input' && (
-            <LyricsInput
-              initialTitle={title}
-              initialKey={key}
-              initialLyrics={lyrics}
-              credits={credits}
-              onCreditsChange={setCredits}
-              onChange={(t, k, l) => {
-                setTitle(t);
-                setKey(k);
-                setLyrics(l);
-              }}
-              onImportChordPro={(t, k, text) => {
-                // Already a chart: keep the text as the lyrics (for Back) and go straight to export.
-                setLyrics(text);
-                setWordGroups([]);
-                setSections([]);
-                applyChordProEdits(text, t, k);
-                setStep('export');
-              }}
-              onSubmit={(t, k, l) => {
-                setTitle(t);
-                setKey(k);
-                setLyrics(l);
-                const { groups, sections: parsedSections } = parseLyricsToWordGroups(l);
-                // Unchanged words keep the syllable splits fixed on the next step last time.
-                setWordGroups(carryOverWordGroups(wordGroups, groups));
-                setSections(parsedSections);
-                setStep('edit-syllables');
-              }}
-            />
-          )}
-
-          {step === 'edit-syllables' && (
-            <SyllableEditor
-              initialGroups={wordGroups}
-              sections={sections}
-              onBack={() => setStep('input')}
-              onSubmit={(groups) => {
-                setWordGroups(groups);
-                const built = wordGroupsToBlocks(groups, sections, key);
-                // Chords, chord slots and the arrangement from before stay wherever the lyrics still match.
-                const carried = carryOverBlocks(blocks, arrangement, built.blocks, built.arrangement);
-                setBlocks(Object.fromEntries(carried.blocks.map((b) => [b.id, b])));
-                setArrangement(carried.arrangement);
-                setCarryReport(carried.report);
-                setStep('chords');
-              }}
-            />
-          )}
-
-          {step === 'chords' && carryReport && carryReport.kept + carryReport.dropped > 0 && (
-            <p className="hint carry-report" role="status">
-              Kept {carryReport.kept} of {carryReport.kept + carryReport.dropped}{' '}
-              {carryReport.kept + carryReport.dropped === 1 ? 'chord' : 'chords'} from before.
-              {carryReport.dropped > 0 &&
-                ` ${carryReport.dropped} ${carryReport.dropped === 1 ? 'was' : 'were'} on lyrics that are gone now.`}{' '}
-              <button className="link-button" onClick={() => setCarryReport(null)}>
-                Dismiss
-              </button>
-            </p>
-          )}
-
-          {step === 'chords' && (
-            <ChordTapper
-              syllables={flatSyllables}
-              songKey={key}
-              palette={palette}
-              onPaletteChange={setPalette}
-              onUpdateBlocks={setBlocks}
-              onBack={() => setStep('edit-syllables')}
-              onSubmit={() => setStep('export')}
-            />
-          )}
-
-          {step === 'export' && (
-            <ExportView
-              // The ChordPro text is generated once and then freely editable, so remount on a key
-              // change to regenerate it with the transposed chords instead of leaving it stale.
-              key={key}
-              song={{ title, key, syllables: flatSyllables, credits }}
-              blocks={blocks}
-              arrangement={arrangement}
-              fontId={chartFontId}
-              onFontIdChange={setChartFontId}
-              lineSpacing={chartLineSpacing}
-              onLineSpacingChange={setChartLineSpacing}
-              onApplyChordPro={applyChordProEdits}
-              onBack={() => setStep('chords')}
-              onStartOver={startOver}
-            />
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

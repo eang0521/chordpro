@@ -8,6 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 24px;
   padding-bottom: 12px;
   border-bottom: 2px solid var(--ink-line);
@@ -24,6 +25,10 @@
   text-transform: uppercase;
   white-space: nowrap;
   margin: 0;
+}
+
+.app-header h1 {
+  margin-right: auto;
 }
 
 .app-logo {
@@ -1307,4 +1312,106 @@ button.link-button.publish-view {
 
 .library-public {
   color: var(--accent);
+}
+
+/* Side menu: beside the page on a wide screen (the page moves over to make room), sliding over
+   it on a narrower one. */
+.side-menu {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  width: 220px;
+  padding: 24px 12px;
+  background: var(--panel-bg);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  transform: translateX(-100%);
+  transition: transform 0.2s ease;
+}
+
+.side-menu.open {
+  transform: none;
+}
+
+.side-menu ul {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.side-menu li button,
+.side-menu li button:hover:not(:disabled) {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  border-radius: 0;
+  color: var(--text);
+  padding: 8px 12px;
+  font-size: 0.95rem;
+}
+
+.side-menu li button:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+
+.side-menu li button.active,
+.side-menu li button.active:hover:not(:disabled) {
+  border-left-color: var(--accent);
+}
+
+.side-menu-toggle,
+.side-menu-toggle:hover:not(:disabled) {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-radius: 4px;
+  color: var(--text);
+  padding: 4px;
+  line-height: 0;
+}
+
+.side-menu-toggle:hover:not(:disabled) {
+  border-color: var(--ink-line);
+}
+
+.side-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: var(--overlay);
+}
+
+@media (min-width: 1200px) {
+  .layout {
+    transition: padding-left 0.2s ease;
+  }
+
+  .layout.menu-open {
+    padding-left: 220px;
+  }
+
+  /* The header's toggle stays in view beside the menu, so the menu's own isn't needed. */
+  .side-menu-backdrop,
+  .side-menu .side-menu-toggle {
+    display: none;
+  }
+
+  .side-menu ul {
+    margin-top: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side-menu,
+  .layout {
+    transition: none;
+  }
 }
