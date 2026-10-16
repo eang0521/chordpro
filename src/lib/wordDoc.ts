@@ -1,7 +1,8 @@
-import type { Paragraph } from 'docx';
+import type { IRunOptions, Paragraph } from 'docx';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from './arrangement';
-import { buildChartRows, groupIntoSections, isChordOnly, keyHeaderText, layoutLine } from './chordChart';
+import { PAGE_FIT_SLACK_PT, layoutChartItems } from './chartLayout';
+import { buildChartRows, continuedTitle, groupIntoSections, isChordOnly, keyHeaderText, layoutLine } from './chordChart';
 import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
 import { embedFontStyles } from './docxFonts';
 import { creditLines } from './credits';
@@ -28,6 +29,7 @@ import {
   labelColumnTwips,
   measureInFont,
 } from './pageLayout';
+import { paginateByHeight } from './pagination';
 
 const halfPt = (pt: number) => pt * 2; // docx run sizes are in half-points
 const twips = (pt: number) => Math.round(pt * 20);
@@ -46,7 +48,7 @@ export async function generateWordDoc(
   credits?: SongCredits,
 ): Promise<Blob> {
   // Loaded on demand — the docx package is sizable and most sessions never export a Word doc.
-  const { AlignmentType, Document, Footer, Header, LineRuleType, Packer, Paragraph, Tab, TabStopType, TextRun } = await import('docx');
+  const { AlignmentType, Document, Footer, Header, LineRuleType, Packer, PageNumber, Paragraph, Tab, TabStopType, TextRun } = await import('docx');
   const font = getChordFontOption(fontId);
   await loadChordFont(font); // measuring chord positions needs the real font loaded
   const sections = groupIntoSections(buildChartRows(blocks, arrangement, key));
@@ -54,6 +56,11 @@ export async function generateWordDoc(
   const labelCol = labelColumnTwips(sections.map((s) => s.label), measure);
   const lyricWidthPt = (CONTENT_WIDTH_TWIPS - labelCol) / 20;
   const footer = creditFooter(creditLines(credits), measure);
+  // Word paginates the doc itself, but it breaks where the preview does (sections are kept
+  // together), so the preview's page count says whether the chart needs page labels at all.
+  const { items, groups } = layoutChartItems(sections, measure, measure, lyricWidthPt, lineSpacing);
+  const contentHeightPt = (PAGE_HEIGHT_TWIPS - MARGIN_TOP_TWIPS - footer.marginBottomTwips) / 20;
+  const multiPage = paginateByHeight(items.map((item) => item.height), groups, contentHeightPt + PAGE_FIT_SLACK_PT).length > 1;
 
   const exactLine = (pt: number, afterPt = 0) => ({
     before: 0,
@@ -151,6 +158,13 @@ export async function generateWordDoc(
       ),
     });
 
+  // The page label sits right-aligned on the key header's line: "p. 1 of 3", then
+  // "Song Name, p. 2 of 3" on later pages (Word fills in the page numbers).
+  const pageLabelTab = [{ type: TabStopType.RIGHT, position: CONTENT_WIDTH_TWIPS }];
+  const pageNumber = ['p. ', PageNumber.CURRENT, ' of ', PageNumber.TOTAL_PAGES];
+  const headerRun = (children: NonNullable<IRunOptions['children']>) =>
+    new TextRun({ children, italics: true, size: halfPt(KEY_SIZE_PT), font: font.wordFont });
+
   // A bundled font travels inside the file so the chart looks right on computers without it.
   const fontFiles = font.files
     ? await Promise.all([font.files.regular, font.files.bold, font.files.italic, font.files.boldItalic].map(fetchFontFile))
@@ -181,13 +195,19 @@ export async function generateWordDoc(
           first: new Header({
             children: [
               new Paragraph({
-                children: [
-                  new TextRun({ text: keyHeaderText(sections, key), italics: true, size: halfPt(KEY_SIZE_PT), font: font.wordFont }),
-                ],
+                tabStops: pageLabelTab,
+                children: [headerRun([keyHeaderText(sections, key)]), ...(multiPage ? [headerRun([new Tab(), ...pageNumber])] : [])],
               }),
             ],
           }),
-          default: new Header({ children: [new Paragraph({ children: [] })] }),
+          default: new Header({
+            children: [
+              new Paragraph({
+                tabStops: pageLabelTab,
+                children: multiPage ? [headerRun([new Tab(), `${continuedTitle(title)}, `, ...pageNumber])] : [],
+              }),
+            ],
+          }),
         },
         // The same footer on the first page and the rest (the first page has its own header).
         footers: { first: creditsFooter(), default: creditsFooter() },

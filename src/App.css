@@ -717,14 +717,6 @@ button.secondary:hover:not(:disabled) {
   color: var(--paper-ink);
 }
 
-.chart-page-number {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  font-size: 0.7rem;
-  color: var(--paper-dim);
-}
-
 .chart-page-credits {
   position: absolute;
   text-align: center;

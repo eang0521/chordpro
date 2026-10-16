@@ -142,6 +142,20 @@ export function keyHeaderText(sections: DocSection[], songKey: KeyName): string 
   return keys.length === 1 ? `Key of ${songKey}` : `Key: ${keys.join('-')}`;
 }
 
+/** The label at the top right of each page of a multi-page chart, level with the key header:
+ * "p. 1 of 3" on the first page, then "Song Name, p. 2 of 3" so a loose page can be put back.
+ * Null for a single-page chart. */
+export function pageLabelText(title: string, pageIndex: number, pageCount: number): string | null {
+  if (pageCount < 2) return null;
+  const page = `p. ${pageIndex + 1} of ${pageCount}`;
+  return pageIndex === 0 ? page : `${continuedTitle(title)}, ${page}`;
+}
+
+/** How later pages name the song ahead of their page number. */
+export function continuedTitle(title: string): string {
+  return title.trim() || 'Untitled';
+}
+
 /** Flattens sections into one entry per line-row (or a single blank entry for a label-only
  * section), so a renderer can lay out a fixed-width label column beside the lyrics/chords —
  * showing the label only on the section's first row, so it visually spans the section the same

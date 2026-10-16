@@ -1,7 +1,8 @@
 import type { PDFFont } from 'pdf-lib';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from './arrangement';
-import { buildChartRows, groupIntoSections, isChordOnly, keyHeaderText, layoutLine } from './chordChart';
+import { PAGE_FIT_SLACK_PT, TITLE_LINE_PT, layoutChartItems } from './chartLayout';
+import { buildChartRows, groupIntoSections, isChordOnly, keyHeaderText, pageLabelText } from './chordChart';
 import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
 import { creditLines } from './credits';
 import type { TextMeasure } from './pageLayout';
@@ -21,8 +22,6 @@ import {
   MARGIN_TOP_TWIPS,
   PAGE_HEIGHT_TWIPS,
   PAGE_WIDTH_TWIPS,
-  SECTION_GAP_PT,
-  TITLE_GAP_PT,
   TITLE_SIZE_PT,
   creditFooter,
   labelColumnTwips,
@@ -31,12 +30,10 @@ import {
 import { paginateByHeight } from './pagination';
 
 const pt = (twips: number) => twips / 20;
-const PAGE_FIT_SLACK_PT = 1;
 const PAGE_WIDTH = pt(PAGE_WIDTH_TWIPS);
 const PAGE_HEIGHT = pt(PAGE_HEIGHT_TWIPS);
 const MARGIN_SIDE = pt(MARGIN_SIDE_TWIPS);
 const MARGIN_TOP = pt(MARGIN_TOP_TWIPS);
-const TITLE_LINE_PT = TITLE_SIZE_PT * 1.15; // matches the preview's title line-height
 
 // For the system fonts, the PDF's built-in fonts with the same metrics (Helvetica = Arial,
 // Times = Times New Roman). Consolas has no built-in twin, so it prints in Courier. Bundled fonts
@@ -52,18 +49,6 @@ const PDF_FONTS: Record<string, { regular: string; bold: string; italic: string 
 function baselineIn(boxTop: number, boxHeight: number, size: number): number {
   return boxTop + (boxHeight - size) / 2 + size * 0.8;
 }
-
-/** One printed line-pair: optional chords above a lyric line, positioned in points. */
-interface PrintedLine {
-  lyricLine: string;
-  chords: { offsetPt: number; label: string }[];
-}
-
-/** A unit of the page layout: the title, or one lyric line (which may wrap into several printed
- * lines) of a section. */
-type LayoutItem =
-  | { kind: 'title'; height: number }
-  | { kind: 'row'; height: number; label: string | null; lines: PrintedLine[] };
 
 /**
  * Builds a downloadable PDF chord chart with the same page size, margins, type sizes and line
@@ -120,47 +105,20 @@ export async function generatePdf(
   const footerTop = PAGE_HEIGHT - pt(CREDIT_BOTTOM_TWIPS) - footer.lines.length * CREDIT_LINE_PT;
   const chordLine = CHORD_LINE_PT * lineSpacing;
   const lyricLine = LYRIC_LINE_PT * lineSpacing;
-  const sectionGap = SECTION_GAP_PT * lineSpacing;
-
-  // Lay out every item with its height, grouped by section so pagination keeps sections whole.
-  const items: LayoutItem[] = [{ kind: 'title', height: TITLE_LINE_PT + TITLE_GAP_PT }];
-  const groups: number[][] = [[0]];
-  sections.forEach((section) => {
-    const group: number[] = [];
-    if (section.lineRows.length === 0) {
-      group.push(items.length);
-      items.push({ kind: 'row', height: lyricLine + sectionGap, label: section.label, lines: [] });
-    }
-    section.lineRows.forEach((row, i) => {
-      const lines = layoutLine(row.tokens, measure, lyricWidth, row.repeat, pageMeasure);
-      const isLast = i === section.lineRows.length - 1;
-      const height =
-        // A chord-only line takes just the lyric line's height (its chords sit on it).
-        lines.reduce((sum, line) => sum + (line.chords.length > 0 && !isChordOnly(line) ? chordLine : 0) + lyricLine, 0) +
-        (isLast ? sectionGap : 0);
-      group.push(items.length);
-      items.push({ kind: 'row', height, label: i === 0 ? section.label : null, lines });
-    });
-    groups.push(group);
-  });
-  // Nothing follows the last section, so its gap shouldn't push it onto another page (the
-  // preview's measurement leaves it off too, so both paginate alike).
-  const lastItem = items[items.length - 1];
-  if (lastItem.kind === 'row') lastItem.height -= sectionGap;
+  const { items, groups } = layoutChartItems(sections, measure, pageMeasure, lyricWidth, lineSpacing);
 
   const black = rgb(0.1, 0.1, 0.1);
   // Positions are tracked down from the page top; PDF coordinates run up from the bottom.
   const draw = (page: ReturnType<typeof doc.addPage>, text: string, x: number, baseline: number, size: number, style: '' | 'bold' | 'italic') =>
     page.drawText(clean(text), { x, y: PAGE_HEIGHT - baseline, size, font: fonts[style], color: black });
 
-  // A point of slack past the page's content area (it lands in the bottom margin, invisibly): the
-  // preview measures rounded line heights, which can come out a fraction of a point shorter than
-  // these exact ones, and a chart that fits on screen shouldn't spill a section onto another page.
-  paginateByHeight(
+  const pages = paginateByHeight(
     items.map((item) => item.height),
     groups,
     contentHeight + PAGE_FIT_SLACK_PT,
-  ).forEach((indices, pageIndex) => {
+  );
+  const headerBaseline = pt(HEADER_TOP_TWIPS) + KEY_SIZE_PT * 0.8;
+  pages.forEach((indices, pageIndex) => {
     const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     footer.lines.forEach((line, i) => {
       const x = (PAGE_WIDTH - measure(line, CREDIT_SIZE_PT, '')) / 2;
@@ -168,7 +126,11 @@ export async function generatePdf(
     });
     // The key header goes on the first page only.
     if (pageIndex === 0) {
-      draw(page, keyHeaderText(sections, key), MARGIN_SIDE, pt(HEADER_TOP_TWIPS) + KEY_SIZE_PT * 0.8, KEY_SIZE_PT, 'italic');
+      draw(page, keyHeaderText(sections, key), MARGIN_SIDE, headerBaseline, KEY_SIZE_PT, 'italic');
+    }
+    const pageLabel = pageLabelText(title, pageIndex, pages.length);
+    if (pageLabel) {
+      draw(page, pageLabel, PAGE_WIDTH - MARGIN_SIDE - measure(pageLabel, KEY_SIZE_PT, 'italic'), headerBaseline, KEY_SIZE_PT, 'italic');
     }
 
     let top = MARGIN_TOP;

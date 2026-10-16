@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from '../lib/arrangement';
 import type { PlacedLine, SectionDisplayRow } from '../lib/chordChart';
-import { buildChartRows, flattenSections, groupIntoSections, isChordOnly, keyHeaderText, layoutLine, songKeys } from '../lib/chordChart';
+import { buildChartRows, flattenSections, groupIntoSections, isChordOnly, keyHeaderText, layoutLine, pageLabelText, songKeys } from '../lib/chordChart';
 import { generateWordDoc } from '../lib/wordDoc';
 import { generatePdf } from '../lib/pdfDoc';
 import { chartFilename, downloadBlob } from '../lib/download';
@@ -364,10 +364,16 @@ export function ChordChartView({
                   ...lineSpacingVar(lineSpacing),
                 }}
               >
-                {/* Only the first page has the header, like the Word and PDF exports. */}
+                {/* Only the first page has the key, like the Word and PDF exports; a multi-page
+                    chart labels every page at the top right, level with it. */}
                 {pageIndex === 0 && (
                   <div className="chart-page-header" style={{ top: HEADER_TOP_PX, left: MARGIN_SIDE_PX }}>
                     {keyHeader}
+                  </div>
+                )}
+                {pages.length > 1 && (
+                  <div className="chart-page-header" style={{ top: HEADER_TOP_PX, right: MARGIN_SIDE_PX }}>
+                    {pageLabelText(title, pageIndex, pages.length)}
                   </div>
                 )}
                 {indices.map((i) => (
@@ -393,10 +399,6 @@ export function ChordChartView({
                   ))}
                 </div>
               )}
-              {/* On screen only — the downloaded charts have no page numbers. */}
-              <div className="chart-page-number">
-                Page {pageIndex + 1} of {pages.length}
-              </div>
             </div>
           ))}
         </div>
