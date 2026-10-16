@@ -20,8 +20,8 @@ interface Props {
 }
 
 /**
- * A published song, laid out like the app's own export step but read-only: the chart, the
- * ChordPro text and the downloads. Changing the key, font or spacing here only changes what
+ * A published song, read-only: it opens on the chart in page layout, like the printed copy, with
+ * the ChordPro text a click away. Changing the key, font or spacing here only changes what
  * you see and download — nothing is saved back to the public song.
  */
 export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onSignIn }: Props) {
@@ -30,7 +30,7 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
   const [key, setKey] = useState<KeyName>('C');
   const [fontId, setFontId] = useState('');
   const [lineSpacing, setLineSpacing] = useState(1);
-  const [showChart, setShowChart] = useState(false);
+  const [view, setView] = useState<'chart' | 'chordpro'>('chart');
   const [copying, setCopying] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -96,10 +96,11 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
         </button>
         {doc && (
           <>
-            <button className="secondary" disabled={doc.arrangement.length === 0} onClick={() => setShowChart(true)}>
-              View chart
+            <button className="secondary" onClick={() => setView(view === 'chart' ? 'chordpro' : 'chart')}>
+              {view === 'chart' ? 'Show ChordPro' : 'Show chart'}
             </button>
-            <KeyControl songKey={key} onChange={setKey} />
+            {/* The chart has its own key control. */}
+            {view === 'chordpro' && <KeyControl songKey={key} onChange={setKey} />}
             <span className="toolbar-spacer" />
             {userId ? (
               <button onClick={() => void copyToLibrary()} disabled={copying}>
@@ -124,7 +125,7 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
       {error && <p className="hint library-error">{error}</p>}
       {!doc && !error && <p className="hint">Loading&hellip;</p>}
 
-      {doc && (
+      {doc && view === 'chordpro' && (
         <ExportView
           // Remount on a key change so the ChordPro text is regenerated in the new key.
           key={key}
@@ -139,8 +140,9 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
         />
       )}
 
-      {doc && showChart && (
+      {doc && view === 'chart' && (
         <ChordChartView
+          inline
           title={doc.title}
           songKey={key}
           onSongKeyChange={setKey}
@@ -151,7 +153,6 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
           lineSpacing={lineSpacing}
           onLineSpacingChange={setLineSpacing}
           credits={doc.credits}
-          onClose={() => setShowChart(false)}
         />
       )}
 

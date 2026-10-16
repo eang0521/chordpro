@@ -506,6 +506,29 @@ button.secondary:hover:not(:disabled) {
   width: fit-content;
 }
 
+/* The chart shown in the page itself (public songs): the pages scroll sideways on narrow
+   screens, while the controls above them wrap. */
+.chart-inline .chart-pages,
+.chart-inline .chord-chart {
+  overflow-x: auto;
+  align-items: safe center;
+}
+
+/* The page is wider than the controls' row, so give the title its own line above them. */
+.chart-inline .arrangement-panel-header {
+  flex-wrap: wrap;
+}
+
+.chart-inline .arrangement-panel-header h2 {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+.chart-inline .chart-panel-actions {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
 .chart-toggle-active {
   background: var(--accent-dim);
   border-color: var(--accent);

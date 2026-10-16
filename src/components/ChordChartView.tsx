@@ -43,7 +43,10 @@ interface Props {
   lineSpacing: number;
   onLineSpacingChange: (value: number) => void;
   credits: SongCredits;
-  onClose: () => void;
+  /** Closes the dialog. Not used when `inline`. */
+  onClose?: () => void;
+  /** Shown in the page itself rather than as a dialog, opening on the page layout. */
+  inline?: boolean;
 }
 
 const FIT_MAX_PAGES = 2;
@@ -155,10 +158,11 @@ export function ChordChartView({
   onLineSpacingChange,
   credits,
   onClose,
+  inline = false,
 }: Props) {
   const [generating, setGenerating] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
-  const [pageMode, setPageMode] = useState(false);
+  const [pageMode, setPageMode] = useState(inline);
   const [fitMessage, setFitMessage] = useState<string | null>(null);
   const sections = useMemo(
     () => groupIntoSections(buildChartRows(blocks, arrangement, songKey)),
@@ -276,137 +280,147 @@ export function ChordChartView({
     }
   }
 
-  return (
-    <div className="arrangement-overlay" onClick={onClose}>
-      <div className={`arrangement-panel chart-panel ${pageMode ? 'chart-panel-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
-        <div className="arrangement-panel-header">
-          <h2>
-            {title || 'Untitled'} <span className="chart-key">({songKey})</span>
-          </h2>
-          <div className="chart-panel-actions">
-            <KeyControl songKey={songKey} onChange={onSongKeyChange} />
-            <select className="chart-font-select" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
-              {CHORD_FONT_OPTIONS.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <label className="chart-line-spacing">
-              <span>Line spacing</span>
-              <input
-                type="number"
-                min={MIN_LINE_SPACING}
-                max={MAX_LINE_SPACING}
-                step={0.05}
-                value={lineSpacing}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (!Number.isNaN(v)) onLineSpacingChange(clampLineSpacing(v));
-                  setFitMessage(null);
-                }}
-              />
-            </label>
-            <button className="secondary" onClick={fitToPage} title="Set the line spacing so the song fits on 1 page, or 2 if it must">
-              Fit to page
-            </button>
-            <button className={`secondary ${pageMode ? 'chart-toggle-active' : ''}`} onClick={() => setPageMode((v) => !v)}>
-              {pageMode ? 'Compact view' : 'Show page layout'}
-            </button>
-            <button className="secondary" disabled={generating} onClick={downloadDocx}>
-              {generating ? 'Generating…' : 'Download .docx'}
-            </button>
-            <button className="secondary" disabled={generatingPdf} onClick={downloadPdf}>
-              {generatingPdf ? 'Generating…' : 'Download PDF'}
-            </button>
+  const panel = (
+    <div
+      className={inline ? 'chart-inline' : `arrangement-panel chart-panel ${pageMode ? 'chart-panel-wide' : ''}`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="arrangement-panel-header">
+        <h2>
+          {title || 'Untitled'} <span className="chart-key">({songKey})</span>
+        </h2>
+        <div className="chart-panel-actions">
+          <KeyControl songKey={songKey} onChange={onSongKeyChange} />
+          <select className="chart-font-select" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
+            {CHORD_FONT_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <label className="chart-line-spacing">
+            <span>Line spacing</span>
+            <input
+              type="number"
+              min={MIN_LINE_SPACING}
+              max={MAX_LINE_SPACING}
+              step={0.05}
+              value={lineSpacing}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (!Number.isNaN(v)) onLineSpacingChange(clampLineSpacing(v));
+                setFitMessage(null);
+              }}
+            />
+          </label>
+          <button className="secondary" onClick={fitToPage} title="Set the line spacing so the song fits on 1 page, or 2 if it must">
+            Fit to page
+          </button>
+          <button className={`secondary ${pageMode ? 'chart-toggle-active' : ''}`} onClick={() => setPageMode((v) => !v)}>
+            {pageMode ? 'Compact view' : 'Show page layout'}
+          </button>
+          <button className="secondary" disabled={generating} onClick={downloadDocx}>
+            {generating ? 'Generating…' : 'Download .docx'}
+          </button>
+          <button className="secondary" disabled={generatingPdf} onClick={downloadPdf}>
+            {generatingPdf ? 'Generating…' : 'Download PDF'}
+          </button>
+          {!inline && (
             <button className="secondary" onClick={onClose}>
               Done
             </button>
-          </div>
+          )}
         </div>
+      </div>
 
-        {fitMessage && <p className="hint chart-fit-message">{fitMessage}</p>}
+      {fitMessage && <p className="hint chart-fit-message">{fitMessage}</p>}
 
-        {displayRows.length === 0 && <p className="hint">Nothing to show yet &mdash; split some lyrics into syllables first.</p>}
+      {displayRows.length === 0 && <p className="hint">Nothing to show yet &mdash; split some lyrics into syllables first.</p>}
 
-        {/* Hidden measurement pass: same width as a page's printable area, so wrapping (and
-            therefore each item's true height) matches what page mode will actually show. */}
-        <div
-          ref={measureRef}
-          className="chart-measure"
-          style={{ fontFamily: font.cssFont, fontSize: LYRIC_SIZE_PT, width: CONTENT_WIDTH_PX, ...lineSpacingVar(lineSpacing) }}
-        >
-          {pageItems.map((item, i) => (
-            <div key={i} ref={(el) => { itemRefs.current[i] = el; }}>
-              {renderPageItem(item, title, labelColEm, font.wordFont)}
+      {/* Hidden measurement pass: same width as a page's printable area, so wrapping (and
+          therefore each item's true height) matches what page mode will actually show. */}
+      <div
+        ref={measureRef}
+        className="chart-measure"
+        style={{ fontFamily: font.cssFont, fontSize: LYRIC_SIZE_PT, width: CONTENT_WIDTH_PX, ...lineSpacingVar(lineSpacing) }}
+      >
+        {pageItems.map((item, i) => (
+          <div key={i} ref={(el) => { itemRefs.current[i] = el; }}>
+            {renderPageItem(item, title, labelColEm, font.wordFont)}
+          </div>
+        ))}
+      </div>
+
+      {pageMode ? (
+        <div className="chart-pages">
+          {pages.map((indices, pageIndex) => (
+            <div className="chart-page" style={{ width: PAGE_WIDTH_PX, height: PAGE_HEIGHT_PX }} key={pageIndex}>
+              <div
+                className="chart-page-content"
+                style={{
+                  fontFamily: font.cssFont,
+                  fontSize: LYRIC_SIZE_PT,
+                  padding: `${MARGIN_TOP_PX}px ${MARGIN_SIDE_PX}px ${marginBottomPx}px`,
+                  ...lineSpacingVar(lineSpacing),
+                }}
+              >
+                {/* Only the first page has the header, like the Word and PDF exports. */}
+                {pageIndex === 0 && (
+                  <div className="chart-page-header" style={{ top: HEADER_TOP_PX, left: MARGIN_SIDE_PX }}>
+                    {keyHeader}
+                  </div>
+                )}
+                {indices.map((i) => (
+                  <div key={i}>{renderPageItem(pageItems[i], title, labelColEm, font.wordFont)}</div>
+                ))}
+              </div>
+              {footer.lines.length > 0 && (
+                // Wrapped exactly where the Word doc and PDF wrap it, so the line count (and
+                // so the room left for the song) matches.
+                <div
+                  className="chart-page-credits"
+                  style={{
+                    fontFamily: font.cssFont,
+                    fontSize: CREDIT_SIZE_PT,
+                    lineHeight: `${CREDIT_LINE_PT}px`,
+                    bottom: twipsToPreviewPx(CREDIT_BOTTOM_TWIPS),
+                    left: MARGIN_SIDE_PX,
+                    right: MARGIN_SIDE_PX,
+                  }}
+                >
+                  {footer.lines.map((line, i) => (
+                    <div key={i}>{line}</div>
+                  ))}
+                </div>
+              )}
+              {/* On screen only — the downloaded charts have no page numbers. */}
+              <div className="chart-page-number">
+                Page {pageIndex + 1} of {pages.length}
+              </div>
             </div>
           ))}
         </div>
+      ) : (
+        <div className="chord-chart" style={{ fontFamily: font.cssFont, ...lineSpacingVar(lineSpacing) }}>
+          <div className="chart-page-header">{keyHeader}</div>
+          {renderTitle(title)}
+          {displayRows.map((display) => renderDisplayRow(display, labelColEm, font.wordFont))}
+          {footer.lines.length > 0 && (
+            <div className="chart-compact-credits">
+              {creditLines(credits).map((line) => (
+                <div key={line}>{line}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
-        {pageMode ? (
-          <div className="chart-pages">
-            {pages.map((indices, pageIndex) => (
-              <div className="chart-page" style={{ width: PAGE_WIDTH_PX, height: PAGE_HEIGHT_PX }} key={pageIndex}>
-                <div
-                  className="chart-page-content"
-                  style={{
-                    fontFamily: font.cssFont,
-                    fontSize: LYRIC_SIZE_PT,
-                    padding: `${MARGIN_TOP_PX}px ${MARGIN_SIDE_PX}px ${marginBottomPx}px`,
-                    ...lineSpacingVar(lineSpacing),
-                  }}
-                >
-                  {/* Only the first page has the header, like the Word and PDF exports. */}
-                  {pageIndex === 0 && (
-                    <div className="chart-page-header" style={{ top: HEADER_TOP_PX, left: MARGIN_SIDE_PX }}>
-                      {keyHeader}
-                    </div>
-                  )}
-                  {indices.map((i) => (
-                    <div key={i}>{renderPageItem(pageItems[i], title, labelColEm, font.wordFont)}</div>
-                  ))}
-                </div>
-                {footer.lines.length > 0 && (
-                  // Wrapped exactly where the Word doc and PDF wrap it, so the line count (and
-                  // so the room left for the song) matches.
-                  <div
-                    className="chart-page-credits"
-                    style={{
-                      fontFamily: font.cssFont,
-                      fontSize: CREDIT_SIZE_PT,
-                      lineHeight: `${CREDIT_LINE_PT}px`,
-                      bottom: twipsToPreviewPx(CREDIT_BOTTOM_TWIPS),
-                      left: MARGIN_SIDE_PX,
-                      right: MARGIN_SIDE_PX,
-                    }}
-                  >
-                    {footer.lines.map((line, i) => (
-                      <div key={i}>{line}</div>
-                    ))}
-                  </div>
-                )}
-                {/* On screen only — the downloaded charts have no page numbers. */}
-                <div className="chart-page-number">
-                  Page {pageIndex + 1} of {pages.length}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="chord-chart" style={{ fontFamily: font.cssFont, ...lineSpacingVar(lineSpacing) }}>
-            <div className="chart-page-header">{keyHeader}</div>
-            {renderTitle(title)}
-            {displayRows.map((display) => renderDisplayRow(display, labelColEm, font.wordFont))}
-            {footer.lines.length > 0 && (
-              <div className="chart-compact-credits">
-                {creditLines(credits).map((line) => (
-                  <div key={line}>{line}</div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+  if (inline) return panel;
+  return (
+    <div className="arrangement-overlay" onClick={onClose}>
+      {panel}
     </div>
   );
 }
