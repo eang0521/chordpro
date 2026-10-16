@@ -33,6 +33,8 @@ import { PublicSongList } from './components/PublicSongList';
 import { PublicSongPage } from './components/PublicSongPage';
 import { PublishControl } from './components/PublishControl';
 import { SongSheet } from './components/SongSheet';
+import type { CarryOverReport } from './lib/carryOver';
+import { carryOverBlocks, carryOverWordGroups } from './lib/carryOver';
 import { ThemeSwitch } from './components/ThemeSwitch';
 import { useAuth, signOut } from './hooks/useAuth';
 import { useAutosave } from './hooks/useAutosave';
@@ -110,6 +112,8 @@ function App() {
   const [chartFontId, setChartFontId] = useState<string>(initialDraft.chartFontId);
   const [chartLineSpacing, setChartLineSpacing] = useState(initialDraft.lineSpacing);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
+  // What happened to the earlier chords when the sections were rebuilt from edited lyrics.
+  const [carryReport, setCarryReport] = useState<CarryOverReport | null>(null);
 
   const doc = useMemo<SongDocument>(
     () => ({
@@ -163,6 +167,7 @@ function App() {
     setShowCredits(false);
     setShowChart(false);
     setShowCopyChords(false);
+    setCarryReport(null);
   }
 
   /** Gets the open library song's last edits saved before showing something else. Resolves
@@ -608,7 +613,8 @@ function App() {
                 setKey(k);
                 setLyrics(l);
                 const { groups, sections: parsedSections } = parseLyricsToWordGroups(l);
-                setWordGroups(groups);
+                // Unchanged words keep the syllable splits fixed on the next step last time.
+                setWordGroups(carryOverWordGroups(wordGroups, groups));
                 setSections(parsedSections);
                 setStep('edit-syllables');
               }}
@@ -622,12 +628,27 @@ function App() {
               onBack={() => setStep('input')}
               onSubmit={(groups) => {
                 setWordGroups(groups);
-                const { blocks: newBlocks, arrangement: newArrangement } = wordGroupsToBlocks(groups, sections, key);
-                setBlocks(Object.fromEntries(newBlocks.map((b) => [b.id, b])));
-                setArrangement(newArrangement);
+                const built = wordGroupsToBlocks(groups, sections, key);
+                // Chords, chord slots and the arrangement from before stay wherever the lyrics still match.
+                const carried = carryOverBlocks(blocks, arrangement, built.blocks, built.arrangement);
+                setBlocks(Object.fromEntries(carried.blocks.map((b) => [b.id, b])));
+                setArrangement(carried.arrangement);
+                setCarryReport(carried.report);
                 setStep('chords');
               }}
             />
+          )}
+
+          {step === 'chords' && carryReport && carryReport.kept + carryReport.dropped > 0 && (
+            <p className="hint carry-report" role="status">
+              Kept {carryReport.kept} of {carryReport.kept + carryReport.dropped}{' '}
+              {carryReport.kept + carryReport.dropped === 1 ? 'chord' : 'chords'} from before.
+              {carryReport.dropped > 0 &&
+                ` ${carryReport.dropped} ${carryReport.dropped === 1 ? 'was' : 'were'} on lyrics that are gone now.`}{' '}
+              <button className="link-button" onClick={() => setCarryReport(null)}>
+                Dismiss
+              </button>
+            </p>
           )}
 
           {step === 'chords' && (

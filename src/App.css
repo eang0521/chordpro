@@ -338,6 +338,14 @@ button.secondary:hover:not(:disabled) {
 }
 
 /* Toolbar */
+.carry-report {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-dim);
+  color: var(--text);
+}
+
 .draft-save-warning {
   color: var(--danger);
   margin: 0 0 12px;
