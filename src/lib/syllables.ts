@@ -74,8 +74,14 @@ function classifySectionType(keyword: string): SectionType {
   return 'other';
 }
 
+// Shorthand for a numbered verse, as in "v2", "V 3:" or "vs. 1", printed as "Verse 2". Only with
+// a number: a lone "V" could be a lyric, and there's no "c2" for Chorus 2, since C2 is a chord.
+const VERSE_SHORTHAND_RE = /^vs?\.?\s*(\d+)\s*[.:]?$/i;
+
 function detectSectionHeader(line: string): { type: SectionType; label: string } | null {
   const stripped = line.replace(/^[[(]\s*/, '').replace(/\s*[\])]$/, '').trim();
+  const verse = VERSE_SHORTHAND_RE.exec(stripped);
+  if (verse) return { type: 'verse', label: `Verse ${Number(verse[1])}` };
   const match = stripped.match(SECTION_HEADER_RE);
   if (!match) return null;
   return { type: classifySectionType(match[1]), label: stripped };
