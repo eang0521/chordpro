@@ -1013,8 +1013,8 @@ button.secondary:hover:not(:disabled) {
   border: none;
   border-radius: 0;
   color: var(--text);
-  padding: 5px 10px;
-  font-size: 0.8rem;
+  padding: 5px 7px;
+  line-height: 0;
 }
 
 .theme-switch button:hover:not(:disabled) {
