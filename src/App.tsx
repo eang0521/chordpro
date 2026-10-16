@@ -32,6 +32,7 @@ import { createSupabasePublicSongStore } from './lib/publicSongStore';
 import { PublicSongList } from './components/PublicSongList';
 import { PublicSongPage } from './components/PublicSongPage';
 import { PublishControl } from './components/PublishControl';
+import { SongSheet } from './components/SongSheet';
 import { ThemeSwitch } from './components/ThemeSwitch';
 import { useAuth, signOut } from './hooks/useAuth';
 import { useAutosave } from './hooks/useAutosave';
@@ -80,7 +81,8 @@ function App() {
   const userId = auth.status === 'signedIn' ? auth.user.id : null;
   // 'local' is the single signed-out draft kept in this browser, 'cloud' a library song.
   const [source, setSource] = useState<'local' | 'cloud'>('local');
-  const [screen, setScreen] = useState<'editor' | 'library' | 'opening'>('editor');
+  // 'view' shows a library song's chart, as public songs are shown; Edit opens the editor.
+  const [screen, setScreen] = useState<'editor' | 'view' | 'library' | 'opening'>('editor');
   const [libraryMessage, setLibraryMessage] = useState<string | null>(null);
   const [showSignIn, setShowSignIn] = useState(false);
   const [draftToUpload, setDraftToUpload] = useState<SongDocument | null>(null);
@@ -130,7 +132,10 @@ function App() {
   );
 
   const editingLibrarySong = source === 'cloud' && screen === 'editor';
-  const autosave = useAutosave(editingLibrarySong ? doc : null, saveToLibrary);
+  // Open to view or to edit: either way it's saved, since a key, font or spacing change on the
+  // chart belongs to the song.
+  const libraryOpen = source === 'cloud' && (screen === 'editor' || screen === 'view');
+  const autosave = useAutosave(libraryOpen ? doc : null, saveToLibrary);
 
   useEffect(() => {
     if (source !== 'local') return;
@@ -163,7 +168,7 @@ function App() {
   /** Gets the open library song's last edits saved before showing something else. Resolves
    * false if they couldn't be saved and the user chose to stay. */
   async function leaveLibrarySong(): Promise<boolean> {
-    if (!editingLibrarySong) return true;
+    if (!libraryOpen) return true;
     if (await autosave.flush()) return true;
     return window.confirm("Your latest changes couldn't be saved. Leave this song anyway and lose them?");
   }
@@ -181,7 +186,8 @@ function App() {
       }
       loadDocument(song);
       setSource('cloud');
-      setScreen('editor');
+      // A song with a chart opens on it; one still being written goes straight to the editor.
+      setScreen(song.arrangement.length > 0 ? 'view' : 'editor');
       rememberOpenSong(song.id);
     } catch (err) {
       rememberOpenSong(null);
@@ -371,7 +377,7 @@ function App() {
           )}
           {auth.status === 'signedIn' && (
             <div className="account">
-              {(route || screen === 'editor') && (
+              {(route || screen === 'editor' || screen === 'view') && (
                 <button
                   className="secondary"
                   onClick={() => {
@@ -441,6 +447,40 @@ function App() {
           onNew={() => void newLibrarySong()}
           publicStore={isPublisher ? publicStore : null}
           onViewPublic={(id) => void goToPublic(id)}
+        />
+      )}
+
+      {!route && userId && screen === 'view' && (
+        <SongSheet
+          key={songId}
+          title={title}
+          songKey={key}
+          onSongKeyChange={setKey}
+          blocks={blocks}
+          arrangement={arrangement}
+          credits={credits}
+          fontId={chartFontId}
+          onFontIdChange={setChartFontId}
+          lineSpacing={chartLineSpacing}
+          onLineSpacingChange={setChartLineSpacing}
+          back={
+            <button className="secondary" onClick={() => void showLibrary()}>
+              &larr; My songs
+            </button>
+          }
+          actions={
+            <>
+              {autosave.status === 'error' && (
+                <span className="save-status save-status-error" role="status">
+                  Couldn&rsquo;t save{' '}
+                  <button className="link-button" onClick={() => void autosave.flush()}>
+                    Retry
+                  </button>
+                </span>
+              )}
+              <button onClick={() => setScreen('editor')}>Edit</button>
+            </>
+          }
         />
       )}
 

@@ -1,12 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { KeyName } from '../types';
 import type { PublicSong, PublicSongStore } from '../lib/publicSongStore';
 import type { SongDocument } from '../lib/songDocument';
 import { NewerSongVersionError } from '../lib/songStore';
-import { deriveFlatSyllables } from '../lib/arrangement';
-import { ChordChartView } from './ChordChartView';
-import { ExportView } from './ExportView';
-import { KeyControl } from './KeyControl';
+import { SongSheet } from './SongSheet';
 
 interface Props {
   store: PublicSongStore;
@@ -30,7 +27,6 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
   const [key, setKey] = useState<KeyName>('C');
   const [fontId, setFontId] = useState('');
   const [lineSpacing, setLineSpacing] = useState(1);
-  const [view, setView] = useState<'chart' | 'chordpro'>('chart');
   const [copying, setCopying] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -62,7 +58,6 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
   }, [store, id]);
 
   const doc = song?.doc;
-  const flatSyllables = useMemo(() => (doc ? deriveFlatSyllables(doc.blocks, doc.arrangement) : []), [doc]);
 
   async function copyToLibrary() {
     if (!doc) return;
@@ -88,73 +83,58 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
     }
   }
 
+  const back = (
+    <button className="secondary" onClick={onBack}>
+      &larr; Public songs
+    </button>
+  );
+
   return (
     <div>
-      <div className="toolbar">
-        <button className="secondary" onClick={onBack}>
-          &larr; Public songs
-        </button>
-        {doc && (
-          <>
-            <button className="secondary" onClick={() => setView(view === 'chart' ? 'chordpro' : 'chart')}>
-              {view === 'chart' ? 'Show ChordPro' : 'Show chart'}
-            </button>
-            {/* The chart has its own key control. */}
-            {view === 'chordpro' && <KeyControl songKey={key} onChange={setKey} />}
-            <span className="toolbar-spacer" />
-            {userId ? (
-              <button onClick={() => void copyToLibrary()} disabled={copying}>
-                {copying ? 'Copying…' : 'Copy to My Songs'}
-              </button>
-            ) : (
-              <button className="secondary" onClick={onSignIn}>
-                Sign in to copy and edit
-              </button>
-            )}
-            {userId && song?.publisherId === userId && (
-              <button className="secondary danger" onClick={() => setConfirmRemove(true)}>
-                Remove from public songs
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {copyFailed && <p className="hint library-error">Couldn&rsquo;t copy it to your songs. Try again.</p>}
-      {removeFailed && <p className="hint library-error">Couldn&rsquo;t remove it. Try again.</p>}
-      {error && <p className="hint library-error">{error}</p>}
-      {!doc && !error && <p className="hint">Loading&hellip;</p>}
-
-      {doc && view === 'chordpro' && (
-        <ExportView
-          // Remount on a key change so the ChordPro text is regenerated in the new key.
-          key={key}
-          readOnly
-          song={{ title: doc.title, key, syllables: flatSyllables, credits: doc.credits }}
-          blocks={doc.blocks}
-          arrangement={doc.arrangement}
-          fontId={fontId}
-          onFontIdChange={setFontId}
-          lineSpacing={lineSpacing}
-          onLineSpacingChange={setLineSpacing}
-        />
-      )}
-
-      {doc && view === 'chart' && (
-        <ChordChartView
-          inline
+      {doc ? (
+        <SongSheet
           title={doc.title}
           songKey={key}
           onSongKeyChange={setKey}
           blocks={doc.blocks}
           arrangement={doc.arrangement}
+          credits={doc.credits}
           fontId={fontId}
           onFontIdChange={setFontId}
           lineSpacing={lineSpacing}
           onLineSpacingChange={setLineSpacing}
-          credits={doc.credits}
+          back={back}
+          notices={
+            <>
+              {copyFailed && <p className="hint library-error">Couldn&rsquo;t copy it to your songs. Try again.</p>}
+              {removeFailed && <p className="hint library-error">Couldn&rsquo;t remove it. Try again.</p>}
+            </>
+          }
+          actions={
+            <>
+              {userId ? (
+                <button onClick={() => void copyToLibrary()} disabled={copying}>
+                  {copying ? 'Copying…' : 'Copy to My Songs'}
+                </button>
+              ) : (
+                <button className="secondary" onClick={onSignIn}>
+                  Sign in to copy and edit
+                </button>
+              )}
+              {userId && song?.publisherId === userId && (
+                <button className="secondary danger" onClick={() => setConfirmRemove(true)}>
+                  Remove from public songs
+                </button>
+              )}
+            </>
+          }
         />
+      ) : (
+        <div className="toolbar">{back}</div>
       )}
+
+      {error && <p className="hint library-error">{error}</p>}
+      {!doc && !error && <p className="hint">Loading&hellip;</p>}
 
       {confirmRemove && doc && (
         <div className="arrangement-overlay" onClick={() => setConfirmRemove(false)}>
