@@ -26,6 +26,7 @@ const COMMON_SUNG_SYLLABLES: Record<string, string[]> = {
   memory: ['mem', 'ory'],
   victory: ['vic', 'tory'],
   mystery: ['mys', 'tery'],
+  finally: ['fi', 'nally'],
   // "-ering" words, often sung as two syllables (wan-d'ring) but sometimes three.
   wandering: ['wan', 'dering'],
   wondering: ['won', 'dering'],
