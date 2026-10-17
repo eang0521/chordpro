@@ -92,6 +92,7 @@ export function LyricFlow({
         ? `${syl.bar ? '| ' : ''}${formatChord(transposeKey(songKey, syl.keyShift ?? 0), syl.chord)}`
         : null;
 
+    const offset = syl.chord ? Math.min(syl.chordOffset ?? 0, syl.text.length) : 0;
     const classes = ['syllable'];
     if (syl.isChordSlot) classes.push('syllable-slot');
     if (i === currentIndex) classes.push('current');
@@ -105,10 +106,25 @@ export function LyricFlow({
         onMouseDown={onSyllableMouseDown ? (e) => onSyllableMouseDown(i, e) : undefined}
         onMouseEnter={onSyllableMouseEnter ? () => onSyllableMouseEnter(i) : undefined}
       >
-        {showChords && (
+        {showChords && !(chordLabel && offset) && (
           <span className={`chord-label ${chordLabel ? '' : 'chord-label-empty'}`}>{chordLabel ?? ''}</span>
         )}
-        <span className={classes.join(' ')}>{syl.isChordSlot ? ' ' : syl.text}</span>
+        <span className={classes.join(' ')}>
+          {syl.isChordSlot ? (
+            ' '
+          ) : chordLabel && offset ? (
+            // A chord partway into the syllable ("J[E]esus") hangs over the letter it falls on.
+            <>
+              {syl.text.slice(0, offset)}
+              <span className="chord-anchor">
+                <span className="chord-label">{chordLabel}</span>
+                {syl.text.slice(offset)}
+              </span>
+            </>
+          ) : (
+            syl.text
+          )}
+        </span>
       </span>,
     );
     return nodes;

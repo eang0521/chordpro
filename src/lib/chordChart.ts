@@ -14,6 +14,8 @@ export interface ChartToken {
   chordLabel: string | null;
   /** A chord with no lyric under it. */
   isSlot: boolean;
+  /** Letters into the syllable the chord sits over (see SyllableToken.chordOffset). */
+  chordOffset?: number;
 }
 
 export interface ChartHeadingRow {
@@ -70,6 +72,7 @@ export function buildChartRows(blocks: BlockMap, arrangement: ArrangementEntry[]
           ? `${syl.bar ? '| ' : ''}${formatChord(transposeKey(key, syl.keyShift ?? 0), syl.chord)}`
           : null,
         isSlot: !!syl.isChordSlot,
+        ...(syl.chord && syl.chordOffset ? { chordOffset: Math.min(syl.chordOffset, syl.text.length) } : {}),
       };
     });
     return { kind: 'line', key: row.key, tokens, ...(repeat && repeat > 1 ? { repeat } : {}) };
@@ -245,11 +248,16 @@ export function placeChords(tokens: ChartToken[], measure: TextMeasure, repeat?:
     if (tok.isWordStart && i !== 0 && lyricLine) lyricLine += ' ';
     // Not enough room after the previous chord (or a chord slot just before): spread the lyrics
     // instead of pushing this syllable's chord off it.
-    const startAt = Math.max(lyricsFromPt, tok.chordLabel ? nextFreePt : 0);
+    // A chord written partway into the syllable ("J[E]esus") sits over that letter, not its start.
+    const before = tok.chordLabel && tok.chordOffset ? tok.text.slice(0, tok.chordOffset) : '';
+    const beforeWidth = before
+      ? measure(lyricLine + before, LYRIC_SIZE_PT, 'bold') - measure(lyricLine, LYRIC_SIZE_PT, 'bold')
+      : 0;
+    const startAt = Math.max(lyricsFromPt, tok.chordLabel ? nextFreePt - beforeWidth : 0);
     if (measure(lyricLine, LYRIC_SIZE_PT, 'bold') < startAt) lyricLine = spreadTo(lyricLine, startAt, withinWord, measure);
     lyricsFromPt = 0;
     if (tok.chordLabel) {
-      const at = Math.max(measure(lyricLine, LYRIC_SIZE_PT, 'bold'), nextFreePt);
+      const at = Math.max(measure(lyricLine + before, LYRIC_SIZE_PT, 'bold'), nextFreePt);
       chords.push({ offsetPt: at, label: tok.chordLabel });
       nextFreePt = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic') + CHORD_MIN_GAP_PT;
     }

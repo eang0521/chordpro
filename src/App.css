@@ -1532,3 +1532,15 @@ button.link-button.publish-view {
 .set-shared-list .library-item {
   padding: 2px 6px;
 }
+
+/* A chord partway into a syllable ("J[E]esus") hangs over the letter after it. The anchor is an
+   inline-block so its box is as tall as the line, like the syllable box the other chord labels hang
+   from; it just starts below that box's 2px top padding. */
+.chord-anchor {
+  position: relative;
+  display: inline-block;
+}
+
+.chord-anchor > .chord-label {
+  top: calc(-1.4em - 2px);
+}

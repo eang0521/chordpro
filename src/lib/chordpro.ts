@@ -76,8 +76,11 @@ export function songToChordPro(song: Song): string {
     // Chords with no lyric under them (slots) are written as "[G] | [C]", the usual ChordPro way
     // to write a turnaround or instrumental line.
     if (syl.bar && syl.chord) currentLine += '| ';
+    // A chord partway into the syllable goes back where it was written ("J[E]esus").
+    const at = syl.chord ? Math.min(syl.chordOffset ?? 0, syl.text.length) : 0;
+    currentLine += syl.text.slice(0, at);
     if (syl.chord) currentLine += `[${formatChord(transposeKey(song.key, syl.keyShift ?? 0), syl.chord)}]`;
-    currentLine += syl.text;
+    currentLine += syl.text.slice(at);
     markRepeat();
   });
   flushLine();

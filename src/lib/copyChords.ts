@@ -52,7 +52,10 @@ const COPIED_SLOT_PREFIX = 'copied-slot-';
  */
 export function previewLine(source: SyllableToken[], target: SyllableToken[], shift: number): LinePreview {
   const sourceLyrics = source.filter((t) => !t.isChordSlot);
-  const lyrics: SyllableToken[] = target.filter((t) => !t.isChordSlot).map((t) => ({ ...t, chord: null, bar: false }));
+  // Copied chords land at the start of their syllable: the target's words differ.
+  const lyrics: SyllableToken[] = target
+    .filter((t) => !t.isChordSlot)
+    .map((t) => ({ ...t, chord: null, bar: false, chordOffset: undefined }));
 
   let dropped = 0;
   sourceLyrics.forEach((tok, i) => {

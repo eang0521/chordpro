@@ -191,14 +191,18 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
         | { kind: 'bar' }
       );
       const items: Item[] = spans.map((span) => ({ kind: 'span', span, offset: span.end - span.text.length }));
-      const labelBySpan = new Map<SyllableSpan, string>();
+      const labelsBySpan = new Map<SyllableSpan, { label: string; offset: number }[]>();
       chords.forEach((chord) => {
         const under = plain[chord.offset];
         if (under === undefined || /\s/.test(under) || under === '|') {
           items.push({ kind: 'slot', label: chord.label, offset: chord.offset });
         } else {
           const span = findSpanForOffset(spans, chord.offset);
-          if (span) labelBySpan.set(span, chord.label);
+          // Where in the syllable it was written: "J[E]esus" is 1 letter into "Je".
+          if (span) {
+            const offset = Math.max(0, chord.offset - (span.end - span.text.length));
+            labelsBySpan.set(span, [...(labelsBySpan.get(span) ?? []), { label: chord.label, offset }]);
+          }
         }
       });
       for (const m of plain.matchAll(/(?<=^|\s)\|(?=\s|$)/g)) items.push({ kind: 'bar', offset: m.index });
@@ -207,31 +211,53 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
 
       let pendingBar = false;
       let lineStart = true;
+      /** A syllable's text, cut so each chord written inside it gets a piece of its own. */
+      type Piece = { text: string; isWordStart: boolean; label?: string; offset: number; isSlot: boolean };
+      const piecesOf = (item: Exclude<Item, { kind: 'bar' }>): Piece[] => {
+        if (item.kind === 'slot') return [{ text: '', isWordStart: true, label: item.label, offset: 0, isSlot: true }];
+        const { text, isWordStart } = item.span;
+        const labels = [...(labelsBySpan.get(item.span) ?? [])].sort((a, b) => a.offset - b.offset);
+        if (labels.length <= 1) return [{ text, isWordStart, label: labels[0]?.label, offset: labels[0]?.offset ?? 0, isSlot: false }];
+        // Two or more chords in one syllable ("lu[E]i[A]a"): the first keeps the syllable's start
+        // (and its place in it), and each later one starts a piece of the syllable at its letter.
+        const pieces: Piece[] = [];
+        labels.forEach((l, i) => {
+          const from = i === 0 ? 0 : l.offset;
+          const to = i + 1 < labels.length ? labels[i + 1].offset : text.length;
+          if (to <= from && i > 0) return; // two chords on the same letter: the later one is kept below
+          pieces.push({ text: text.slice(from, to), isWordStart: i === 0 && isWordStart, label: l.label, offset: i === 0 ? l.offset : 0, isSlot: false });
+        });
+        return pieces;
+      };
+
       items.forEach((item) => {
         if (item.kind === 'bar') {
           pendingBar = true;
           return;
         }
-        let label = item.kind === 'slot' ? item.label : labelBySpan.get(item.span);
-        // "[|C]" is another way to write a bar line before a chord.
-        if (label?.startsWith('|')) {
-          pendingBar = true;
-          label = label.slice(1).trim();
-        }
-        const chord = label ? parseChord(currentKey, label) : null;
-        block.syllables.push({
-          id: makeId(),
-          text: item.kind === 'span' ? item.span.text : '',
-          isWordStart: item.kind === 'span' ? item.span.isWordStart : true,
-          isLineStart: lineStart,
-          chord,
-          ...(pendingBar && chord ? { bar: true } : {}),
-          ...(item.kind === 'slot' ? { isChordSlot: true } : {}),
-          blockId: block.id,
-          localIndex: block.syllables.length,
+        piecesOf(item).forEach((piece) => {
+          let label = piece.label;
+          // "[|C]" is another way to write a bar line before a chord.
+          if (label?.startsWith('|')) {
+            pendingBar = true;
+            label = label.slice(1).trim();
+          }
+          const chord = label ? parseChord(currentKey, label) : null;
+          block.syllables.push({
+            id: makeId(),
+            text: piece.text,
+            isWordStart: piece.isWordStart,
+            isLineStart: lineStart,
+            chord,
+            ...(pendingBar && chord ? { bar: true } : {}),
+            ...(chord && piece.offset > 0 ? { chordOffset: piece.offset } : {}),
+            ...(piece.isSlot ? { isChordSlot: true } : {}),
+            blockId: block.id,
+            localIndex: block.syllables.length,
+          });
+          if (chord) pendingBar = false;
+          lineStart = false;
         });
-        if (chord) pendingBar = false;
-        lineStart = false;
       });
     });
 

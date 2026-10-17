@@ -43,6 +43,10 @@ export interface SyllableToken {
   chord: Chord | null;
   /** A bar line before this syllable's chord, as in "G C | Csus | C". */
   bar?: boolean;
+  /** How many letters into the syllable its chord falls, when not at the start: "J[E]esus" puts
+   * the E over the "e" of "Je", so 1. Comes from ChordPro text; chords placed in the tapper sit at
+   * the syllable's start. */
+  chordOffset?: number;
   /** A chord slot with no lyric under it (text is ''), for instrumental chords: a turnaround
    * after a line's last word, or a whole chord-only line such as a turn or intro. */
   isChordSlot?: boolean;

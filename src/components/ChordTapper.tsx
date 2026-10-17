@@ -163,7 +163,7 @@ export function ChordTapper({
   function cut() {
     const marks = copySelection();
     if (!marks) return;
-    updateRange(selStart, selEnd, (tok) => ({ ...tok, chord: null, bar: false }));
+    updateRange(selStart, selEnd, (tok) => ({ ...tok, chord: null, bar: false, chordOffset: undefined }));
     flash(`Cut ${pluralize(marks.filter((m) => m.chord).length, 'chord')} from ${pluralize(marks.length, 'syllable')}`);
   }
 
@@ -176,7 +176,13 @@ export function ChordTapper({
     }
     if (index < 0) return;
     const end = Math.min(selStart + clipboard.length, syllables.length) - 1;
-    updateRange(selStart, end, (tok, offset) => ({ ...tok, chord: clipboard[offset].chord, bar: clipboard[offset].bar }));
+    // The text under a pasted chord may differ, so it goes at the start of its syllable.
+    updateRange(selStart, end, (tok, offset) => ({
+      ...tok,
+      chord: clipboard[offset].chord,
+      bar: clipboard[offset].bar,
+      chordOffset: undefined,
+    }));
     setAnchor(selStart);
     setIndex(end);
     const pasted = end - selStart + 1;
@@ -200,7 +206,7 @@ export function ChordTapper({
       moveTo(index - 1);
       return;
     }
-    updateRange(selStart, selEnd, (tok) => ({ ...tok, chord: null, bar: false }));
+    updateRange(selStart, selEnd, (tok) => ({ ...tok, chord: null, bar: false, chordOffset: undefined }));
   }
 
   /** Adds an empty chord slot (a chord with no lyric under it) right after the cursor. */
