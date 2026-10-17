@@ -133,7 +133,15 @@ function carryOverTokens(oldBlock: Block, newBlock: Block, report: CarryOverRepo
       report.dropped++;
       return;
     }
-    tokens[ni] = { ...tokens[ni], chord: old.chord, ...(old.bar ? { bar: true } : {}) };
+    // A chord written partway into a syllable ("J[E]esus") keeps its letter only while the
+    // syllable's text is unchanged; on a reworded syllable it goes to the start.
+    const keepsLetter = !!old.chordOffset && tokens[ni].text === old.text;
+    tokens[ni] = {
+      ...tokens[ni],
+      chord: old.chord,
+      ...(old.bar ? { bar: true } : {}),
+      ...(keepsLetter ? { chordOffset: old.chordOffset } : {}),
+    };
     report.kept++;
   });
 
