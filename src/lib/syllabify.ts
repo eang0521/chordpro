@@ -25,6 +25,9 @@ const CODA_ONLY_CLUSTERS = new Set(['ng', 'ck']);
 // have too many non-prefixed collisions (forest, foreign) to apply safely.
 const SEPARABLE_PREFIXES = ['under', 'over', 'out', 'down', 'back', 'off', 'up'];
 
+// Words that start with one of those prefixes without being built on it (u-pon, not "up-on").
+const NOT_PREFIXED = new Set(['upon']);
+
 // A small closed set of words where "-ed" keeps its own syllable as an adjective (naked,
 // wicked, ...) even though the general silent-"-ed" rule below would otherwise drop it —
 // there's essentially no common verb reading of these to conflict with.
@@ -127,7 +130,7 @@ export function syllabifyCore(core: string): string[] {
   }
 
   const lower = core.toLowerCase();
-  for (const prefix of SEPARABLE_PREFIXES) {
+  for (const prefix of NOT_PREFIXED.has(lower) ? [] : SEPARABLE_PREFIXES) {
     if (lower.length <= prefix.length || !lower.startsWith(prefix)) continue;
     const remainder = core.slice(prefix.length);
     // Only split here if what's left can actually carry its own syllable (guards against
