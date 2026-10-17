@@ -28,7 +28,10 @@ import {
   MAX_LINE_SPACING,
   MIN_LINE_SPACING,
   clampLineSpacing,
+  TITLE_GAP_PT,
+  titleSizePt,
 } from '../lib/pageLayout';
+import { TITLE_LINE_PT } from '../lib/chartLayout';
 import { fitLineSpacing, paginateByHeight } from '../lib/pagination';
 import { KeyControl } from './KeyControl';
 
@@ -134,16 +137,19 @@ function renderDisplayRow(display: SectionDisplayRow, labelColEm: number, fontFa
   );
 }
 
-function renderTitle(title: string): ReactNode {
+/** The title at its fitted size (`sizePt`), in a line box that stays the usual height, as in the
+ * PDF and Word export. */
+function renderTitle(title: string, sizePt: number): ReactNode {
+  const style = { fontSize: `${sizePt / LYRIC_SIZE_PT}em`, lineHeight: TITLE_LINE_PT / sizePt, marginBottom: `${TITLE_GAP_PT / sizePt}em` };
   return (
-    <div className="chart-doc-title" key="header">
+    <div className="chart-doc-title" key="header" style={style}>
       {title || 'Untitled'}
     </div>
   );
 }
 
-function renderPageItem(item: PageItem, title: string, labelColEm: number, fontFamily: string): ReactNode {
-  return item.kind === 'header' ? renderTitle(title) : renderDisplayRow(item.display, labelColEm, fontFamily);
+function renderPageItem(item: PageItem, title: string, titleSize: number, labelColEm: number, fontFamily: string): ReactNode {
+  return item.kind === 'header' ? renderTitle(title, titleSize) : renderDisplayRow(item.display, labelColEm, fontFamily);
 }
 
 export function ChordChartView({
@@ -200,6 +206,13 @@ export function ChordChartView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [credits, font.wordFont, fontLoads],
   );
+  // Long titles shrink to fit on one line, measured as the PDF and Word export measure them.
+  const titleSize = useMemo(
+    () => titleSizePt(title, measureInFont(font.wordFont)),
+    // fontLoads: as above, measure again once the font has loaded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [title, font.wordFont, fontLoads],
+  );
   const marginBottomPx = twipsToPreviewPx(footer.marginBottomTwips);
   const contentHeightPx = PAGE_HEIGHT_PX - MARGIN_TOP_PX - marginBottomPx;
 
@@ -237,7 +250,7 @@ export function ChordChartView({
     setPages(paginateByHeight(measureHeights(), groups, contentHeightPx));
     // measureHeights only reads the DOM rendered from these.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageItems, groups, font.cssFont, lineSpacing, fontLoads, contentHeightPx]);
+  }, [pageItems, groups, font.cssFont, lineSpacing, fontLoads, contentHeightPx, titleSize]);
 
   /** Picks the roomiest line spacing that still fits the song on one page (or two if it must),
    * by re-measuring the hidden layout at each candidate spacing. */
@@ -346,7 +359,7 @@ export function ChordChartView({
       >
         {pageItems.map((item, i) => (
           <div key={i} ref={(el) => { itemRefs.current[i] = el; }}>
-            {renderPageItem(item, title, labelColEm, font.wordFont)}
+            {renderPageItem(item, title, titleSize, labelColEm, font.wordFont)}
           </div>
         ))}
       </div>
@@ -377,7 +390,7 @@ export function ChordChartView({
                   </div>
                 )}
                 {indices.map((i) => (
-                  <div key={i}>{renderPageItem(pageItems[i], title, labelColEm, font.wordFont)}</div>
+                  <div key={i}>{renderPageItem(pageItems[i], title, titleSize, labelColEm, font.wordFont)}</div>
                 ))}
               </div>
               {footer.lines.length > 0 && (
@@ -405,7 +418,7 @@ export function ChordChartView({
       ) : (
         <div className="chord-chart" style={{ fontFamily: font.cssFont, ...lineSpacingVar(lineSpacing) }}>
           <div className="chart-page-header">{keyHeader}</div>
-          {renderTitle(title)}
+          {renderTitle(title, titleSize)}
           {displayRows.map((display) => renderDisplayRow(display, labelColEm, font.wordFont))}
           {footer.lines.length > 0 && (
             <div className="chart-compact-credits">

@@ -22,10 +22,10 @@ import {
   MARGIN_TOP_TWIPS,
   PAGE_HEIGHT_TWIPS,
   PAGE_WIDTH_TWIPS,
-  TITLE_SIZE_PT,
   creditFooter,
   labelColumnTwips,
   measureInFont,
+  titleSizePt,
 } from './pageLayout';
 import { paginateByHeight } from './pagination';
 
@@ -149,6 +149,7 @@ async function addSongPages(
   const labelCol = pt(labelColumnTwips(sections.map((s) => s.label), pageMeasure));
   const lyricWidth = pt(CONTENT_WIDTH_TWIPS) - labelCol;
   const footer = creditFooter(creditLines(credits), pageMeasure);
+  const titleSize = titleSizePt(title, pageMeasure);
   const contentHeight = PAGE_HEIGHT - MARGIN_TOP - pt(footer.marginBottomTwips);
   const footerTop = PAGE_HEIGHT - pt(CREDIT_BOTTOM_TWIPS) - footer.lines.length * CREDIT_LINE_PT;
   const chordLine = CHORD_LINE_PT * lineSpacing;
@@ -186,8 +187,8 @@ async function addSongPages(
       const item = items[index];
       if (item.kind === 'title') {
         const text = (title || 'Untitled').toUpperCase();
-        const x = (PAGE_WIDTH - measure(text, TITLE_SIZE_PT, 'bold')) / 2;
-        draw(page, text, x, baselineIn(top, TITLE_LINE_PT, TITLE_SIZE_PT), TITLE_SIZE_PT, 'bold');
+        const x = (PAGE_WIDTH - measure(text, titleSize, 'bold')) / 2;
+        draw(page, text, x, baselineIn(top, TITLE_LINE_PT, titleSize), titleSize, 'bold');
       } else {
         let lineTop = top;
         if (item.lines.length === 0 && item.label) {

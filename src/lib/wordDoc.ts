@@ -1,7 +1,7 @@
 import type { IRunOptions, Paragraph } from 'docx';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from './arrangement';
-import { PAGE_FIT_SLACK_PT, layoutChartItems } from './chartLayout';
+import { PAGE_FIT_SLACK_PT, TITLE_LINE_PT, layoutChartItems } from './chartLayout';
 import { buildChartRows, continuedTitle, groupIntoSections, isChordOnly, keyHeaderText, layoutLine } from './chordChart';
 import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
 import { embedFontStyles } from './docxFonts';
@@ -24,10 +24,10 @@ import {
   PAGE_WIDTH_TWIPS,
   SECTION_GAP_PT,
   TITLE_GAP_PT,
-  TITLE_SIZE_PT,
   creditFooter,
   labelColumnTwips,
   measureInFont,
+  titleSizePt,
 } from './pageLayout';
 import { paginateByHeight } from './pagination';
 
@@ -76,10 +76,11 @@ export async function generateWordDoc(
   const body: Paragraph[] = [
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { after: twips(TITLE_GAP_PT) },
+      // A shrunken long title keeps the usual line height, like the preview and PDF.
+      spacing: { after: twips(TITLE_GAP_PT), line: twips(TITLE_LINE_PT), lineRule: LineRuleType.EXACT },
       keepNext: true,
       children: [
-        new TextRun({ text: title || 'Untitled', bold: true, allCaps: true, size: halfPt(TITLE_SIZE_PT), font: font.wordFont }),
+        new TextRun({ text: title || 'Untitled', bold: true, allCaps: true, size: halfPt(titleSizePt(title, measure)), font: font.wordFont }),
       ],
     }),
   ];

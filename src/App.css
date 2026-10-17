@@ -627,6 +627,12 @@ button.secondary:hover:not(:disabled) {
   margin-bottom: 0.5em;
 }
 
+/* On a page the title is fitted to one line (shrunk if it's long), as in the PDF. */
+.chart-page-content .chart-doc-title,
+.chart-measure .chart-doc-title {
+  white-space: nowrap;
+}
+
 .chart-page-header {
   font-size: 0.857em;
   font-style: italic;

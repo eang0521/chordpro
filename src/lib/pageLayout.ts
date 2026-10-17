@@ -103,6 +103,23 @@ export function labelColumnTwips(labels: string[], measure: TextMeasure): number
   return Math.max(MIN_LABEL_COLUMN_TWIPS, Math.ceil(widest * 20) + LABEL_GAP_TWIPS);
 }
 
+// A long title is set smaller so it stays on one line, but no smaller than this.
+export const MIN_TITLE_SIZE_PT = 14;
+// Room left at the title's ends: the browser's widths include kerning and the PDF's don't, so
+// the PDF can set a title a point or two wider than it was measured.
+const TITLE_FIT_SLACK_PT = 6;
+
+/** The title's size, in points: the usual size, or as much smaller as it takes for the all-caps
+ * title to fit on one line across the page. The preview, Word doc and PDF all measure it in the
+ * browser, so they pick the same size. */
+export function titleSizePt(title: string, measure: TextMeasure): number {
+  const width = measure((title || 'Untitled').toUpperCase(), TITLE_SIZE_PT, 'bold');
+  const room = CONTENT_WIDTH_TWIPS / 20 - TITLE_FIT_SLACK_PT;
+  if (width <= room) return TITLE_SIZE_PT;
+  // Rounded down to a quarter point, so the text never ends up a hair too wide.
+  return Math.max(MIN_TITLE_SIZE_PT, Math.floor(((TITLE_SIZE_PT * room) / width) * 4) / 4);
+}
+
 /** Breaks text at spaces so each line fits `widthPt`; a single word wider than that stays whole. */
 export function wrapText(text: string, widthPt: number, sizePt: number, measure: TextMeasure): string[] {
   const lines: string[] = [];
