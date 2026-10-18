@@ -30,6 +30,8 @@ export interface ChartLineRow {
   tokens: ChartToken[];
   /** Set on a section's last line when the section repeats: printed as "2x" after its chords. */
   repeat?: number;
+  /** A blank line before this line, splitting its section into parts. */
+  gapBefore?: boolean;
 }
 
 export interface ChartKeyChangeRow {
@@ -75,7 +77,15 @@ export function buildChartRows(blocks: BlockMap, arrangement: ArrangementEntry[]
         ...(syl.chord && syl.chordOffset ? { chordOffset: Math.min(syl.chordOffset, syl.text.length) } : {}),
       };
     });
-    return { kind: 'line', key: row.key, tokens, ...(repeat && repeat > 1 ? { repeat } : {}) };
+    const first = flat[row.indexes[0]];
+    const gapBefore = !!first.gapBefore && first.localIndex > 0;
+    return {
+      kind: 'line',
+      key: row.key,
+      tokens,
+      ...(repeat && repeat > 1 ? { repeat } : {}),
+      ...(gapBefore ? { gapBefore: true } : {}),
+    };
   });
 }
 

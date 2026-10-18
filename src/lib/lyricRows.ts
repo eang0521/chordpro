@@ -10,6 +10,8 @@ export interface LineRow {
   kind: 'line';
   key: string;
   indexes: number[];
+  /** A blank line before this line, splitting its section into parts. */
+  gapBefore?: boolean;
 }
 
 /** A key change before the next section: `keyShift` is the new key, in semitones above the song's key. */
@@ -34,7 +36,7 @@ export function buildRows(syllables: SyllableToken[]): Row[] {
       if (syl.section.label) rows.push({ kind: 'section', key: `section-${syl.id}`, section: syl.section });
       rows.push({ kind: 'line', key: `line-${syl.id}`, indexes: [i] });
     } else if (syl.isLineStart) {
-      rows.push({ kind: 'line', key: `line-${syl.id}`, indexes: [i] });
+      rows.push({ kind: 'line', key: `line-${syl.id}`, indexes: [i], ...(syl.gapBefore ? { gapBefore: true } : {}) });
     } else {
       const lastRow = rows[rows.length - 1];
       if (lastRow.kind === 'line') lastRow.indexes.push(i);

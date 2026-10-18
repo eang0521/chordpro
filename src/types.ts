@@ -43,6 +43,9 @@ export interface SyllableToken {
   chord: Chord | null;
   /** A bar line before this syllable's chord, as in "G C | Csus | C". */
   bar?: boolean;
+  /** On the first syllable of a line: a blank line before it, splitting the section into parts
+   * (a verse printed in two halves). Never on a section's first line. */
+  gapBefore?: boolean;
   /** How many letters into the syllable its chord falls, when not at the start: "J[E]esus" puts
    * the E over the "e" of "Je", so 1. Comes from ChordPro text; chords placed in the tapper sit at
    * the syllable's start. */

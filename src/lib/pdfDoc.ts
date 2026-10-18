@@ -190,7 +190,7 @@ async function addSongPages(
         const x = (PAGE_WIDTH - measure(text, titleSize, 'bold')) / 2;
         draw(page, text, x, baselineIn(top, TITLE_LINE_PT, titleSize), titleSize, 'bold');
       } else {
-        let lineTop = top;
+        let lineTop = top + item.gapBefore;
         if (item.lines.length === 0 && item.label) {
           draw(page, item.label.toUpperCase(), MARGIN_SIDE, baselineIn(lineTop, lyricLine, LABEL_SIZE_PT), LABEL_SIZE_PT, 'bold');
         }

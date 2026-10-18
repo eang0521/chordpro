@@ -1550,3 +1550,16 @@ button.link-button.publish-view {
 .chord-anchor > .chord-label {
   top: calc(-1.4em - 2px);
 }
+
+/* A blank line splitting a section into parts: the same space as between sections. */
+.chart-section-row.chart-gap-before {
+  margin-top: calc(0.5714em * var(--line-spacing, 1));
+}
+
+.lyric-line-row.lyric-line-gap {
+  margin-top: 0.9em;
+}
+
+.syllable-line-gap {
+  height: 0.9em;
+}

@@ -115,7 +115,14 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
   const arrangement: ArrangementEntry[] = [];
   let currentBlock: Block | null = null;
 
+  // A blank line inside a section, waiting for the next lyric line; and whether {end_of_...} has
+  // closed the section (blank lines after that are just the space between sections).
+  let pendingGap = false;
+  let sectionClosed = false;
+
   function startBlock(type: SectionType, label: string) {
+    pendingGap = false;
+    sectionClosed = false;
     currentBlock = { id: makeId(), type, label, syllables: [] };
     blocks.push(currentBlock);
     arrangement.push(currentBlock.id);
@@ -125,7 +132,11 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
     .split('\n')
     .forEach((rawLine) => {
       const trimmed = rawLine.trim();
-      if (trimmed.length === 0) return;
+      if (trimmed.length === 0) {
+        // Inside a section that has lyrics already, a blank line splits it into parts.
+        if (currentBlock && !sectionClosed && currentBlock.syllables.length > 0) pendingGap = true;
+        return;
+      }
 
       const titleMatch = TITLE_RE.exec(trimmed);
       if (titleMatch) {
@@ -156,7 +167,11 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
         startBlock(startMatch[1].toLowerCase() as SectionType, startMatch[2].trim());
         return;
       }
-      if (END_SECTION_RE.test(trimmed)) return;
+      if (END_SECTION_RE.test(trimmed)) {
+        sectionClosed = true;
+        pendingGap = false;
+        return;
+      }
       const commentMatch = COMMENT_RE.exec(trimmed);
       if (commentMatch) {
         startBlock('other', commentMatch[1].trim());
@@ -248,6 +263,7 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
             text: piece.text,
             isWordStart: piece.isWordStart,
             isLineStart: lineStart,
+            ...(lineStart && pendingGap && block.syllables.length > 0 ? { gapBefore: true } : {}),
             chord,
             ...(pendingBar && chord ? { bar: true } : {}),
             ...(chord && piece.offset > 0 ? { chordOffset: piece.offset } : {}),
@@ -256,6 +272,7 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
             localIndex: block.syllables.length,
           });
           if (chord) pendingBar = false;
+          if (lineStart) pendingGap = false;
           lineStart = false;
         });
       });

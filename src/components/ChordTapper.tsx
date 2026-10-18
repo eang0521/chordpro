@@ -225,11 +225,30 @@ export function ChordTapper({
     while (start > 0 && !syllables[start].isLineStart) start--;
     const first = syllables[start];
     edit((prev) => {
-      const withSlot = insertTokens(prev, first.blockId, first.localIndex - 1, [makeChordSlot(first.blockId, true)]);
+      // The new slot starts the line now, so it takes over any blank-line gap above it.
+      const slot = { ...makeChordSlot(first.blockId, true), ...(first.gapBefore ? { gapBefore: true } : {}) };
+      const withSlot = insertTokens(prev, first.blockId, first.localIndex - 1, [slot]);
       // The old first syllable no longer starts the line.
-      return updateBlockToken(withSlot, first.blockId, first.localIndex + 1, (tok) => ({ ...tok, isLineStart: false }));
+      return updateBlockToken(withSlot, first.blockId, first.localIndex + 1, (tok) => ({
+        ...tok,
+        isLineStart: false,
+        gapBefore: undefined,
+      }));
     });
     moveTo(start);
+  }
+
+  /** Adds or removes a blank line above the cursor's line, splitting its section into parts. */
+  function toggleGapAboveLine() {
+    if (index < 0) return;
+    let start = index;
+    while (start > 0 && !syllables[start].isLineStart) start--;
+    const first = syllables[start];
+    if (first.localIndex === 0) {
+      flash('That’s the first line of its section — there’s already space above it', true);
+      return;
+    }
+    updateRange(start, start, (tok) => ({ ...tok, gapBefore: tok.gapBefore ? undefined : true }));
   }
 
   /** Adds a line of empty chord slots after the cursor's line. */
@@ -476,6 +495,14 @@ export function ChordTapper({
           title="Add a chord slot before this line's first word ([)"
         >
           + Slot at line start
+        </button>
+        <button
+          className="secondary"
+          onClick={toggleGapAboveLine}
+          disabled={index < 0}
+          title="Add or remove a blank line above this line, splitting the section into parts"
+        >
+          Space above line
         </button>
         <button className="secondary" onClick={addChordLine} disabled={index < 0} title="Add a line of chord slots after this line">
           + Chord line

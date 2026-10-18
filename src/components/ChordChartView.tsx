@@ -110,7 +110,9 @@ function renderLinePair(placed: PlacedLine, key: number): ReactNode {
  * the chord line. The label column width is in em of the lyric size, so it matches the doc's
  * physical width in page mode (where 1em = the lyric point size) and scales with the compact view. */
 function renderDisplayRow(display: SectionDisplayRow, labelColEm: number, fontFamily: string): ReactNode {
-  const gapClass = display.isLastInSection ? 'chart-gap-section' : 'chart-gap-line';
+  const gapClass = `${display.isLastInSection ? 'chart-gap-section' : 'chart-gap-line'}${
+    display.row?.gapBefore && !display.isFirstInSection ? ' chart-gap-before' : ''
+  }`;
   // Laid out within the page width beside the label column, wrapping where the PDF and Word
   // export do (1pt = 1px here), so the pages measured for Fit to page match what prints.
   const lines = display.row

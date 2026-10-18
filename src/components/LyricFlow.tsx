@@ -143,7 +143,11 @@ export function LyricFlow({
             {row.section.repeat && row.section.repeat > 1 ? <span className="section-repeat"> {row.section.repeat}x</span> : null}
           </div>
         ) : (
-          <div className="lyric-line-row" key={row.key} ref={ri === currentRowIndex ? currentLineRef : undefined}>
+          <div
+            className={`lyric-line-row ${row.gapBefore ? 'lyric-line-gap' : ''}`}
+            key={row.key}
+            ref={ri === currentRowIndex ? currentLineRef : undefined}
+          >
             {row.indexes.map((i, idxInLine) => renderSyllable(i, idxInLine === 0))}
           </div>
         ),

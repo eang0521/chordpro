@@ -52,7 +52,8 @@ export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Pr
         re-split here are remembered for your next song. Section headings (Verse, Chorus,
         Bridge, etc.) are detected automatically and aren't tapped or charted. An instrumental heading
         (Intro, Turn, Midtro, Tag, Outro, ...) with no lyrics under it becomes a line of empty chord
-        slots to fill in on the next step. A line like &ldquo;Key change to D&rdquo; becomes a key change.
+        slots to fill in on the next step. A blank line between two lines of a section keeps them in the
+        section but prints a space between them. A line like &ldquo;Key change to D&rdquo; becomes a key change.
       </p>
       <div className="syllable-editor">
         {lineIndexes.map((lineIndex) => (
@@ -60,6 +61,7 @@ export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Pr
             {(sectionsByLine.get(lineIndex) ?? []).map((s, i, all) => (
               <SectionHeading key={i} section={s} empty={all.slice(i + 1).some((later) => !later.keyChange)} />
             ))}
+            {groups.find((g) => g.lineIndex === lineIndex)?.gapBefore && <div className="syllable-line-gap" aria-hidden />}
             <div className="syllable-line">
               {groups
                 .filter((g) => g.lineIndex === lineIndex)

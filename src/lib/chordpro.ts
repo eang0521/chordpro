@@ -65,6 +65,8 @@ export function songToChordPro(song: Song): string {
       }
     } else if (syl.isLineStart && i !== 0) {
       flushLine();
+      // A blank line inside the section splits it into parts (read back the same way).
+      if (syl.gapBefore) lines.push('');
     }
 
     // An empty chord slot is just a placeholder for a chord that hasn't been placed yet.

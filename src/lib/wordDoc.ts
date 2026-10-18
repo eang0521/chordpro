@@ -62,8 +62,8 @@ export async function generateWordDoc(
   const contentHeightPt = (PAGE_HEIGHT_TWIPS - MARGIN_TOP_TWIPS - footer.marginBottomTwips) / 20;
   const multiPage = paginateByHeight(items.map((item) => item.height), groups, contentHeightPt + PAGE_FIT_SLACK_PT).length > 1;
 
-  const exactLine = (pt: number, afterPt = 0) => ({
-    before: 0,
+  const exactLine = (pt: number, afterPt = 0, beforePt = 0) => ({
+    before: twips(beforePt * lineSpacing),
     after: twips(afterPt * lineSpacing),
     line: twips(pt * lineSpacing),
     lineRule: LineRuleType.EXACT,
@@ -91,8 +91,15 @@ export async function generateWordDoc(
       return;
     }
     // Each row laid out within the page width, wrapping exactly where the preview and PDF do.
-    const pieces = section.lineRows.flatMap((row) => layoutLine(row.tokens, measure, lyricWidthPt, row.repeat));
-    pieces.forEach((placed, i) => {
+    // A row's first piece carries the space for a blank line splitting the section (not on the
+    // section's first row).
+    const pieces = section.lineRows.flatMap((row, r) =>
+      layoutLine(row.tokens, measure, lyricWidthPt, row.repeat).map((placed, j) => ({
+        placed,
+        gapBefore: j === 0 && r > 0 && row.gapBefore ? SECTION_GAP_PT : 0,
+      })),
+    );
+    pieces.forEach(({ placed, gapBefore }, i) => {
       const { lyricLine, chords } = placed;
       const isLast = i === pieces.length - 1;
       const withLabel = i === 0 && section.label;
@@ -107,7 +114,7 @@ export async function generateWordDoc(
         // the label (which is narrower than its column) followed by tabs to each chord.
         body.push(
           new Paragraph({
-            spacing: exactLine(LYRIC_LINE_PT, isLast ? SECTION_GAP_PT : 0),
+            spacing: exactLine(LYRIC_LINE_PT, isLast ? SECTION_GAP_PT : 0, gapBefore),
             keepNext: !isLast,
             keepLines: true,
             tabStops: chordTabStops,
@@ -120,7 +127,7 @@ export async function generateWordDoc(
       if (chords.length > 0) {
         body.push(
           new Paragraph({
-            spacing: exactLine(CHORD_LINE_PT),
+            spacing: exactLine(CHORD_LINE_PT, 0, gapBefore),
             // Every line of a section keeps with the next one, so Word never splits a section
             // across pages (matching the preview's pagination).
             keepNext: true,
@@ -132,7 +139,8 @@ export async function generateWordDoc(
       }
       body.push(
         new Paragraph({
-          spacing: exactLine(LYRIC_LINE_PT, isLast ? SECTION_GAP_PT : 0),
+          // The gap goes above the chord line when there is one, otherwise above the lyrics.
+          spacing: exactLine(LYRIC_LINE_PT, isLast ? SECTION_GAP_PT : 0, chords.length > 0 ? 0 : gapBefore),
           keepNext: !isLast,
           keepLines: true,
           // Hanging indent: the label sits at the margin on the first line, and the lyrics (plus

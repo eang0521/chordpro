@@ -11,6 +11,8 @@ export interface WordGroup {
   id: string;
   lineIndex: number;
   syllables: string[];
+  /** On a line's first word: a blank line came before this line inside its section. */
+  gapBefore?: boolean;
 }
 
 /** A detected section heading (e.g. "Verse 1", "BRIDGE"), anchored to the lyric line it precedes. */
@@ -121,31 +123,49 @@ export function parseLyricsToWordGroups(text: string): { groups: WordGroup[]; se
   const groups: WordGroup[] = [];
   const sections: Section[] = [];
   let lineIndex = 0;
+  // A blank line between two lyric lines of the same section splits it into parts; blank lines
+  // before a heading (or before any lyrics) are just the usual space between sections.
+  let linesInSection = 0;
+  let pendingGap = false;
 
   normalizeApostrophes(text)
     .split('\n')
     .forEach((rawLine) => {
       const trimmed = rawLine.trim();
-      if (trimmed.length === 0) return;
+      if (trimmed.length === 0) {
+        if (linesInSection > 0) pendingGap = true;
+        return;
+      }
 
       const keyChange = detectKeyChange(trimmed);
       if (keyChange) {
         sections.push({ type: 'other', label: trimmed, beforeLineIndex: lineIndex, keyChange });
+        linesInSection = 0;
+        pendingGap = false;
         return;
       }
 
       const header = detectSectionHeader(trimmed);
       if (header) {
         sections.push({ ...header, beforeLineIndex: lineIndex });
+        linesInSection = 0;
+        pendingGap = false;
         return;
       }
 
       trimmed
         .split(/\s+/)
         .filter(Boolean)
-        .forEach((word) => {
-          groups.push({ id: makeId(), lineIndex, syllables: hyphenateWord(word) });
+        .forEach((word, w) => {
+          groups.push({
+            id: makeId(),
+            lineIndex,
+            syllables: hyphenateWord(word),
+            ...(w === 0 && pendingGap ? { gapBefore: true } : {}),
+          });
         });
+      pendingGap = false;
+      linesInSection += 1;
       lineIndex += 1;
     });
 
@@ -225,6 +245,7 @@ export function wordGroupsToBlocks(
           isWordStart: isFirstOfWord,
           isLineStart: isFirstOfWord && isNewLine,
           chord: null,
+          ...(group.gapBefore && isFirstOfWord && isNewLine && block.syllables.length > 0 ? { gapBefore: true } : {}),
           blockId: block.id,
           localIndex: block.syllables.length,
         });

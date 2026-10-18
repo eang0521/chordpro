@@ -20,7 +20,7 @@ export interface PrintedLine {
  * lines) of a section. */
 export type LayoutItem =
   | { kind: 'title'; height: number }
-  | { kind: 'row'; height: number; label: string | null; lines: PrintedLine[] };
+  | { kind: 'row'; height: number; label: string | null; lines: PrintedLine[]; gapBefore: number };
 
 /**
  * Lays out the chart as items with their heights in points, grouped by section so pagination
@@ -44,17 +44,20 @@ export function layoutChartItems(
     const group: number[] = [];
     if (section.lineRows.length === 0) {
       group.push(items.length);
-      items.push({ kind: 'row', height: lyricLine + sectionGap, label: section.label, lines: [] });
+      items.push({ kind: 'row', height: lyricLine + sectionGap, label: section.label, lines: [], gapBefore: 0 });
     }
     section.lineRows.forEach((row, i) => {
       const lines = layoutLine(row.tokens, measure, lyricWidth, row.repeat, pageMeasure);
       const isLast = i === section.lineRows.length - 1;
+      // A blank line splitting the section into parts: the same space as between sections.
+      const gapBefore = row.gapBefore && i > 0 ? sectionGap : 0;
       const height =
+        gapBefore +
         // A chord-only line takes just the lyric line's height (its chords sit on it).
         lines.reduce((sum, line) => sum + (line.chords.length > 0 && !isChordOnly(line) ? chordLine : 0) + lyricLine, 0) +
         (isLast ? sectionGap : 0);
       group.push(items.length);
-      items.push({ kind: 'row', height, label: i === 0 ? section.label : null, lines });
+      items.push({ kind: 'row', height, label: i === 0 ? section.label : null, lines, gapBefore });
     });
     groups.push(group);
   });

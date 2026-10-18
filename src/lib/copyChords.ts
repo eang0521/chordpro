@@ -87,7 +87,9 @@ export function previewLine(source: SyllableToken[], target: SyllableToken[], sh
     tokens.push(...(slotsAt.get(k) ?? []));
     if (k < lyrics.length) tokens.push(lyrics[k]);
   }
-  tokens.forEach((tok, i) => (tokens[i] = { ...tok, isLineStart: i === 0 }));
+  // The line's own blank-line gap stays on whichever token now starts it.
+  const gap = target[0]?.gapBefore;
+  tokens.forEach((tok, i) => (tokens[i] = { ...tok, isLineStart: i === 0, gapBefore: i === 0 && gap ? true : undefined }));
 
   return {
     tokens,

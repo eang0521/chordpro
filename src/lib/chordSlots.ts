@@ -59,7 +59,7 @@ export function removeToken(blocks: BlockMap, blockId: string, localIndex: numbe
   const next = block.syllables.filter((_, i) => i !== localIndex);
   const follower = next[localIndex];
   if (removed?.isLineStart && follower && !follower.isLineStart) {
-    next[localIndex] = { ...follower, isLineStart: true };
+    next[localIndex] = { ...follower, isLineStart: true, ...(removed.gapBefore ? { gapBefore: true } : {}) };
   }
   return withSyllables(blocks, block, next);
 }
