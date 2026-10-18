@@ -20,6 +20,8 @@ interface Props {
   onLineSpacingChange: (value: number) => void;
   /** The way back, at the start of the toolbar. */
   back: ReactNode;
+  /** The version dropdown, beside the way back. */
+  versions?: ReactNode;
   /** What can be done with the song, at the end of the toolbar. */
   actions: ReactNode;
   /** Messages about those actions (a failed save, say), shown under the toolbar. */
@@ -42,6 +44,7 @@ export function SongSheet({
   lineSpacing,
   onLineSpacingChange,
   back,
+  versions,
   actions,
   notices,
 }: Props) {
@@ -52,6 +55,7 @@ export function SongSheet({
     <div>
       <div className="toolbar">
         {back}
+        {versions}
         <button className="secondary" onClick={() => setView(view === 'chart' ? 'chordpro' : 'chart')}>
           {view === 'chart' ? 'Show ChordPro' : 'Show chart'}
         </button>

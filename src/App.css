@@ -1563,3 +1563,44 @@ button.link-button.publish-view {
 .syllable-line-gap {
   height: 0.9em;
 }
+
+/* Song versions */
+.version-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.version-picker select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 0.9rem;
+  max-width: 220px;
+}
+
+.version-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.version-actions button {
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.move-dialog .public-search {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.move-list {
+  max-height: 50vh;
+  overflow-y: auto;
+}

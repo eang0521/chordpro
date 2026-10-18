@@ -7,7 +7,7 @@ import { EMPTY_CREDITS } from './credits';
 
 /** Bump this, and add a step to upgradeSongDocument, whenever the saved shape changes — songs
  * saved by older versions are migrated on load instead of being thrown away. */
-export const SONG_SCHEMA_VERSION = 2;
+export const SONG_SCHEMA_VERSION = 3;
 
 /**
  * Everything needed to reopen a song exactly where it was left, in the format it is saved in
@@ -30,6 +30,15 @@ export interface SongDocument {
   lineSpacing: number;
   /** Added in version 2. */
   credits: SongCredits;
+  /** Added in version 3: the song this is a version of, shared by all its versions (a new
+   * song's is its own id), and this version's name ('' for an unnamed one, shown as "Original"). */
+  workId: string;
+  versionName: string;
+}
+
+/** A version's name as shown in the app. */
+export function versionLabel(versionName: string): string {
+  return versionName.trim() || 'Original';
 }
 
 export type UpgradeResult =
@@ -65,6 +74,8 @@ export function emptySongDocument(id = newSongId()): SongDocument {
     chartFontId: DEFAULT_CHORD_FONT_ID,
     lineSpacing: 1,
     credits: EMPTY_CREDITS,
+    workId: id,
+    versionName: '',
   };
 }
 
@@ -93,7 +104,8 @@ function readCredits(raw: unknown): SongCredits {
 /**
  * Turns anything previously saved into a current SongDocument, or says why it can't.
  * Version 0 is the single local draft from before the library existed ('chordpro-draft-v4'):
- * the same song fields with no id, no version and no chart settings. Version 2 added credits.
+ * the same song fields with no id, no version and no chart settings. Version 2 added credits,
+ * version 3 versions.
  */
 export function upgradeSongDocument(raw: unknown): UpgradeResult {
   if (!isRecord(raw)) return { ok: false, reason: 'invalid' };
@@ -119,6 +131,10 @@ export function upgradeSongDocument(raw: unknown): UpgradeResult {
     lineSpacing: typeof raw.lineSpacing === 'number' && raw.lineSpacing > 0 ? clampLineSpacing(raw.lineSpacing) : base.lineSpacing,
     // Version 1 had no credits; they start blank.
     credits: readCredits(raw.credits),
+    // Version 2 and earlier: each song was its own one-version song. (The library and public
+    // song stores fill both in from their own columns, which win over the document.)
+    workId: typeof raw.workId === 'string' && raw.workId ? raw.workId : base.id,
+    versionName: typeof raw.versionName === 'string' ? raw.versionName : '',
   };
   // Future migrations go here, one `if (version < N)` step each, oldest first.
   return { ok: true, doc };

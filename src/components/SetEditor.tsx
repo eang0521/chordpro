@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyName } from '../types';
 import type { SetEntry, SetStore, SongSet } from '../lib/setStore';
 import { shareSetUrl } from '../lib/setStore';
-import type { SongStore, SongSummary } from '../lib/songStore';
+import { versionSuffix, type SongStore, type SongSummary } from '../lib/songStore';
 import type { SongDocument } from '../lib/songDocument';
 import { KEY_NAMES } from '../lib/musicTheory';
 import { makeId } from '../lib/id';
@@ -18,7 +18,8 @@ interface Props {
   onBack: () => void;
 }
 
-const titleOf = (song: SongSummary) => song.title.trim() || 'Untitled';
+// With the version's name, since a set can hold more than one version of a song.
+const titleOf = (song: SongSummary) => `${song.title.trim() || 'Untitled'}${versionSuffix(song)}`;
 const byTitle = (a: SongSummary, b: SongSummary) => titleOf(a).localeCompare(titleOf(b), undefined, { numeric: true, sensitivity: 'base' });
 
 /** One set: its name, its songs in order with the key each is played in, sharing and printing. */

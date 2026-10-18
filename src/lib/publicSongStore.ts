@@ -8,12 +8,17 @@ import { NewerSongVersionError } from './songStore';
 /** What the public list shows for a song. */
 export interface PublicSongSummary {
   id: string;
+  /** The song it's a version of, shared with every other version (public or private). */
+  workId: string;
+  versionName: string;
   title: string;
   keys: KeyName[];
   /** The "Words and music by ..." line, or ''. */
   writers: string;
   /** ISO timestamp of the latest publish. */
   updatedAt: string;
+  /** ISO timestamp of the first publish. */
+  publishedAt: string;
 }
 
 /** Where a library song's public snapshot is, and when it was last published. */
@@ -34,7 +39,10 @@ export interface PublicSong {
  * Each public song is a snapshot of one of its publisher's library songs.
  */
 export interface PublicSongStore {
+  /** Every public version of every song, one entry per version. */
   list(): Promise<PublicSongSummary[]>;
+  /** The public versions of one song. */
+  listVersions(workId: string): Promise<PublicSongSummary[]>;
   get(id: string): Promise<PublicSong | null>;
   /** Whether the signed-in user is on the publishers list. */
   isPublisher(): Promise<boolean>;
@@ -62,23 +70,34 @@ export function createSupabasePublicSongStore(client: SupabaseClient): PublicSon
     return data ? { id: data.id as string, updatedAt: data.updated_at as string } : null;
   }
 
+  const SUMMARY = 'id, work_id, version_name, title, keys, writers, updated_at, published_at';
+  const toSummary = (row: Record<string, unknown>): PublicSongSummary => ({
+    id: row.id as string,
+    workId: row.work_id as string,
+    versionName: row.version_name as string,
+    title: row.title as string,
+    keys: (row.keys ?? []) as KeyName[],
+    writers: row.writers as string,
+    updatedAt: row.updated_at as string,
+    publishedAt: row.published_at as string,
+  });
+
   return {
     async list() {
-      const { data, error } = await table().select('id, title, keys, writers, updated_at').order('title');
+      const { data, error } = await table().select(SUMMARY).order('title');
       if (error) throw error;
-      return (data ?? []).map(
-        (row): PublicSongSummary => ({
-          id: row.id as string,
-          title: row.title as string,
-          keys: (row.keys ?? []) as KeyName[],
-          writers: row.writers as string,
-          updatedAt: row.updated_at as string,
-        }),
-      );
+      return (data ?? []).map(toSummary);
+    },
+
+    async listVersions(workId) {
+      // Oldest first, so the first version published is the one a song opens on by default.
+      const { data, error } = await table().select(SUMMARY).eq('work_id', workId).order('published_at');
+      if (error) throw error;
+      return (data ?? []).map(toSummary);
     },
 
     async get(id) {
-      const { data, error } = await table().select('document, publisher').eq('id', id).maybeSingle();
+      const { data, error } = await table().select('document, publisher, work_id, version_name').eq('id', id).maybeSingle();
       if (error) throw error;
       if (!data) return null;
       const result = upgradeSongDocument(data.document);
@@ -86,7 +105,10 @@ export function createSupabasePublicSongStore(client: SupabaseClient): PublicSon
         if (result.reason === 'newer') throw new NewerSongVersionError();
         throw new Error("This song's saved data couldn't be read.");
       }
-      return { doc: { ...result.doc, id }, publisherId: (data.publisher as string | null) ?? null };
+      return {
+        doc: { ...result.doc, id, workId: data.work_id as string, versionName: data.version_name as string },
+        publisherId: (data.publisher as string | null) ?? null,
+      };
     },
 
     async isPublisher() {
@@ -118,6 +140,8 @@ export function createSupabasePublicSongStore(client: SupabaseClient): PublicSon
       const { error } = await table().upsert({
         id,
         source_song_id: doc.id,
+        work_id: doc.workId,
+        version_name: doc.versionName.trim(),
         title: doc.title.trim(),
         keys: songKeysOf(doc.blocks, doc.arrangement, doc.key),
         writers: writersLine(doc.credits),

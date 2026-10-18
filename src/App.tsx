@@ -42,6 +42,8 @@ import { makeId } from './lib/id';
 import type { CarryOverReport } from './lib/carryOver';
 import { carryOverBlocks, carryOverWordGroups } from './lib/carryOver';
 import { ThemeSwitch } from './components/ThemeSwitch';
+import { VersionPicker } from './components/VersionPicker';
+import { rememberVersion, type VersionRef } from './lib/lastVersion';
 import { useAuth, signOut } from './hooks/useAuth';
 import { useAutosave } from './hooks/useAutosave';
 import './App.css';
@@ -137,6 +139,8 @@ function App() {
   const [arrangement, setArrangement] = useState<ArrangementEntry[]>(initialDraft.arrangement);
   const [palette, setPalette] = useState<Chord[]>(initialDraft.palette);
   const [credits, setCredits] = useState<SongCredits>(initialDraft.credits);
+  const [workId, setWorkId] = useState(initialDraft.workId);
+  const [versionName, setVersionName] = useState(initialDraft.versionName);
   const [showCredits, setShowCredits] = useState(false);
   const [showArrangement, setShowArrangement] = useState(false);
   const [showChart, setShowChart] = useState(false);
@@ -165,8 +169,10 @@ function App() {
       chartFontId,
       lineSpacing: chartLineSpacing,
       credits,
+      workId,
+      versionName,
     }),
-    [songId, step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette, chartFontId, chartLineSpacing, credits],
+    [songId, step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette, chartFontId, chartLineSpacing, credits, workId, versionName],
   );
 
   const editingLibrarySong = source === 'cloud' && screen === 'editor';
@@ -197,6 +203,8 @@ function App() {
     setChartFontId(next.chartFontId);
     setChartLineSpacing(next.lineSpacing);
     setCredits(next.credits);
+    setWorkId(next.workId);
+    setVersionName(next.versionName);
     setShowArrangement(false);
     setShowCredits(false);
     setShowChart(false);
@@ -228,6 +236,7 @@ function App() {
       // A song with a chart opens on it; one still being written goes straight to the editor.
       setScreen(song.arrangement.length > 0 ? 'view' : 'editor');
       rememberOpenSong(song.id);
+      rememberVersion(song.workId, { kind: 'own', id: song.id });
     } catch (err) {
       rememberOpenSong(null);
       setLibraryMessage(err instanceof NewerSongVersionError ? err.message : "Couldn't open that song. Check your connection and try again.");
@@ -382,13 +391,45 @@ function App() {
     setRoute(null);
   }
 
-  /** A private, editable copy of a public song, opened in the editor. */
+  /** A private, editable copy of a public song, as the user's own version of the same song
+   * (keeping its version name), opened in My Songs. */
   async function copyPublicSong(publicDoc: SongDocument) {
     if (!songStore) return;
     const copy: SongDocument = { ...publicDoc, id: newSongId(), step: 'export' };
     await songStore.save(copy);
     leavePublic();
     await openSong(copy.id);
+  }
+
+  /** Opens a version chosen from a song page's dropdown, in My Songs or in Public songs. */
+  function openVersion(version: VersionRef) {
+    if (version.kind === 'public') {
+      void goToPublic(version.id);
+      return;
+    }
+    if (route) leavePublic();
+    void openSong(version.id);
+  }
+
+  /** Copies the open library version under a new name, as another version of the same song. */
+  async function newVersion(name: string) {
+    if (!songStore) return;
+    const copy: SongDocument = { ...doc, id: newSongId(), versionName: name };
+    await songStore.save(copy);
+    await openSong(copy.id);
+  }
+
+  /** Deletes the open library version, then opens another of the user's versions of the same
+   * song, or goes back to My Songs if that was the last. */
+  async function deleteVersion() {
+    if (!songStore || !(await leaveLibrarySong())) return;
+    await songStore.delete(songId);
+    const others = (await songStore.listVersions(workId)).filter((v) => v.id !== songId);
+    if (others.length > 0) await openSong(others[0].id);
+    else {
+      setScreen('library');
+      rememberOpenSong(null);
+    }
   }
 
   // Signed in, only a library song is ever shown in the editor — never the local draft for a
@@ -521,6 +562,8 @@ function App() {
             onBack={() => void goToPublic()}
             onCopyToLibrary={copyPublicSong}
             onSignIn={() => setShowSignIn(true)}
+            songStore={userId ? songStore : null}
+            onSelectVersion={openVersion}
           />
         )}
         {route?.kind === 'public' && publicStore && !route.songId && (
@@ -556,6 +599,19 @@ function App() {
                 &larr; My songs
               </button>
             }
+            versions={
+              <VersionPicker
+                // Reloads the list when a version is added, removed or moved to another song.
+                key={`${songId}:${workId}`}
+                workId={workId}
+                current={{ kind: 'own', id: songId }}
+                currentName={versionName}
+                songStore={songStore}
+                publicStore={publicStore}
+                onSelect={openVersion}
+                ownActions={{ onNew: newVersion, onRename: setVersionName, onDelete: deleteVersion, onMove: setWorkId }}
+              />
+            }
             actions={
               <>
                 {autosave.status === 'error' && (
@@ -565,6 +621,9 @@ function App() {
                       Retry
                     </button>
                   </span>
+                )}
+                {isPublisher && publicStore && (
+                  <PublishControl store={publicStore} doc={doc} onViewPublic={(id) => void goToPublic(id)} />
                 )}
                 <button onClick={() => setScreen('editor')}>Edit</button>
               </>

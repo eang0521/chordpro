@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import type { KeyName } from '../types';
 import type { PublicSong, PublicSongStore } from '../lib/publicSongStore';
 import type { SongDocument } from '../lib/songDocument';
-import { NewerSongVersionError } from '../lib/songStore';
+import { NewerSongVersionError, type SongStore } from '../lib/songStore';
+import { rememberVersion, type VersionRef } from '../lib/lastVersion';
 import { SongSheet } from './SongSheet';
+import { VersionPicker } from './VersionPicker';
 
 interface Props {
   store: PublicSongStore;
@@ -14,6 +16,9 @@ interface Props {
   /** Makes an editable copy in the user's own library. */
   onCopyToLibrary: (doc: SongDocument) => Promise<void>;
   onSignIn: () => void;
+  /** The signed-in user's library, so their own versions of this song join the dropdown. */
+  songStore: SongStore | null;
+  onSelectVersion: (version: VersionRef) => void;
 }
 
 /**
@@ -21,7 +26,7 @@ interface Props {
  * the ChordPro text a click away. Changing the key, font or spacing here only changes what
  * you see and download — nothing is saved back to the public song.
  */
-export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onSignIn }: Props) {
+export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onSignIn, songStore, onSelectVersion }: Props) {
   const [song, setSong] = useState<PublicSong | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [key, setKey] = useState<KeyName>('C');
@@ -43,6 +48,7 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
           return;
         }
         setSong(loaded);
+        rememberVersion(loaded.doc.workId, { kind: 'public', id });
         setKey(loaded.doc.key);
         setFontId(loaded.doc.chartFontId);
         setLineSpacing(loaded.doc.lineSpacing);
@@ -104,6 +110,16 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
           lineSpacing={lineSpacing}
           onLineSpacingChange={setLineSpacing}
           back={back}
+          versions={
+            <VersionPicker
+              workId={doc.workId}
+              current={{ kind: 'public', id }}
+              currentName={doc.versionName}
+              songStore={songStore}
+              publicStore={store}
+              onSelect={onSelectVersion}
+            />
+          }
           notices={
             <>
               {copyFailed && <p className="hint library-error">Couldn&rsquo;t copy it to your songs. Try again.</p>}

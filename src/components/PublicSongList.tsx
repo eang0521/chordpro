@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { PublicSongStore, PublicSongSummary } from '../lib/publicSongStore';
+import { lastVersion } from '../lib/lastVersion';
 
 interface Props {
   store: PublicSongStore;
@@ -7,6 +8,24 @@ interface Props {
 }
 
 const titleOf = (song: PublicSongSummary) => song.title.trim() || 'Untitled';
+
+/** One row of the list: a song, shown by the version it opens on, with all its public versions. */
+interface SongRow extends PublicSongSummary {
+  versions: PublicSongSummary[];
+}
+
+/** Groups public versions into songs. A song opens on the version last opened here, or else
+ * the first one published. */
+function groupByWork(songs: PublicSongSummary[]): SongRow[] {
+  const byWork = new Map<string, PublicSongSummary[]>();
+  songs.forEach((s) => byWork.set(s.workId, [...(byWork.get(s.workId) ?? []), s]));
+  return [...byWork.entries()].map(([workId, versions]) => {
+    versions.sort((a, b) => a.publishedAt.localeCompare(b.publishedAt));
+    const last = lastVersion(workId);
+    const opensOn = versions.find((v) => last?.kind === 'public' && v.id === last.id) ?? versions[0];
+    return { ...opensOn, versions };
+  });
+}
 
 export function PublicSongList({ store, onOpen }: Props) {
   const [songs, setSongs] = useState<PublicSongSummary[] | null>(null);
@@ -33,8 +52,9 @@ export function PublicSongList({ store, onOpen }: Props) {
     if (!songs) return null;
     const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
     const q = fold(query.trim());
-    return songs
-      .filter((s) => !q || fold(`${s.title} ${s.writers}`).includes(q))
+    return groupByWork(songs)
+      // Any version's title or writers matches, since arrangements can credit different people.
+      .filter((s) => !q || fold([s.title, ...s.versions.map((v) => `${v.title} ${v.writers}`)].join(' ')).includes(q))
       .sort((a, b) => titleOf(a).localeCompare(titleOf(b), undefined, { numeric: true, sensitivity: 'base' }));
   }, [songs, query]);
 
@@ -74,6 +94,7 @@ export function PublicSongList({ store, onOpen }: Props) {
                 <span className="library-title">{titleOf(song)}</span>
                 <span className="library-meta">
                   {song.keys.length > 0 && <span>Key {song.keys.join('-')}</span>}
+                  {song.versions.length > 1 && <span>{song.versions.length} versions</span>}
                   {song.writers && <span>{song.writers}</span>}
                 </span>
               </button>

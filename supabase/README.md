@@ -103,6 +103,14 @@ can open, signed in or not, to see that set and print it; it shows the songs as 
 so later edits come through. **Stop sharing** turns the link off, and sharing again makes a new
 one.
 
+## 8. Song versions
+
+**SQL Editor → New query**: paste all of
+[`migrations/0004_song_versions.sql`](migrations/0004_song_versions.sql) and **Run**, before
+the app version that uses it is deployed (it reads the new columns). Every existing song
+becomes a song with one unnamed ("Original") version; a public song joins the library song
+it was published from. Group other versions by hand with **Move…** on a song's page.
+
 ## Checking row-level security
 
 With two accounts (two email addresses, each signed in in its own browser), each sees only
