@@ -24,6 +24,15 @@ export function creditLines(credits: SongCredits | undefined): string[] {
 /** Just the writers part of the credits, or '' if none were entered. */
 export function writersLine(credits: SongCredits | undefined): string {
   if (!credits) return '';
+  // Wording the standard forms can't express ("Original words by A; music and alternate words by
+  // B") is printed exactly as typed.
+  const custom = credits.useCustomWriters ? credits.customWriters?.trim() : '';
+  if (custom) return custom;
+  return builtWritersLine(credits);
+}
+
+/** The writers line built from the words / music fields, ignoring any custom wording. */
+export function builtWritersLine(credits: SongCredits): string {
   const words = credits.wordsBy.trim();
   const music = credits.separateMusic ? credits.musicBy.trim() : '';
   return credits.separateMusic

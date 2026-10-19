@@ -98,6 +98,8 @@ function readCredits(raw: unknown): SongCredits {
     musicBy: text(raw.musicBy),
     separateMusic: raw.separateMusic === true,
     copyright: text(raw.copyright),
+    ...(raw.useCustomWriters === true ? { useCustomWriters: true } : {}),
+    ...(text(raw.customWriters) ? { customWriters: text(raw.customWriters) } : {}),
   };
 }
 

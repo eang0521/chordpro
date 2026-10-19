@@ -106,6 +106,11 @@ export interface SongCredits {
   separateMusic: boolean;
   /** As typed, e.g. "2025 This Group Inc."; a © is added when printed if it has none. */
   copyright: string;
+  /** When on, `customWriters` is printed as the writers line exactly as typed, in place of the
+   * "Words and music by ..." wording built from the fields above. */
+  useCustomWriters?: boolean;
+  /** e.g. "Original words by Charitie Lees Bancroft; music and alternate words by Vikki Cook." */
+  customWriters?: string;
 }
 
 export interface Song {

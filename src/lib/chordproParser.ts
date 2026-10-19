@@ -76,6 +76,8 @@ function findSpanForOffset(spans: SyllableSpan[], offset: number): SyllableSpan 
 const TITLE_RE = /^\{title:\s*(.*)\}$/i;
 const KEY_RE = /^\{key:\s*(.*)\}$/i;
 const CREDIT_RE = /^\{(lyricist|composer|copyright):\s*(.*)\}$/i;
+// The app's custom credit line: {meta: writers Original words by A; music by B.}
+const WRITERS_META_RE = /^\{meta:\s*writers\s+(.*)\}$/i;
 const START_SECTION_RE = /^\{start_of_(verse|chorus|bridge|instrumental):\s*(.*)\}$/i;
 const END_SECTION_RE = /^\{end_of_(?:verse|chorus|bridge|instrumental)\}$/i;
 const COMMENT_RE = /^\{comment:\s*(.*)\}$/i;
@@ -109,7 +111,7 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
   let key: KeyName = fallbackKey;
   // The key chords are being read in: the song's key until a later {key} changes it.
   let currentKey: KeyName = fallbackKey;
-  const creditFields: Partial<Record<'lyricist' | 'composer' | 'copyright', string>> = {};
+  const creditFields: Partial<Record<'lyricist' | 'composer' | 'copyright' | 'writers', string>> = {};
 
   const blocks: Block[] = [];
   const arrangement: ArrangementEntry[] = [];
@@ -141,6 +143,11 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
       const titleMatch = TITLE_RE.exec(trimmed);
       if (titleMatch) {
         title = titleMatch[1].trim() || fallbackTitle;
+        return;
+      }
+      const writersMatch = WRITERS_META_RE.exec(trimmed);
+      if (writersMatch) {
+        creditFields.writers = writersMatch[1].trim();
         return;
       }
       const creditMatch = CREDIT_RE.exec(trimmed);
@@ -289,13 +296,16 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
   return { title, key, blocks, arrangement, credits: creditsFrom(creditFields) };
 }
 
-function creditsFrom(fields: Partial<Record<'lyricist' | 'composer' | 'copyright', string>>): SongCredits | null {
-  const { lyricist = '', composer = '', copyright = '' } = fields;
-  if (!lyricist && !composer && !copyright) return null;
+function creditsFrom(
+  fields: Partial<Record<'lyricist' | 'composer' | 'copyright' | 'writers', string>>,
+): SongCredits | null {
+  const { lyricist = '', composer = '', copyright = '', writers = '' } = fields;
+  if (!lyricist && !composer && !copyright && !writers) return null;
   // Only the same writers for both print as "Words and music by"; just one of the two is a
   // "Words by" or "Music by" credit on its own.
   const separate = (lyricist || composer) && lyricist.toLowerCase() !== composer.toLowerCase();
+  const custom = writers ? { useCustomWriters: true, customWriters: writers } : {};
   return !separate
-    ? { wordsBy: lyricist, musicBy: '', separateMusic: false, copyright }
-    : { wordsBy: lyricist, musicBy: composer, separateMusic: true, copyright };
+    ? { wordsBy: lyricist, musicBy: '', separateMusic: false, copyright, ...custom }
+    : { wordsBy: lyricist, musicBy: composer, separateMusic: true, copyright, ...custom };
 }

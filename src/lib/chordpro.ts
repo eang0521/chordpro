@@ -10,9 +10,12 @@ function creditDirectives(song: Song): string[] {
   const words = c.wordsBy.trim();
   const music = c.separateMusic ? c.musicBy.trim() : words;
   const copyright = c.copyright.trim();
+  const custom = c.useCustomWriters ? c.customWriters?.trim() : '';
   return [
     ...(words ? [`{lyricist: ${words}}`] : []),
     ...(music ? [`{composer: ${music}}`] : []),
+    // Custom wording for the credit line ("Original words by ..."), kept as written.
+    ...(custom ? [`{meta: writers ${custom}}`] : []),
     ...(copyright ? [`{copyright: ${copyright}}`] : []),
   ];
 }

@@ -1,5 +1,5 @@
 import type { SongCredits } from '../types';
-import { creditLines } from '../lib/credits';
+import { builtWritersLine, creditLines } from '../lib/credits';
 
 interface Props {
   credits: SongCredits;
@@ -13,27 +13,54 @@ export function CreditsFields({ credits, onChange }: Props) {
 
   return (
     <div className="credits-fields">
-      <label className="field">
-        <span>{credits.separateMusic ? 'Words by' : 'Words and music by'}</span>
-        <input
-          value={credits.wordsBy}
-          onChange={(e) => set({ wordsBy: e.target.value })}
-          placeholder="e.g. Jane Smith and John Doe"
-        />
-      </label>
       <label className="credits-toggle">
         <input
           type="checkbox"
-          checked={credits.separateMusic}
-          onChange={(e) => set({ separateMusic: e.target.checked })}
+          checked={!!credits.useCustomWriters}
+          onChange={(e) =>
+            set({
+              useCustomWriters: e.target.checked,
+              // Start from the line as it prints now, so it's a matter of rewording it.
+              ...(e.target.checked && !credits.customWriters?.trim() ? { customWriters: builtWritersLine(credits) } : {}),
+            })
+          }
         />
-        <span>Music by someone else</span>
+        <span>Write the credit line myself</span>
       </label>
-      {credits.separateMusic && (
+      {credits.useCustomWriters ? (
         <label className="field">
-          <span>Music by</span>
-          <input value={credits.musicBy} onChange={(e) => set({ musicBy: e.target.value })} />
+          <span>Credit line</span>
+          <input
+            value={credits.customWriters ?? ''}
+            onChange={(e) => set({ customWriters: e.target.value })}
+            placeholder="e.g. Original words by Charitie Lees Bancroft; music and alternate words by Vikki Cook."
+          />
         </label>
+      ) : (
+        <>
+          <label className="field">
+            <span>{credits.separateMusic ? 'Words by' : 'Words and music by'}</span>
+            <input
+              value={credits.wordsBy}
+              onChange={(e) => set({ wordsBy: e.target.value })}
+              placeholder="e.g. Jane Smith and John Doe"
+            />
+          </label>
+          <label className="credits-toggle">
+            <input
+              type="checkbox"
+              checked={credits.separateMusic}
+              onChange={(e) => set({ separateMusic: e.target.checked })}
+            />
+            <span>Music by someone else</span>
+          </label>
+          {credits.separateMusic && (
+            <label className="field">
+              <span>Music by</span>
+              <input value={credits.musicBy} onChange={(e) => set({ musicBy: e.target.value })} />
+            </label>
+          )}
+        </>
       )}
       <label className="field">
         <span>Copyright</span>
