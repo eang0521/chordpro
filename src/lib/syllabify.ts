@@ -55,7 +55,13 @@ const SILENT_E_SUFFIXES: [suffix: string, syllables: string[]][] = [
 // Words that look like stem + suffix above but aren't (el-e-ment, not "ele" + "ment").
 const NOT_SILENT_E_STEMS = new Set(['element', 'elements']);
 
-/** The stem + suffix split for a word like "surely" or "hopelessly", or null if it isn't one. */
+// The ones that also keep their own syllables after a consonant (kind+ness, care+less is above):
+// without this, "righteousness" would read as "righ-teou-sness", the "sn" taken as an onset.
+// "-ly" is left out, since after a consonant it's usually not a suffix at all (holy, family).
+const CONSONANT_STEM_SUFFIXES = new Set(['lessness', 'fulness', 'lessly', 'fully', 'ments', 'ness', 'less', 'ment', 'ful']);
+
+/** The stem + suffix split for a word like "surely", "hopelessly" or "kindness", or null if it
+ * isn't one. */
 function splitSilentESuffix(core: string): [stem: string, suffixSyllables: string[]] | null {
   const lower = core.toLowerCase();
   if (NOT_SILENT_E_STEMS.has(lower)) return null;
@@ -63,6 +69,13 @@ function splitSilentESuffix(core: string): [stem: string, suffixSyllables: strin
     if (!lower.endsWith(suffix)) continue;
     const stem = core.slice(0, core.length - suffix.length);
     const s = stem.toLowerCase();
+    // A stem ending in a consonant (kind+ness, faith+ful), with a vowel to carry its own syllable.
+    // A double consonant is left to the regular rules: it splits there anyway (bless, wit-ness).
+    const last = s[s.length - 1];
+    if (CONSONANT_STEM_SUFFIXES.has(suffix) && s.length >= 3 && /[b-df-hj-np-tv-z]/.test(last ?? '') && /[aeiouy]/.test(s) && last !== suffix[0]) {
+      let at = stem.length;
+      return [stem, syllables.map((syl) => core.slice(at, (at += syl.length)))];
+    }
     // A real silent-e stem: at least 3 letters, ending consonant + "e" ("sure", "gentle"), with a
     // vowel earlier on to carry the syllable ("free"+"ly" and "re"+"ly" don't qualify).
     if (s.length < 3 || !s.endsWith('e') || 'aeiou'.includes(s[s.length - 2])) continue;
@@ -130,6 +143,10 @@ export function syllabifyCore(core: string): string[] {
   }
 
   const lower = core.toLowerCase();
+  // "right" keeps its whole "ght" before "-eous" (right-eous, not "righ-teous").
+  const ghteous = lower.indexOf('ghteous');
+  if (ghteous > 0) return [...syllabifyCore(core.slice(0, ghteous + 3)), ...syllabifyCore(core.slice(ghteous + 3))];
+
   for (const prefix of NOT_PREFIXED.has(lower) ? [] : SEPARABLE_PREFIXES) {
     if (lower.length <= prefix.length || !lower.startsWith(prefix)) continue;
     const remainder = core.slice(prefix.length);
