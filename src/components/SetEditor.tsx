@@ -8,6 +8,7 @@ import { KEY_NAMES } from '../lib/musicTheory';
 import { makeId } from '../lib/id';
 import { downloadSetPdf } from '../lib/setPdf';
 import { useAutosave } from '../hooks/useAutosave';
+import { SetCharts } from './SetCharts';
 
 interface Props {
   setStore: SetStore;
@@ -55,6 +56,32 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
     // Loads once per set; initialSet is only ever the set this was opened with.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setStore, songStore, setId]);
+
+  // Each song's full chart, loaded once per song as it's added, for the charts below the list.
+  const [docs, setDocs] = useState<Map<string, SongDocument | null>>(new Map());
+  const entryIds = set?.entries.map((e) => e.songId).join(',') ?? '';
+  useEffect(() => {
+    const missing = [...new Set(entryIds.split(',').filter(Boolean))].filter((id) => !docs.has(id));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    void Promise.all(missing.map((id) => songStore.get(id).catch(() => null))).then((loaded) => {
+      if (!cancelled) setDocs((prev) => new Map([...prev, ...missing.map((id, i) => [id, loaded[i]] as const)]));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // docs: only read to skip the songs already loaded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryIds, songStore]);
+  // Each in the key it's played in for this set.
+  const charts = useMemo(
+    () =>
+      (set?.entries ?? []).map((e) => {
+        const doc = docs.get(e.songId);
+        return doc ? { ...doc, key: e.key } : null;
+      }),
+    [set?.entries, docs],
+  );
 
   const songsById = useMemo(() => new Map((songs ?? []).map((s) => [s.id, s])), [songs]);
   const sortedSongs = useMemo(() => [...(songs ?? [])].sort(byTitle), [songs]);
@@ -263,6 +290,8 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
           </select>
         </label>
       </div>
+
+      <SetCharts songs={charts} />
     </div>
   );
 }

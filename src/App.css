@@ -1604,3 +1604,8 @@ button.link-button.publish-view {
   max-height: 50vh;
   overflow-y: auto;
 }
+
+/* A set's songs as they print, one after another under the set. */
+.set-charts {
+  margin-top: 8px;
+}

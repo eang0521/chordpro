@@ -50,6 +50,8 @@ interface Props {
   onClose?: () => void;
   /** Shown in the page itself rather than as a dialog, opening on the page layout. */
   inline?: boolean;
+  /** Just the pages, as they print, with no controls (a set's charts). Implies `inline`. */
+  pagesOnly?: boolean;
 }
 
 const FIT_MAX_PAGES = 2;
@@ -166,8 +168,10 @@ export function ChordChartView({
   onLineSpacingChange,
   credits,
   onClose,
-  inline = false,
+  inline: inlineProp = false,
+  pagesOnly = false,
 }: Props) {
+  const inline = inlineProp || pagesOnly;
   const [generating, setGenerating] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pageMode, setPageMode] = useState(inline);
@@ -300,53 +304,55 @@ export function ChordChartView({
       className={inline ? 'chart-inline' : `arrangement-panel chart-panel ${pageMode ? 'chart-panel-wide' : ''}`}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="arrangement-panel-header">
-        <h2>
-          {title || 'Untitled'} <span className="chart-key">({songKey})</span>
-        </h2>
-        <div className="chart-panel-actions">
-          <KeyControl songKey={songKey} onChange={onSongKeyChange} />
-          <select className="chart-font-select" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
-            {CHORD_FONT_OPTIONS.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <label className="chart-line-spacing">
-            <span>Line spacing</span>
-            <input
-              type="number"
-              min={MIN_LINE_SPACING}
-              max={MAX_LINE_SPACING}
-              step={0.05}
-              value={lineSpacing}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                if (!Number.isNaN(v)) onLineSpacingChange(clampLineSpacing(v));
-                setFitMessage(null);
-              }}
-            />
-          </label>
-          <button className="secondary" onClick={fitToPage} title="Set the line spacing so the song fits on 1 page, or 2 if it must">
-            Fit to page
-          </button>
-          <button className={`secondary ${pageMode ? 'chart-toggle-active' : ''}`} onClick={() => setPageMode((v) => !v)}>
-            {pageMode ? 'Compact view' : 'Show page layout'}
-          </button>
-          <button className="secondary" disabled={generating} onClick={downloadDocx}>
-            {generating ? 'Generating…' : 'Download .docx'}
-          </button>
-          <button className="secondary" disabled={generatingPdf} onClick={downloadPdf}>
-            {generatingPdf ? 'Generating…' : 'Download PDF'}
-          </button>
-          {!inline && (
-            <button className="secondary" onClick={onClose}>
-              Done
+      {!pagesOnly && (
+        <div className="arrangement-panel-header">
+          <h2>
+            {title || 'Untitled'} <span className="chart-key">({songKey})</span>
+          </h2>
+          <div className="chart-panel-actions">
+            <KeyControl songKey={songKey} onChange={onSongKeyChange} />
+            <select className="chart-font-select" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
+              {CHORD_FONT_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <label className="chart-line-spacing">
+              <span>Line spacing</span>
+              <input
+                type="number"
+                min={MIN_LINE_SPACING}
+                max={MAX_LINE_SPACING}
+                step={0.05}
+                value={lineSpacing}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (!Number.isNaN(v)) onLineSpacingChange(clampLineSpacing(v));
+                  setFitMessage(null);
+                }}
+              />
+            </label>
+            <button className="secondary" onClick={fitToPage} title="Set the line spacing so the song fits on 1 page, or 2 if it must">
+              Fit to page
             </button>
-          )}
+            <button className={`secondary ${pageMode ? 'chart-toggle-active' : ''}`} onClick={() => setPageMode((v) => !v)}>
+              {pageMode ? 'Compact view' : 'Show page layout'}
+            </button>
+            <button className="secondary" disabled={generating} onClick={downloadDocx}>
+              {generating ? 'Generating…' : 'Download .docx'}
+            </button>
+            <button className="secondary" disabled={generatingPdf} onClick={downloadPdf}>
+              {generatingPdf ? 'Generating…' : 'Download PDF'}
+            </button>
+            {!inline && (
+              <button className="secondary" onClick={onClose}>
+                Done
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {fitMessage && <p className="hint chart-fit-message">{fitMessage}</p>}
 

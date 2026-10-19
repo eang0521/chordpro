@@ -4,6 +4,7 @@ import type { SetStore, SharedSet } from '../lib/setStore';
 import { downloadSetPdf } from '../lib/setPdf';
 import { songKeysOf } from '../lib/chordChart';
 import { SongSheet } from './SongSheet';
+import { SetCharts } from './SetCharts';
 
 interface Props {
   store: SetStore;
@@ -86,31 +87,34 @@ export function SharedSetPage({ store, token }: Props) {
   }
 
   return (
-    <div className="panel library">
-      <div className="library-header">
-        <h2>{set.name.trim() || 'Untitled set'}</h2>
-        <div className="library-header-actions">
-          <button disabled={printing || set.songs.length === 0} onClick={() => void print(set)}>
-            {printing ? 'Making PDF…' : 'Download PDF'}
-          </button>
-        </div>
-      </div>
-      {error && <p className="hint library-error">{error}</p>}
-      {set.songs.length === 0 && <p className="hint">This set has no songs yet.</p>}
-      <ol className="library-list set-shared-list">
-        {set.songs.map((doc, i) => (
-          <li key={i} className="library-item">
-            <button className="library-open" onClick={() => setOpen(i)}>
-              <span className="library-title">
-                {i + 1}. {doc.title.trim() || 'Untitled'}
-              </span>
-              <span className="library-meta">
-                <span>Key {songKeysOf(doc.blocks, doc.arrangement, doc.key).join('-')}</span>
-              </span>
+    <div>
+      <div className="panel library">
+        <div className="library-header">
+          <h2>{set.name.trim() || 'Untitled set'}</h2>
+          <div className="library-header-actions">
+            <button disabled={printing || set.songs.length === 0} onClick={() => void print(set)}>
+              {printing ? 'Making PDF…' : 'Download PDF'}
             </button>
-          </li>
-        ))}
-      </ol>
+          </div>
+        </div>
+        {error && <p className="hint library-error">{error}</p>}
+        {set.songs.length === 0 && <p className="hint">This set has no songs yet.</p>}
+        <ol className="library-list set-shared-list">
+          {set.songs.map((doc, i) => (
+            <li key={i} className="library-item">
+              <button className="library-open" onClick={() => setOpen(i)}>
+                <span className="library-title">
+                  {i + 1}. {doc.title.trim() || 'Untitled'}
+                </span>
+                <span className="library-meta">
+                  <span>Key {songKeysOf(doc.blocks, doc.arrangement, doc.key).join('-')}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <SetCharts songs={set.songs} />
     </div>
   );
 }
