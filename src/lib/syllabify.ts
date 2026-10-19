@@ -48,6 +48,7 @@ const SILENT_E_SUFFIXES: [suffix: string, syllables: string[]][] = [
   ['ness', ['ness']],
   ['less', ['less']],
   ['ment', ['ment']],
+  ['some', ['some']],
   ['ful', ['ful']],
   ['ly', ['ly']],
 ];
@@ -58,7 +59,7 @@ const NOT_SILENT_E_STEMS = new Set(['element', 'elements']);
 // The ones that also keep their own syllables after a consonant (kind+ness, care+less is above):
 // without this, "righteousness" would read as "righ-teou-sness", the "sn" taken as an onset.
 // "-ly" is left out, since after a consonant it's usually not a suffix at all (holy, family).
-const CONSONANT_STEM_SUFFIXES = new Set(['lessness', 'fulness', 'lessly', 'fully', 'ments', 'ness', 'less', 'ment', 'ful']);
+const CONSONANT_STEM_SUFFIXES = new Set(['lessness', 'fulness', 'lessly', 'fully', 'ments', 'ness', 'less', 'ment', 'some', 'ful']);
 
 /** The stem + suffix split for a word like "surely", "hopelessly" or "kindness", or null if it
  * isn't one. */
@@ -111,6 +112,17 @@ function isVowelAt(letters: string[], i: number): boolean {
   // where it acts as a glide/consonant onset ("beyond"; "boy"/"day" stay 1 syllable anyway).
   if (i === 0) return false;
   return !'aeiou'.includes(letters[i - 1].toLowerCase());
+}
+
+/** A lone "w" between "o"/"e" and "e"/"i" belongs with the vowel before it, which it rounds off
+ * (pow-er, flow-ing, view-er, new-ing). Not after a first-letter "e", where it starts the next
+ * syllable of a prefixed word (be-wil-der, re-wind). */
+function keepsGlideW(letters: string[], clusterStart: number, cluster: string): boolean {
+  if (cluster.toLowerCase() !== 'w') return false;
+  const before = letters[clusterStart - 1].toLowerCase();
+  const after = letters[clusterStart + 1]?.toLowerCase() ?? '';
+  if (!'ei'.includes(after) || !after) return false;
+  return before === 'o' || (before === 'e' && clusterStart - 1 > 1);
 }
 
 // Contraction endings that never add a syllable: there's, we're, I've, we'll, he'd, I'm, and the
@@ -272,6 +284,8 @@ export function syllabifyCore(core: string): string[] {
     let staysWithPrev: string;
     if (g === syllabicEIndex && cluster.length >= 3) {
       staysWithPrev = cluster.slice(0, -2);
+    } else if (keepsGlideW(letters, clusterStart, cluster)) {
+      staysWithPrev = cluster;
     } else {
       [staysWithPrev] = splitCluster(cluster);
     }
