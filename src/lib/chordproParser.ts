@@ -1,5 +1,5 @@
 import type { ArrangementEntry, Block, KeyName, SectionType, SongCredits } from '../types';
-import { hyphenateWord, normalizeApostrophes } from './syllables';
+import { detectSectionHeader, hyphenateWord, normalizeApostrophes } from './syllables';
 import { keyFromName, parseChord, semitonesBetween } from './musicTheory';
 import { makeKeyChange } from './arrangement';
 import { makeId } from './id';
@@ -78,9 +78,25 @@ const KEY_RE = /^\{key:\s*(.*)\}$/i;
 const CREDIT_RE = /^\{(lyricist|composer|copyright):\s*(.*)\}$/i;
 // The app's custom credit line: {meta: writers Original words by A; music by B.}
 const WRITERS_META_RE = /^\{meta:\s*writers\s+(.*)\}$/i;
-const START_SECTION_RE = /^\{start_of_(verse|chorus|bridge|instrumental):\s*(.*)\}$/i;
-const END_SECTION_RE = /^\{end_of_(?:verse|chorus|bridge|instrumental)\}$/i;
-const COMMENT_RE = /^\{comment:\s*(.*)\}$/i;
+// Any section, labeled or not: {start_of_verse: Verse 1}, {start_of_prechorus}, {soc}.
+const START_SECTION_RE = /^\{(?:start_of_([\w-]+)|so([cvb]))(?::\s*(.*))?\}$/i;
+const END_SECTION_RE = /^\{(?:end_of_[\w-]+|eo[cvb])\}$/i;
+const COMMENT_RE = /^\{(?:comment|c|ci):\s*(.*)\}$/i;
+const SHORT_SECTIONS: Record<string, string> = { c: 'chorus', v: 'verse', b: 'bridge' };
+
+/** The section a {start_of_...} directive opens. One with no label is named after the directive
+ * ({start_of_prechorus} is "Pre-Chorus"). */
+function sectionFromDirective(name: string, label: string): { type: SectionType; label: string } {
+  const words = name.toLowerCase().replace(/[_-]+/g, ' ').trim();
+  const joined = words.replace(/\s/g, '');
+  const titleCased = words.replace(/(^|\s)(\w)/g, (_, space: string, c: string) => space + c.toUpperCase());
+  const named =
+    joined === 'prechorus' ? 'Pre-Chorus' : joined === 'postchorus' ? 'Post-Chorus' : titleCased;
+  const type: SectionType = (['verse', 'chorus', 'bridge', 'instrumental'] as const).find((t) => t === joined)
+    ?? detectSectionHeader(label || named)?.type
+    ?? 'other';
+  return { type, label: label || named };
+}
 const ANY_DIRECTIVE_RE = /^\{.*\}$/;
 // "(2x)", "2x", "(x2)", "x 3" at the very end of a line.
 const REPEAT_RE = /(?:^|\s)\(?\s*(?:(\d{1,2})\s*[x×]|[x×]\s*(\d{1,2}))\s*\)?\s*$/i;
@@ -171,7 +187,8 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
       }
       const startMatch = START_SECTION_RE.exec(trimmed);
       if (startMatch) {
-        startBlock(startMatch[1].toLowerCase() as SectionType, startMatch[2].trim());
+        const section = sectionFromDirective(startMatch[1] ?? SHORT_SECTIONS[startMatch[2].toLowerCase()], (startMatch[3] ?? '').trim());
+        startBlock(section.type, section.label);
         return;
       }
       if (END_SECTION_RE.test(trimmed)) {
@@ -185,6 +202,13 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
         return;
       }
       if (ANY_DIRECTIVE_RE.test(trimmed)) return; // unrecognized directive — skip, not lyrics
+
+      // A plain heading line, as in pasted charts: "Pre-Chorus:", "[Bridge]", "CHORUS 2".
+      const heading = detectSectionHeader(trimmed);
+      if (heading) {
+        startBlock(heading.type, heading.label);
+        return;
+      }
 
       // A repeat count at the end of a line ("(2x)", "x2") marks how many times its section is
       // played; it isn't a lyric.

@@ -38,9 +38,13 @@ function detectKeyChange(line: string): { to: KeyName | null } | null {
   return { to: name ? keyFromName(name) : null };
 }
 
+// "Pre-Chorus" however it's written: "Pre Chorus", "PreChorus", "Pre–Chorus" (any dash), "Pre.Chorus",
+// and the shorthand "Pre" or "Pre-Ch". Likewise "Post-Chorus".
+const CHORUS_JOIN = '[\\s\\-‐-―.]*';
 const SECTION_KEYWORDS = [
-  'pre-?chorus',
-  'post-?chorus',
+  `pre${CHORUS_JOIN}chorus`,
+  `pre(?:${CHORUS_JOIN}ch\\.?)?`,
+  `post${CHORUS_JOIN}chorus`,
   'verse',
   'chorus',
   'bridge',
@@ -85,13 +89,16 @@ function classifySectionType(keyword: string): SectionType {
 // a number: a lone "V" could be a lyric, and there's no "c2" for Chorus 2, since C2 is a chord.
 const VERSE_SHORTHAND_RE = /^vs?\.?\s*(\d+)\s*[.:]?$/i;
 
-function detectSectionHeader(line: string): { type: SectionType; label: string } | null {
+/** The section a heading line names ("Verse 2", "[Pre-Chorus]", "Intro/Turn"), or null for a line
+ * that isn't one. */
+export function detectSectionHeader(line: string): { type: SectionType; label: string } | null {
   const stripped = line.replace(/^[[(]\s*/, '').replace(/\s*[\])]$/, '').trim();
   const verse = VERSE_SHORTHAND_RE.exec(stripped);
   if (verse) return { type: 'verse', label: `Verse ${Number(verse[1])}` };
   const match = stripped.match(SECTION_HEADER_RE);
   if (!match) return null;
-  return { type: classifySectionType(match[1]), label: stripped };
+  // A trailing colon ("Pre-Chorus:") just marks it as a heading; it isn't part of the name.
+  return { type: classifySectionType(match[1]), label: stripped.replace(/\s*:$/, '') };
 }
 
 // Lyrics pasted from lots of places (Genius, word processors with "smart quotes", hymnals)
