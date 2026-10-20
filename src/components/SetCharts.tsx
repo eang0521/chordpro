@@ -11,12 +11,18 @@ interface Props {
 /** Every song in a set as its chart prints, one after another, as the set's PDF lays them out. */
 export function SetCharts({ songs }: Props) {
   if (songs.length === 0) return null;
+  // Keyed by song (and which time it comes up, for a song in the set twice), so a chart moves with
+  // its song when the set is reordered rather than taking over another song's page breaks.
+  const seen = new Map<string, number>();
   return (
     <div className="set-charts">
-      {songs.map((doc, i) =>
-        doc ? (
+      {songs.map((doc) => {
+        if (!doc) return null;
+        const n = (seen.get(doc.id) ?? 0) + 1;
+        seen.set(doc.id, n);
+        return (
           <ChordChartView
-            key={i}
+            key={`${doc.id}-${n}`}
             pagesOnly
             title={doc.title}
             songKey={doc.key}
@@ -29,8 +35,8 @@ export function SetCharts({ songs }: Props) {
             onLineSpacingChange={noop}
             credits={doc.credits}
           />
-        ) : null,
-      )}
+        );
+      })}
     </div>
   );
 }

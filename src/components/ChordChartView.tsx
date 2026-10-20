@@ -399,7 +399,9 @@ export function ChordChartView({
                     {pageLabelText(title, pageIndex, pages.length)}
                   </div>
                 )}
-                {indices.map((i) => (
+                {/* Until it's re-paginated, a chart that just lost rows can have page breaks
+                    for rows it no longer has. */}
+                {indices.filter((i) => i < pageItems.length).map((i) => (
                   <div key={i}>{renderPageItem(pageItems[i], title, titleSize, labelColEm, font.wordFont)}</div>
                 ))}
               </div>
