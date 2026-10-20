@@ -59,9 +59,14 @@ const SECTION_KEYWORDS = [
 ];
 
 // Matches a line that is ONLY a section keyword plus trailing numbering/punctuation
-// (e.g. "Verse 1", "BRIDGE", "Pre-Chorus 2:", "[Tag]" once brackets are stripped) —
-// never a normal lyric line, since any other trailing word fails the charset.
-const SECTION_HEADER_RE = new RegExp(`^(${SECTION_KEYWORDS.join('|')})[\\s0-9ivxIVX.\\-:]*$`, 'i');
+// (e.g. "Verse 1", "BRIDGE", "Pre-Chorus 2:", "[Tag]" once brackets are stripped), or several
+// joined by slashes for a part that does double duty ("Intro/Turn") — never a normal lyric line,
+// since any other trailing word fails the charset. The first keyword decides the section's type.
+const SECTION_KEYWORD_ALTS = SECTION_KEYWORDS.join('|');
+const SECTION_HEADER_RE = new RegExp(
+  `^(${SECTION_KEYWORD_ALTS})[\\s0-9ivxIVX.\\-:]*(?:/\\s*(?:${SECTION_KEYWORD_ALTS})[\\s0-9ivxIVX.\\-:]*)*$`,
+  'i',
+);
 
 // Headings for chord-only parts of a song. One with no lyrics under it (like "Turn" right
 // before "Verse 4") still becomes a section, made of empty chord slots to fill in.
