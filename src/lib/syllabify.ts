@@ -125,6 +125,10 @@ function keepsGlideW(letters: string[], clusterStart: number, cluster: string): 
   return before === 'o' || (before === 'e' && clusterStart - 1 > 1);
 }
 
+// Compounds of "any"/"every"/"some"/"no", split into their two words first, so the parts don't run
+// together (a-ny-one, not "a-nyone"; some-day, not "so-me-day").
+const COMPOUND_RE = /^(any|every|some|no)(ones?|body|thing|where|ways?|days?|times?|how|what)$/i;
+
 // Contraction endings that never add a syllable: there's, we're, I've, we'll, he'd, I'm, and the
 // old poetic o'er / e'er / ne'er.
 const CONTRACTION_RE = /^(.*[a-z])('(?:s|re|ve|ll|d|m|er))$/i;
@@ -153,6 +157,9 @@ export function syllabifyCore(core: string): string[] {
     stem[stem.length - 1] += contraction[2];
     return stem;
   }
+
+  const compound = COMPOUND_RE.exec(core);
+  if (compound) return [...syllabifyCore(compound[1]), ...syllabifyCore(compound[2])];
 
   const lower = core.toLowerCase();
   // "right" keeps its whole "ght" before "-eous" (right-eous, not "righ-teous").
