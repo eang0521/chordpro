@@ -236,6 +236,20 @@ export function ChordChartView({
   const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [pages, setPages] = useState<number[][]>([]);
 
+  // On a screen narrower than a page (a phone), the pages are shrunk to fit its width, like a PDF
+  // viewer, rather than being cut off.
+  const pagesRef = useRef<HTMLDivElement | null>(null);
+  const [pageScale, setPageScale] = useState(1);
+  useLayoutEffect(() => {
+    const el = pagesRef.current;
+    if (!el) return;
+    const fit = () => setPageScale(Math.min(1, el.clientWidth / PAGE_WIDTH_PX));
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [pageMode]);
+
   // Page items grouped by song section (the title on its own), so a section is never split
   // across pages.
   const groups = useMemo(() => {
@@ -383,55 +397,65 @@ export function ChordChartView({
       </div>
 
       {pageMode ? (
-        <div className="chart-pages">
+        <div className="chart-pages" ref={pagesRef}>
           {pages.map((indices, pageIndex) => (
-            <div className="chart-page" style={{ width: PAGE_WIDTH_PX, height: PAGE_HEIGHT_PX }} key={pageIndex}>
+            // Takes the shrunk page's size, since a CSS scale leaves the page's layout box full size.
+            <div className="chart-page-frame" style={{ width: PAGE_WIDTH_PX * pageScale, height: PAGE_HEIGHT_PX * pageScale }} key={pageIndex}>
               <div
-                className="chart-page-content"
+                className="chart-page"
                 style={{
-                  fontFamily: font.cssFont,
-                  fontSize: LYRIC_SIZE_PT,
-                  padding: `${MARGIN_TOP_PX}px ${MARGIN_SIDE_PX}px ${marginBottomPx}px`,
-                  ...lineSpacingVar(lineSpacing),
+                  width: PAGE_WIDTH_PX,
+                  height: PAGE_HEIGHT_PX,
+                  ...(pageScale < 1 ? { transform: `scale(${pageScale})`, transformOrigin: 'top left' } : {}),
                 }}
               >
-                {/* Only the first page has the key, like the Word and PDF exports; a multi-page
-                    chart labels every page at the top right, level with it. */}
-                {pageIndex === 0 && (
-                  <div className="chart-page-header" style={{ top: HEADER_TOP_PX, left: MARGIN_SIDE_PX }}>
-                    {keyHeader}
-                  </div>
-                )}
-                {pages.length > 1 && (
-                  <div className="chart-page-header" style={{ top: HEADER_TOP_PX, right: MARGIN_SIDE_PX }}>
-                    {pageLabelText(title, pageIndex, pages.length)}
-                  </div>
-                )}
-                {/* Until it's re-paginated, a chart that just lost rows can have page breaks
-                    for rows it no longer has. */}
-                {indices.filter((i) => i < pageItems.length).map((i) => (
-                  <div key={i}>{renderPageItem(pageItems[i], title, titleSize, labelColEm, font.wordFont)}</div>
-                ))}
-              </div>
-              {footer.lines.length > 0 && (
-                // Wrapped exactly where the Word doc and PDF wrap it, so the line count (and
-                // so the room left for the song) matches.
                 <div
-                  className="chart-page-credits"
+                  className="chart-page-content"
                   style={{
                     fontFamily: font.cssFont,
-                    fontSize: CREDIT_SIZE_PT,
-                    lineHeight: `${CREDIT_LINE_PT}px`,
-                    bottom: twipsToPreviewPx(CREDIT_BOTTOM_TWIPS),
-                    left: MARGIN_SIDE_PX,
-                    right: MARGIN_SIDE_PX,
+                    fontSize: LYRIC_SIZE_PT,
+                    padding: `${MARGIN_TOP_PX}px ${MARGIN_SIDE_PX}px ${marginBottomPx}px`,
+                    ...lineSpacingVar(lineSpacing),
                   }}
                 >
-                  {footer.lines.map((line, i) => (
-                    <div key={i}>{line}</div>
+                  {/* Only the first page has the key, like the Word and PDF exports; a multi-page
+                      chart labels every page at the top right, level with it. */}
+                  {pageIndex === 0 && (
+                    <div className="chart-page-header" style={{ top: HEADER_TOP_PX, left: MARGIN_SIDE_PX }}>
+                      {keyHeader}
+                    </div>
+                  )}
+                  {pages.length > 1 && (
+                    <div className="chart-page-header" style={{ top: HEADER_TOP_PX, right: MARGIN_SIDE_PX }}>
+                      {pageLabelText(title, pageIndex, pages.length)}
+                    </div>
+                  )}
+                  {/* Until it's re-paginated, a chart that just lost rows can have page breaks
+                      for rows it no longer has. */}
+                  {indices.filter((i) => i < pageItems.length).map((i) => (
+                    <div key={i}>{renderPageItem(pageItems[i], title, titleSize, labelColEm, font.wordFont)}</div>
                   ))}
                 </div>
-              )}
+                {footer.lines.length > 0 && (
+                  // Wrapped exactly where the Word doc and PDF wrap it, so the line count (and
+                  // so the room left for the song) matches.
+                  <div
+                    className="chart-page-credits"
+                    style={{
+                      fontFamily: font.cssFont,
+                      fontSize: CREDIT_SIZE_PT,
+                      lineHeight: `${CREDIT_LINE_PT}px`,
+                      bottom: twipsToPreviewPx(CREDIT_BOTTOM_TWIPS),
+                      left: MARGIN_SIDE_PX,
+                      right: MARGIN_SIDE_PX,
+                    }}
+                  >
+                    {footer.lines.map((line, i) => (
+                      <div key={i}>{line}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
