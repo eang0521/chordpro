@@ -31,7 +31,7 @@ import {
   TITLE_GAP_PT,
   titleSizePt,
 } from '../lib/pageLayout';
-import { TITLE_LINE_PT } from '../lib/chartLayout';
+import { PAGE_FIT_SLACK_PT, TITLE_LINE_PT } from '../lib/chartLayout';
 import { fitLineSpacing, paginateByHeight } from '../lib/pagination';
 import { KeyControl } from './KeyControl';
 
@@ -253,7 +253,9 @@ export function ChordChartView({
   }
 
   useLayoutEffect(() => {
-    setPages(paginateByHeight(measureHeights(), groups, contentHeightPx));
+    // The same room per page as the PDF and Word export allow, so a section that only just fits
+    // (or only just doesn't) breaks onto the same page here as it does there.
+    setPages(paginateByHeight(measureHeights(), groups, contentHeightPx + PAGE_FIT_SLACK_PT));
     // measureHeights only reads the DOM rendered from these.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageItems, groups, font.cssFont, lineSpacing, fontLoads, contentHeightPx, titleSize]);
