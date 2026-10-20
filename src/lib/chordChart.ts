@@ -145,12 +145,20 @@ export function songKeysOf(blocks: BlockMap, arrangement: ArrangementEntry[], so
   return songKeys(groupIntoSections(buildChartRows(blocks, arrangement, songKey)), songKey);
 }
 
+/** The key a capoed guitarist's chord shapes are in: `capo` semitones below the key played. */
+export function capoShapeKey(key: KeyName, capo = 0): KeyName {
+  return capo ? transposeKey(key, -capo) : key;
+}
+
 /**
  * The page header's key: "Key of C", or every key the song is played in, in order, when it
  * changes key partway ("Key: F-G"). Key changes print only here, not in the chart itself.
+ * With a capo, `sections` and `songKey` are in the chord shapes' key, and the header gives the
+ * key played and the shapes: "Key of Eb-F (C-D, capo 3)".
  */
-export function keyHeaderText(sections: DocSection[], songKey: KeyName): string {
+export function keyHeaderText(sections: DocSection[], songKey: KeyName, capo = 0): string {
   const keys = songKeys(sections, songKey);
+  if (capo) return `Key of ${keys.map((k) => transposeKey(k, capo)).join('-')} (${keys.join('-')}, capo ${capo})`;
   return keys.length === 1 ? `Key of ${songKey}` : `Key: ${keys.join('-')}`;
 }
 

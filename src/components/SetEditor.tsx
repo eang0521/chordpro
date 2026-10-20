@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyName } from '../types';
-import type { SetEntry, SetStore, SongSet } from '../lib/setStore';
-import { shareSetUrl } from '../lib/setStore';
+import type { SetEntry, SetSongDocument, SetStore, SongSet } from '../lib/setStore';
+import { inChartMode, shareSetUrl } from '../lib/setStore';
 import { versionSuffix, type SongStore, type SongSummary } from '../lib/songStore';
 import type { SongDocument } from '../lib/songDocument';
 import { KEY_NAMES } from '../lib/musicTheory';
 import { makeId } from '../lib/id';
 import { downloadSetPdf } from '../lib/setPdf';
 import { useAutosave } from '../hooks/useAutosave';
-import { SetCharts } from './SetCharts';
+import { CapoChartsSwitch, CapoSelect, SetCharts } from './SetCharts';
 
 interface Props {
   setStore: SetStore;
@@ -30,6 +30,8 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
   const [error, setError] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Standard charts, or each song with its capo (which is its default for anyone viewing the set).
+  const [capoCharts, setCapoCharts] = useState(false);
   const save = useCallback((s: SongSet) => setStore.save(s), [setStore]);
   const autosave = useAutosave(set, save);
   // Leaving some other way than Back (the menu, say) still saves the last change.
@@ -73,12 +75,12 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
     // docs: only read to skip the songs already loaded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryIds, songStore]);
-  // Each in the key it's played in for this set.
+  // Each in the key it's played in for this set, with its capo.
   const charts = useMemo(
     () =>
-      (set?.entries ?? []).map((e) => {
+      (set?.entries ?? []).map((e): SetSongDocument | null => {
         const doc = docs.get(e.songId);
-        return doc ? { ...doc, key: e.key } : null;
+        return doc ? { ...doc, key: e.key, capo: e.capo } : null;
       }),
     [set?.entries, docs],
   );
@@ -123,11 +125,11 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
     setError(null);
     try {
       const docs = await Promise.all(currentSet.entries.map((e) => songStore.get(e.songId)));
-      const inKey = currentSet.entries.flatMap((entry, i): SongDocument[] => {
+      const inKey = currentSet.entries.flatMap((entry, i): SetSongDocument[] => {
         const doc = docs[i];
-        return doc ? [{ ...doc, key: entry.key }] : [];
+        return doc ? [{ ...doc, key: entry.key, capo: entry.capo }] : [];
       });
-      await downloadSetPdf(currentSet.name, inKey);
+      await downloadSetPdf(currentSet.name, inChartMode(inKey, capoCharts));
     } catch {
       setError("Couldn't make the PDF. Check your connection and try again.");
     } finally {
@@ -174,6 +176,7 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
             Share link
           </button>
         )}
+        <CapoChartsSwitch capoCharts={capoCharts} onChange={setCapoCharts} />
         <button disabled={printing || set.entries.length === 0} onClick={() => void print(set)}>
           {printing ? 'Making PDF…' : 'Download PDF'}
         </button>
@@ -241,6 +244,17 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
                       ))}
                     </select>
                   </label>
+                  {/* For a guitarist with a capo: the chart shows the chord shapes they play. It's the
+                      song's default capo for anyone viewing the set, who can change it for themselves. */}
+                  <CapoSelect
+                    capo={entry.capo ?? 0}
+                    onChange={(capo) => {
+                      setEntries((entries) =>
+                        entries.map((x, j) => (j === i ? (capo ? { ...x, capo } : { songId: x.songId, key: x.key }) : x)),
+                      );
+                      if (capo) setCapoCharts(true);
+                    }}
+                  />
                   <span className="set-entry-actions">
                     <button className="secondary" aria-label="Move up" title="Move up" disabled={i === 0} onClick={() => move(i, i - 1)}>
                       &#9650;
@@ -291,7 +305,7 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
         </label>
       </div>
 
-      <SetCharts songs={charts} />
+      <SetCharts songs={inChartMode(charts, capoCharts)} />
     </div>
   );
 }

@@ -7,6 +7,26 @@ import { upgradeSongDocument, type SongDocument } from './songDocument';
 export interface SetEntry {
   songId: string;
   key: KeyName;
+  /** The fret a guitarist capos at for this song (unset or 0 for none): its chart shows the chord
+   * shapes they play, that many semitones below the key. */
+  capo?: number;
+}
+
+/** The highest capo a set offers. */
+export const MAX_CAPO = 9;
+
+/** A song as a set plays it: in the set's key, with its capo if it has one. */
+export type SetSongDocument = SongDocument & { capo?: number };
+
+/** A set's songs as they're shown and printed: with their capos for capo charts, or every song
+ * at the key played (no capo) for standard charts. */
+export function inChartMode<T extends SetSongDocument | null>(songs: T[], capoCharts: boolean): T[] {
+  return capoCharts ? songs : songs.map((s) => (s?.capo ? { ...s, capo: 0 } : s));
+}
+
+/** A capo as stored, or 0 for none (or anything that isn't a usable fret). */
+export function readCapo(value: unknown): number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MAX_CAPO ? value : 0;
 }
 
 /** A named, ordered list of the user's own songs, for a service or a rehearsal. */
@@ -30,7 +50,7 @@ export interface SetSummary {
 /** A set opened from its share link: its songs as they are now, each in the set's key. */
 export interface SharedSet {
   name: string;
-  songs: SongDocument[];
+  songs: SetSongDocument[];
 }
 
 /** Where sets live; like SongStore, saves are last-write-wins. */
@@ -49,9 +69,9 @@ const isKeyName = (value: unknown): value is KeyName => KEY_NAMES.includes(value
 
 function readEntries(value: unknown): SetEntry[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(
-    (e): e is SetEntry => typeof e === 'object' && e !== null && typeof e.songId === 'string' && isKeyName(e.key),
-  );
+  return value
+    .filter((e): e is SetEntry => typeof e === 'object' && e !== null && typeof e.songId === 'string' && isKeyName(e.key))
+    .map(({ songId, key, capo }) => (readCapo(capo) ? { songId, key, capo: readCapo(capo) } : { songId, key }));
 }
 
 /** The `sets` table and `get_shared_set` function from supabase/migrations/0003_sets.sql. */
@@ -104,11 +124,13 @@ export function createSupabaseSetStore(client: SupabaseClient): SetStore {
       const { data, error } = await client.rpc('get_shared_set', { token });
       if (error) throw error;
       if (!data) return null;
-      const songs: SongDocument[] = [];
-      for (const song of (data.songs ?? []) as { key: unknown; document: unknown }[]) {
+      const songs: SetSongDocument[] = [];
+      for (const song of (data.songs ?? []) as { key: unknown; capo?: unknown; document: unknown }[]) {
         const result = upgradeSongDocument(song.document);
         // A song saved by a newer app version than this one is skipped rather than failing the set.
-        if (result.ok) songs.push({ ...result.doc, key: isKeyName(song.key) ? song.key : result.doc.key });
+        if (result.ok) {
+          songs.push({ ...result.doc, key: isKeyName(song.key) ? song.key : result.doc.key, capo: readCapo(song.capo) });
+        }
       }
       return { name: data.name as string, songs };
     },

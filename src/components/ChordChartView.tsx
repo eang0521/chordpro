@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from '../lib/arrangement';
 import type { PlacedLine, SectionDisplayRow } from '../lib/chordChart';
-import { buildChartRows, flattenSections, groupIntoSections, isChordOnly, keyHeaderText, layoutLine, pageLabelText, songKeys } from '../lib/chordChart';
+import { buildChartRows, capoShapeKey, flattenSections, groupIntoSections, isChordOnly, keyHeaderText, layoutLine, pageLabelText, songKeys } from '../lib/chordChart';
 import { generateWordDoc } from '../lib/wordDoc';
 import { generatePdf } from '../lib/pdfDoc';
 import { chartFilename, downloadBlob } from '../lib/download';
@@ -34,6 +34,7 @@ import {
 import { PAGE_FIT_SLACK_PT, TITLE_LINE_PT } from '../lib/chartLayout';
 import { fitLineSpacing, paginateByHeight } from '../lib/pagination';
 import { KeyControl } from './KeyControl';
+import { transposeKey } from '../lib/musicTheory';
 
 interface Props {
   title: string;
@@ -52,6 +53,9 @@ interface Props {
   inline?: boolean;
   /** Just the pages, as they print, with no controls (a set's charts). Implies `inline`. */
   pagesOnly?: boolean;
+  /** A guitarist's capo (a song in a set): the chords are spelled as the shapes they play, and the
+   * header gives both keys (see keyHeaderText). */
+  capo?: number;
 }
 
 const FIT_MAX_PAGES = 2;
@@ -170,18 +174,22 @@ export function ChordChartView({
   onClose,
   inline: inlineProp = false,
   pagesOnly = false,
+  capo = 0,
 }: Props) {
   const inline = inlineProp || pagesOnly;
   const [generating, setGenerating] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pageMode, setPageMode] = useState(inline);
   const [fitMessage, setFitMessage] = useState<string | null>(null);
+  const shapeKey = capoShapeKey(songKey, capo);
   const sections = useMemo(
-    () => groupIntoSections(buildChartRows(blocks, arrangement, songKey)),
-    [blocks, arrangement, songKey],
+    () => groupIntoSections(buildChartRows(blocks, arrangement, shapeKey)),
+    [blocks, arrangement, shapeKey],
   );
   const displayRows = useMemo(() => flattenSections(sections), [sections]);
-  const keyHeader = keyHeaderText(sections, songKey);
+  const keyHeader = keyHeaderText(sections, shapeKey, capo);
+  // The keys the song is played in (not the capo shapes), for the file names.
+  const playedKeys = songKeys(sections, shapeKey).map((k) => transposeKey(k, capo));
   const pageItems = useMemo<PageItem[]>(
     () => [{ kind: 'header' }, ...displayRows.map((display) => ({ kind: 'row' as const, display }))],
     [displayRows],
@@ -284,8 +292,8 @@ export function ChordChartView({
   async function downloadDocx() {
     setGenerating(true);
     try {
-      const blob = await generateWordDoc(title, songKey, blocks, arrangement, fontId, lineSpacing, credits);
-      downloadBlob(blob, chartFilename(title, songKeys(sections, songKey), 'docx'));
+      const blob = await generateWordDoc(title, songKey, blocks, arrangement, fontId, lineSpacing, credits, capo);
+      downloadBlob(blob, chartFilename(title, playedKeys, 'docx'));
     } finally {
       setGenerating(false);
     }
@@ -294,8 +302,8 @@ export function ChordChartView({
   async function downloadPdf() {
     setGeneratingPdf(true);
     try {
-      const blob = await generatePdf(title, songKey, blocks, arrangement, fontId, lineSpacing, credits);
-      downloadBlob(blob, chartFilename(title, songKeys(sections, songKey), 'pdf'));
+      const blob = await generatePdf(title, songKey, blocks, arrangement, fontId, lineSpacing, credits, capo);
+      downloadBlob(blob, chartFilename(title, playedKeys, 'pdf'));
     } finally {
       setGeneratingPdf(false);
     }
@@ -309,7 +317,7 @@ export function ChordChartView({
       {!pagesOnly && (
         <div className="arrangement-panel-header">
           <h2>
-            {title || 'Untitled'} <span className="chart-key">({songKey})</span>
+            {title || 'Untitled'} <span className="chart-key">({songKey}{capo ? `, capo ${capo}` : ''})</span>
           </h2>
           <div className="chart-panel-actions">
             <KeyControl songKey={songKey} onChange={onSongKeyChange} />

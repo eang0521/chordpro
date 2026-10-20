@@ -111,6 +111,12 @@ the app version that uses it is deployed (it reads the new columns). Every exist
 becomes a song with one unnamed ("Original") version; a public song joins the library song
 it was published from. Group other versions by hand with **Move…** on a song's page.
 
+## 9. Capo charts in shared sets
+
+**SQL Editor → New query**: paste all of [`migrations/0005_set_capo.sql`](migrations/0005_set_capo.sql)
+and **Run**. Capos set on a set's songs work in the set itself (and its PDF) without it; this
+lets a shared set's link show them too. Until then, a shared set shows every song without its capo.
+
 ## Checking row-level security
 
 With two accounts (two email addresses, each signed in in its own browser), each sees only

@@ -543,7 +543,9 @@ button.secondary:hover:not(:disabled) {
   min-width: 0;
 }
 
-.chart-toggle-active {
+/* Beats button.secondary, whose colors would otherwise hide which one is on. */
+button.secondary.chart-toggle-active,
+button.secondary.chart-toggle-active:hover:not(:disabled) {
   background: var(--accent-dim);
   border-color: var(--accent);
   color: var(--accent);
@@ -1608,4 +1610,9 @@ button.link-button.publish-view {
 /* A set's songs as they print, one after another under the set. */
 .set-charts {
   margin-top: 8px;
+}
+
+.capo-switch {
+  display: inline-flex;
+  gap: 4px;
 }

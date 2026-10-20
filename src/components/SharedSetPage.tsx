@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import type { KeyName } from '../types';
 import type { SetStore, SharedSet } from '../lib/setStore';
 import { downloadSetPdf } from '../lib/setPdf';
+import { inChartMode } from '../lib/setStore';
 import { songKeysOf } from '../lib/chordChart';
 import { SongSheet } from './SongSheet';
-import { SetCharts } from './SetCharts';
+import { CapoChartsSwitch, CapoSelect, SetCharts } from './SetCharts';
 
 interface Props {
   store: SetStore;
@@ -21,6 +22,8 @@ export function SharedSetPage({ store, token }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
+  // Standard charts, or each song with its capo: the set's own to start with, changeable here.
+  const [capoCharts, setCapoCharts] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,7 +43,7 @@ export function SharedSetPage({ store, token }: Props) {
   async function print(shared: SharedSet) {
     setPrinting(true);
     try {
-      await downloadSetPdf(shared.name, shared.songs);
+      await downloadSetPdf(shared.name, inChartMode(shared.songs, capoCharts));
     } catch {
       setError("Couldn't make the PDF. Try again.");
     } finally {
@@ -67,6 +70,7 @@ export function SharedSetPage({ store, token }: Props) {
         onFontIdChange={(chartFontId) => change({ chartFontId })}
         lineSpacing={doc.lineSpacing}
         onLineSpacingChange={(lineSpacing) => change({ lineSpacing })}
+        capo={capoCharts ? doc.capo : 0}
         back={
           <button className="secondary" onClick={() => setOpen(null)}>
             &larr; {set.name.trim() || 'Set'}
@@ -92,6 +96,7 @@ export function SharedSetPage({ store, token }: Props) {
         <div className="library-header">
           <h2>{set.name.trim() || 'Untitled set'}</h2>
           <div className="library-header-actions">
+            <CapoChartsSwitch capoCharts={capoCharts} onChange={setCapoCharts} />
             <button disabled={printing || set.songs.length === 0} onClick={() => void print(set)}>
               {printing ? 'Making PDF…' : 'Download PDF'}
             </button>
@@ -110,11 +115,19 @@ export function SharedSetPage({ store, token }: Props) {
                   <span>Key {songKeysOf(doc.blocks, doc.arrangement, doc.key).join('-')}</span>
                 </span>
               </button>
+              {/* Starts at the capo the set gives the song; a change here is just for this viewer. */}
+              <CapoSelect
+                capo={doc.capo ?? 0}
+                onChange={(capo) => {
+                  setSet((prev) => (prev ? { ...prev, songs: prev.songs.map((s, j) => (j === i ? { ...s, capo } : s)) } : prev));
+                  if (capo) setCapoCharts(true);
+                }}
+              />
             </li>
           ))}
         </ol>
       </div>
-      <SetCharts songs={set.songs} />
+      <SetCharts songs={inChartMode(set.songs, capoCharts)} />
     </div>
   );
 }

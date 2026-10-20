@@ -1,11 +1,48 @@
-import type { SongDocument } from '../lib/songDocument';
+import type { SetSongDocument } from '../lib/setStore';
+import { MAX_CAPO } from '../lib/setStore';
 import { ChordChartView } from './ChordChartView';
+
+/** Switches a set between standard charts (for most of the band) and capo charts (for a guitarist
+ * with a capo), each song's capo set in the set as its default. */
+export function CapoChartsSwitch({ capoCharts, onChange }: { capoCharts: boolean; onChange: (capoCharts: boolean) => void }) {
+  return (
+    <span className="capo-switch" role="group" aria-label="Chart type">
+      <button className={`secondary ${capoCharts ? '' : 'chart-toggle-active'}`} aria-pressed={!capoCharts} onClick={() => onChange(false)}>
+        Standard charts
+      </button>
+      <button
+        className={`secondary ${capoCharts ? 'chart-toggle-active' : ''}`}
+        aria-pressed={capoCharts}
+        onClick={() => onChange(true)}
+        title="Each song's chords as the shapes played with its capo"
+      >
+        Capo charts
+      </button>
+    </span>
+  );
+}
+
+/** A song's capo in a set: 0 (none) up to MAX_CAPO. */
+export function CapoSelect({ capo, onChange }: { capo: number; onChange: (capo: number) => void }) {
+  return (
+    <label className="set-entry-key">
+      <span>Capo</span>
+      <select value={capo} onChange={(e) => onChange(Number(e.target.value))}>
+        {Array.from({ length: MAX_CAPO + 1 }, (_, c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 const noop = () => {};
 
 interface Props {
   /** The set's songs in order, each already in the set's key; null for one still loading or deleted. */
-  songs: (SongDocument | null)[];
+  songs: (SetSongDocument | null)[];
 }
 
 /** Every song in a set as its chart prints, one after another, as the set's PDF lays them out. */
@@ -34,6 +71,7 @@ export function SetCharts({ songs }: Props) {
             lineSpacing={doc.lineSpacing}
             onLineSpacingChange={noop}
             credits={doc.credits}
+            capo={doc.capo}
           />
         );
       })}

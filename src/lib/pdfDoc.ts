@@ -2,7 +2,7 @@ import type { PDFFont } from 'pdf-lib';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from './arrangement';
 import { PAGE_FIT_SLACK_PT, TITLE_LINE_PT, layoutChartItems } from './chartLayout';
-import { buildChartRows, groupIntoSections, isChordOnly, keyHeaderText, pageLabelText } from './chordChart';
+import { buildChartRows, capoShapeKey, groupIntoSections, isChordOnly, keyHeaderText, pageLabelText } from './chordChart';
 import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
 import { creditLines } from './credits';
 import type { TextMeasure } from './pageLayout';
@@ -59,6 +59,8 @@ export interface PdfSong {
   fontId: string;
   lineSpacing: number;
   credits?: SongCredits;
+  /** A guitarist's capo: the chart shows the chord shapes they play (see keyHeaderText). */
+  capo?: number;
 }
 
 type PdfStyle = '' | 'bold' | 'italic';
@@ -79,8 +81,9 @@ export async function generatePdf(
   fontId: string,
   lineSpacing = 1,
   credits?: SongCredits,
+  capo = 0,
 ): Promise<Blob> {
-  return generateSongsPdf(title, [{ title, key, blocks, arrangement, fontId, lineSpacing, credits }]);
+  return generateSongsPdf(title, [{ title, key, blocks, arrangement, fontId, lineSpacing, credits, capo }]);
 }
 
 /**
@@ -124,7 +127,7 @@ async function addSongPages(
   doc: PdfDocument,
   { rgb }: PdfLib,
   fonts: Record<PdfStyle, PDFFont>,
-  { title, key, blocks, arrangement, fontId, lineSpacing, credits }: PdfSong,
+  { title, key: playedKey, blocks, arrangement, fontId, lineSpacing, credits, capo = 0 }: PdfSong,
 ): Promise<void> {
   const option = getChordFontOption(fontId);
 
@@ -137,6 +140,8 @@ async function addSongPages(
       .join('');
   const measure: TextMeasure = (text, sizePt, style) => fonts[style].widthOfTextAtSize(clean(text), sizePt);
 
+  // With a capo, the chords are spelled as the shapes the guitarist plays.
+  const key = capoShapeKey(playedKey, capo);
   const sections = groupIntoSections(buildChartRows(blocks, arrangement, key));
   // Anything that decides how many lines the chart takes — where lyric lines wrap, the label
   // column's width, how the credits break — is measured the way the on-screen chart (and the Word
@@ -175,7 +180,7 @@ async function addSongPages(
     });
     // The key header goes on the first page only.
     if (pageIndex === 0) {
-      draw(page, keyHeaderText(sections, key), MARGIN_SIDE, headerBaseline, KEY_SIZE_PT, 'italic');
+      draw(page, keyHeaderText(sections, key, capo), MARGIN_SIDE, headerBaseline, KEY_SIZE_PT, 'italic');
     }
     const pageLabel = pageLabelText(title, pageIndex, pages.length);
     if (pageLabel) {

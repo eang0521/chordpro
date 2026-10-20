@@ -2,7 +2,7 @@ import type { IRunOptions, Paragraph } from 'docx';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from './arrangement';
 import { PAGE_FIT_SLACK_PT, TITLE_LINE_PT, layoutChartItems } from './chartLayout';
-import { buildChartRows, continuedTitle, groupIntoSections, isChordOnly, keyHeaderText, layoutLine } from './chordChart';
+import { buildChartRows, capoShapeKey, continuedTitle, groupIntoSections, isChordOnly, keyHeaderText, layoutLine } from './chordChart';
 import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
 import { embedFontStyles } from './docxFonts';
 import { creditLines } from './credits';
@@ -46,12 +46,15 @@ export async function generateWordDoc(
   fontId: string,
   lineSpacing = 1,
   credits?: SongCredits,
+  capo = 0,
 ): Promise<Blob> {
   // Loaded on demand — the docx package is sizable and most sessions never export a Word doc.
   const { AlignmentType, Document, Footer, Header, LineRuleType, Packer, PageNumber, Paragraph, Tab, TabStopType, TextRun } = await import('docx');
   const font = getChordFontOption(fontId);
   await loadChordFont(font); // measuring chord positions needs the real font loaded
-  const sections = groupIntoSections(buildChartRows(blocks, arrangement, key));
+  // With a capo, the chords are spelled as the shapes the guitarist plays.
+  const shapeKey = capoShapeKey(key, capo);
+  const sections = groupIntoSections(buildChartRows(blocks, arrangement, shapeKey));
   const measure = measureInFont(font.wordFont);
   const labelCol = labelColumnTwips(sections.map((s) => s.label), measure);
   const lyricWidthPt = (CONTENT_WIDTH_TWIPS - labelCol) / 20;
@@ -205,7 +208,7 @@ export async function generateWordDoc(
             children: [
               new Paragraph({
                 tabStops: pageLabelTab,
-                children: [headerRun([keyHeaderText(sections, key)]), ...(multiPage ? [headerRun([new Tab(), ...pageNumber])] : [])],
+                children: [headerRun([keyHeaderText(sections, shapeKey, capo)]), ...(multiPage ? [headerRun([new Tab(), ...pageNumber])] : [])],
               }),
             ],
           }),

@@ -26,6 +26,8 @@ interface Props {
   actions: ReactNode;
   /** Messages about those actions (a failed save, say), shown under the toolbar. */
   notices?: ReactNode;
+  /** A guitarist's capo, for a song in a set: the chart shows the shapes they play. */
+  capo?: number;
 }
 
 /**
@@ -47,6 +49,7 @@ export function SongSheet({
   versions,
   actions,
   notices,
+  capo,
 }: Props) {
   const [view, setView] = useState<'chart' | 'chordpro'>('chart');
   const flatSyllables = useMemo(() => deriveFlatSyllables(blocks, arrangement), [blocks, arrangement]);
@@ -92,6 +95,7 @@ export function SongSheet({
           lineSpacing={lineSpacing}
           onLineSpacingChange={onLineSpacingChange}
           credits={credits}
+          capo={capo}
         />
       )}
     </div>
