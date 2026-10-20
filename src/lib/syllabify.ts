@@ -240,7 +240,21 @@ export function syllabifyCore(core: string): string[] {
   // (little, apple, candle), which the cluster-splitting below handles specially.
   let syllabicEIndex = -1;
   const last = groups[groups.length - 1];
-  if (last[0] === last[1] && last[1] === n - 1 && letters[last[1]].toLowerCase() === 'e') {
+  // "-led"/"-les" on a syllabic "-Cle" stem keeps that syllable (hum-bled, trou-bles, set-tled),
+  // though not after "l", "r" or "w", where the "l" just ends the syllable before (called,
+  // whirled, howled).
+  const onSyllabicLeStem =
+    last[0] === last[1] &&
+    last[1] === n - 2 &&
+    last[0] >= 2 &&
+    letters[last[1]].toLowerCase() === 'e' &&
+    'ds'.includes(letters[n - 1].toLowerCase()) &&
+    letters[last[0] - 1].toLowerCase() === 'l' &&
+    !isVowelAt(letters, last[0] - 2) &&
+    !'lrw'.includes(letters[last[0] - 2].toLowerCase());
+  if (onSyllabicLeStem) {
+    syllabicEIndex = groups.length - 1;
+  } else if (last[0] === last[1] && last[1] === n - 1 && letters[last[1]].toLowerCase() === 'e') {
     const isSyllabicLe = last[0] >= 2 && letters[last[0] - 1].toLowerCase() === 'l' && !isVowelAt(letters, last[0] - 2);
     if (!isSyllabicLe) groups.pop();
     else syllabicEIndex = groups.length - 1;
@@ -282,7 +296,8 @@ export function syllabifyCore(core: string): string[] {
     const cluster = letters.slice(clusterStart, clusterEnd + 1).join('');
 
     let staysWithPrev: string;
-    if (g === syllabicEIndex && cluster.length >= 3) {
+    // The consonant before a syllabic "-le" goes with it (ti-tle, cra-dle, lit-tle).
+    if (g === syllabicEIndex && cluster.length >= 2) {
       staysWithPrev = cluster.slice(0, -2);
     } else if (keepsGlideW(letters, clusterStart, cluster)) {
       staysWithPrev = cluster;
