@@ -51,6 +51,9 @@ const COMMON_SUNG_SYLLABLES: Record<string, string[]> = {
   somehow: ['some', 'how'],
   power: ['pow', 'er'],
   israel: ['is', 'ra', 'el'],
+  // Often sung as two syllables, sometimes one.
+  lion: ['li', 'on'],
+  lions: ['li', 'ons'],
 };
 
 const LEARNED_KEY = 'chordpro-syllable-overrides';
