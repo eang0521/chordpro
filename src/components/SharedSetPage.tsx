@@ -115,15 +115,17 @@ export function SharedSetPage({ store, token }: Props) {
                   <span>Key {songKeysOf(doc.blocks, doc.arrangement, doc.key).join('-')}</span>
                 </span>
               </button>
-              {/* Starts at the capo the set gives the song; a change here is just for this viewer. */}
-              <CapoSelect
-                capo={doc.capo ?? 0}
-                keys={songKeysOf(doc.blocks, doc.arrangement, doc.key)}
-                onChange={(capo) => {
-                  setSet((prev) => (prev ? { ...prev, songs: prev.songs.map((s, j) => (j === i ? { ...s, capo } : s)) } : prev));
-                  if (capo) setCapoCharts(true);
-                }}
-              />
+              {/* With capo charts showing: starts at the capo the set gives the song, and a change
+                  here is just for this viewer. */}
+              {capoCharts && (
+                <CapoSelect
+                  capo={doc.capo ?? 0}
+                  keys={songKeysOf(doc.blocks, doc.arrangement, doc.key)}
+                  onChange={(capo) =>
+                    setSet((prev) => (prev ? { ...prev, songs: prev.songs.map((s, j) => (j === i ? { ...s, capo } : s)) } : prev))
+                  }
+                />
+              )}
             </li>
           ))}
         </ol>

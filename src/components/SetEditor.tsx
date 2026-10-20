@@ -245,18 +245,20 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
                       ))}
                     </select>
                   </label>
-                  {/* For a guitarist with a capo: the chart shows the chord shapes they play. It's the
-                      song's default capo for anyone viewing the set, who can change it for themselves. */}
-                  <CapoSelect
-                    capo={entry.capo ?? 0}
-                    keys={charts[i] ? songKeysOf(charts[i].blocks, charts[i].arrangement, entry.key) : [entry.key]}
-                    onChange={(capo) => {
-                      setEntries((entries) =>
-                        entries.map((x, j) => (j === i ? (capo ? { ...x, capo } : { songId: x.songId, key: x.key }) : x)),
-                      );
-                      if (capo) setCapoCharts(true);
-                    }}
-                  />
+                  {/* For a guitarist with a capo, set while showing capo charts: the chart shows the
+                      chord shapes they play. It's the song's default capo for anyone viewing the
+                      set, who can change it for themselves. */}
+                  {capoCharts && (
+                    <CapoSelect
+                      capo={entry.capo ?? 0}
+                      keys={charts[i] ? songKeysOf(charts[i].blocks, charts[i].arrangement, entry.key) : [entry.key]}
+                      onChange={(capo) =>
+                        setEntries((entries) =>
+                          entries.map((x, j) => (j === i ? (capo ? { ...x, capo } : { songId: x.songId, key: x.key }) : x)),
+                        )
+                      }
+                    />
+                  )}
                   <span className="set-entry-actions">
                     <button className="secondary" aria-label="Move up" title="Move up" disabled={i === 0} onClick={() => move(i, i - 1)}>
                       &#9650;
