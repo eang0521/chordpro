@@ -1,5 +1,6 @@
 import type { ArrangementEntry, KeyName, SectionType } from '../types';
-import { formatChord, transposeKey } from './musicTheory';
+import { transposeKey } from './musicTheory';
+import { chordMarkLabel } from './chordSlots';
 import { buildRows } from './lyricRows';
 import type { BlockMap } from './arrangement';
 import { deriveFlatSyllables } from './arrangement';
@@ -10,7 +11,7 @@ export interface ChartToken {
   key: string;
   text: string;
   isWordStart: boolean;
-  /** Includes a leading "| " when a bar line comes before the chord. */
+  /** Includes a leading "| " when a bar line comes before the chord. A "/" beat mark on a slot. */
   chordLabel: string | null;
   /** A chord with no lyric under it. */
   isSlot: boolean;
@@ -70,9 +71,7 @@ export function buildChartRows(blocks: BlockMap, arrangement: ArrangementEntry[]
         text: syl.text,
         isWordStart: syl.isWordStart,
         // Chords are spelled in the key this part of the song is played in.
-        chordLabel: syl.chord
-          ? `${syl.bar ? '| ' : ''}${formatChord(transposeKey(key, syl.keyShift ?? 0), syl.chord)}`
-          : null,
+        chordLabel: chordMarkLabel(syl, key),
         isSlot: !!syl.isChordSlot,
         ...(syl.chord && syl.chordOffset ? { chordOffset: Math.min(syl.chordOffset, syl.text.length) } : {}),
       };

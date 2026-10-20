@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import type { KeyName, SyllableToken } from '../types';
-import { formatChord, transposeKey } from '../lib/musicTheory';
+import { transposeKey } from '../lib/musicTheory';
+import { chordMarkLabel } from '../lib/chordSlots';
 import { buildRows } from '../lib/lyricRows';
 
 interface Props {
@@ -87,10 +88,7 @@ export function LyricFlow({
     const nodes: ReactNode[] = [];
     if (!isLineFirst && syl.isWordStart) nodes.push(' ');
 
-    const chordLabel =
-      showChords && songKey && syl.chord
-        ? `${syl.bar ? '| ' : ''}${formatChord(transposeKey(songKey, syl.keyShift ?? 0), syl.chord)}`
-        : null;
+    const chordLabel = showChords && songKey ? chordMarkLabel(syl, songKey) : null;
 
     const offset = syl.chord ? Math.min(syl.chordOffset ?? 0, syl.text.length) : 0;
     const classes = ['syllable'];

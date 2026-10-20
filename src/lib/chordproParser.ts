@@ -3,7 +3,7 @@ import { hyphenateWord, normalizeApostrophes } from './syllables';
 import { keyFromName, parseChord, semitonesBetween } from './musicTheory';
 import { makeKeyChange } from './arrangement';
 import { makeId } from './id';
-import { makeChordLine } from './chordSlots';
+import { BEAT_MARK, makeChordLine } from './chordSlots';
 
 export interface ParsedChordProSong {
   title: string;
@@ -58,7 +58,7 @@ function splitLineIntoSyllableSpans(plain: string): SyllableSpan[] {
   const wordRe = /\S+/g;
   let match: RegExpExecArray | null;
   while ((match = wordRe.exec(plain))) {
-    if (match[0] === '|') continue; // a bar line, not a lyric
+    if (match[0] === '|' || match[0] === BEAT_MARK) continue; // a bar line or beat mark, not a lyric
     let cursor = match.index;
     hyphenateWord(match[0]).forEach((syl, i) => {
       if (syl.length === 0) return;
@@ -216,7 +216,7 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
       const labelsBySpan = new Map<SyllableSpan, { label: string; offset: number }[]>();
       chords.forEach((chord) => {
         const under = plain[chord.offset];
-        if (under === undefined || /\s/.test(under) || under === '|') {
+        if (under === undefined || /\s/.test(under) || under === '|' || under === BEAT_MARK) {
           items.push({ kind: 'slot', label: chord.label, offset: chord.offset });
         } else {
           const span = findSpanForOffset(spans, chord.offset);
@@ -228,6 +228,8 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
         }
       });
       for (const m of plain.matchAll(/(?<=^|\s)\|(?=\s|$)/g)) items.push({ kind: 'bar', offset: m.index });
+      // A bare "/" counts a beat, as in "[G] / / / | [C] / / /".
+      for (const m of plain.matchAll(/(?<=^|\s)\/(?=\s|$)/g)) items.push({ kind: 'slot', label: BEAT_MARK, offset: m.index });
       // By position; a bar sharing a slot's position was written after that slot's chord.
       items.sort((a, b) => a.offset - b.offset || (a.kind === 'bar' ? 1 : 0) - (b.kind === 'bar' ? 1 : 0));
 
@@ -264,7 +266,8 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
             pendingBar = true;
             label = label.slice(1).trim();
           }
-          const chord = label ? parseChord(currentKey, label) : null;
+          const beat = piece.isSlot && label === BEAT_MARK;
+          const chord = label && !beat ? parseChord(currentKey, label) : null;
           block.syllables.push({
             id: makeId(),
             text: piece.text,
@@ -272,13 +275,14 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
             isLineStart: lineStart,
             ...(lineStart && pendingGap && block.syllables.length > 0 ? { gapBefore: true } : {}),
             chord,
-            ...(pendingBar && chord ? { bar: true } : {}),
+            ...(pendingBar && (chord || beat) ? { bar: true } : {}),
             ...(chord && piece.offset > 0 ? { chordOffset: piece.offset } : {}),
             ...(piece.isSlot ? { isChordSlot: true } : {}),
+            ...(beat ? { beat: true } : {}),
             blockId: block.id,
             localIndex: block.syllables.length,
           });
-          if (chord) pendingBar = false;
+          if (chord || beat) pendingBar = false;
           if (lineStart) pendingGap = false;
           lineStart = false;
         });

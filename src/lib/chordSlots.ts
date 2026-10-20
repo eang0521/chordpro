@@ -1,6 +1,21 @@
-import type { Block, SyllableToken } from '../types';
+import type { Block, KeyName, SyllableToken } from '../types';
 import type { BlockMap } from './arrangement';
 import { makeId } from './id';
+import { formatChord, transposeKey } from './musicTheory';
+
+/** What a beat mark (see SyllableToken.beat) prints as. */
+export const BEAT_MARK = '/';
+
+/** The chord (or beat mark) printed over a syllable, in the key it's played in, with a leading
+ * "| " for a bar line; null when there's neither. */
+export function chordMarkLabel(syl: SyllableToken, songKey: KeyName): string | null {
+  const mark = syl.chord
+    ? formatChord(transposeKey(songKey, syl.keyShift ?? 0), syl.chord)
+    : syl.beat && syl.isChordSlot
+      ? BEAT_MARK
+      : null;
+  return mark ? `${syl.bar ? '| ' : ''}${mark}` : null;
+}
 
 /** How many empty chord slots a new chord-only line (or instrumental section) starts with. */
 export const DEFAULT_SLOT_COUNT = 4;

@@ -4,7 +4,7 @@ import type { BlockMap } from '../lib/arrangement';
 import { blockIdsOf } from '../lib/arrangement';
 import type { LineMapping } from '../lib/copyChords';
 import { applyCopy, defaultMappings, previewLine, splitLines } from '../lib/copyChords';
-import { formatChord } from '../lib/musicTheory';
+import { chordMarkLabel } from '../lib/chordSlots';
 
 interface Props {
   blocks: BlockMap;
@@ -35,8 +35,8 @@ function renderLine(tokens: SyllableToken[], songKey: KeyName) {
     <span key={tok.id}>
       {i > 0 && tok.isWordStart ? ' ' : null}
       <span className="syl-wrap">
-        <span className={`chord-label ${tok.chord ? '' : 'chord-label-empty'}`}>
-          {tok.chord ? `${tok.bar ? '| ' : ''}${formatChord(songKey, tok.chord)}` : ''}
+        <span className={`chord-label ${chordMarkLabel(tok, songKey) ? '' : 'chord-label-empty'}`}>
+          {chordMarkLabel(tok, songKey) ?? ''}
         </span>
         <span className={`syllable past ${tok.isChordSlot ? 'syllable-slot' : ''}`}>{tok.text}</span>
       </span>

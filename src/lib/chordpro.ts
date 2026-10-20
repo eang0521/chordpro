@@ -1,5 +1,6 @@
 import type { Song } from '../types';
 import { formatChord, transposeKey } from './musicTheory';
+import { BEAT_MARK } from './chordSlots';
 
 type WrappedSectionType = 'verse' | 'chorus' | 'bridge' | 'instrumental';
 
@@ -73,14 +74,20 @@ export function songToChordPro(song: Song): string {
     }
 
     // An empty chord slot is just a placeholder for a chord that hasn't been placed yet.
-    if (syl.isChordSlot && !syl.chord) {
+    if (syl.isChordSlot && !syl.chord && !syl.beat) {
       markRepeat();
       return;
     }
     if (syl.isWordStart && currentLine.length > 0) currentLine += ' ';
     // Chords with no lyric under them (slots) are written as "[G] | [C]", the usual ChordPro way
     // to write a turnaround or instrumental line.
-    if (syl.bar && syl.chord) currentLine += '| ';
+    if (syl.bar && (syl.chord || syl.beat)) currentLine += '| ';
+    // A beat mark is written bare, as in "[G] / / / | [C] / / /".
+    if (syl.isChordSlot && !syl.chord) {
+      currentLine += BEAT_MARK;
+      markRepeat();
+      return;
+    }
     // A chord partway into the syllable goes back where it was written ("J[E]esus").
     const at = syl.chord ? Math.min(syl.chordOffset ?? 0, syl.text.length) : 0;
     currentLine += syl.text.slice(0, at);

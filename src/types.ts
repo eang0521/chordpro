@@ -41,8 +41,11 @@ export interface SyllableToken {
   isLineStart: boolean;
   /** The chord placed on this syllable, or null for none. */
   chord: Chord | null;
-  /** A bar line before this syllable's chord, as in "G C | Csus | C". */
+  /** A bar line before this syllable's chord (or beat mark), as in "G C | Csus | C". */
   bar?: boolean;
+  /** On a chord slot with no chord: a "/" beat mark, counting out a beat of the chord before it
+   * in an intro, turn or instrumental ("G / / / | C / / /"). */
+  beat?: boolean;
   /** On the first syllable of a line: a blank line before it, splitting the section into parts
    * (a verse printed in two halves). Never on a section's first line. */
   gapBefore?: boolean;
