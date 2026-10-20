@@ -1,5 +1,7 @@
 import type { SetSongDocument } from '../lib/setStore';
 import { MAX_CAPO } from '../lib/setStore';
+import type { KeyName } from '../types';
+import { capoShapeKey } from '../lib/chordChart';
 import { ChordChartView } from './ChordChartView';
 
 /** Switches a set between standard charts (for most of the band) and capo charts (for a guitarist
@@ -22,15 +24,16 @@ export function CapoChartsSwitch({ capoCharts, onChange }: { capoCharts: boolean
   );
 }
 
-/** A song's capo in a set: 0 (none) up to MAX_CAPO. */
-export function CapoSelect({ capo, onChange }: { capo: number; onChange: (capo: number) => void }) {
+/** A song's capo in a set: 0 (none) up to MAX_CAPO, each with the key(s) its chord shapes are in
+ * ("3 (C-D)"). `keys` are the keys the song is played in, in order. */
+export function CapoSelect({ capo, keys, onChange }: { capo: number; keys: KeyName[]; onChange: (capo: number) => void }) {
   return (
     <label className="set-entry-key">
       <span>Capo</span>
       <select value={capo} onChange={(e) => onChange(Number(e.target.value))}>
         {Array.from({ length: MAX_CAPO + 1 }, (_, c) => (
           <option key={c} value={c}>
-            {c}
+            {c ? `${c} (${keys.map((k) => capoShapeKey(k, c)).join('-')})` : '0'}
           </option>
         ))}
       </select>

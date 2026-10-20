@@ -5,6 +5,7 @@ import { inChartMode, shareSetUrl } from '../lib/setStore';
 import { versionSuffix, type SongStore, type SongSummary } from '../lib/songStore';
 import type { SongDocument } from '../lib/songDocument';
 import { KEY_NAMES } from '../lib/musicTheory';
+import { songKeysOf } from '../lib/chordChart';
 import { makeId } from '../lib/id';
 import { downloadSetPdf } from '../lib/setPdf';
 import { useAutosave } from '../hooks/useAutosave';
@@ -248,6 +249,7 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
                       song's default capo for anyone viewing the set, who can change it for themselves. */}
                   <CapoSelect
                     capo={entry.capo ?? 0}
+                    keys={charts[i] ? songKeysOf(charts[i].blocks, charts[i].arrangement, entry.key) : [entry.key]}
                     onChange={(capo) => {
                       setEntries((entries) =>
                         entries.map((x, j) => (j === i ? (capo ? { ...x, capo } : { songId: x.songId, key: x.key }) : x)),

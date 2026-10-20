@@ -118,6 +118,7 @@ export function SharedSetPage({ store, token }: Props) {
               {/* Starts at the capo the set gives the song; a change here is just for this viewer. */}
               <CapoSelect
                 capo={doc.capo ?? 0}
+                keys={songKeysOf(doc.blocks, doc.arrangement, doc.key)}
                 onChange={(capo) => {
                   setSet((prev) => (prev ? { ...prev, songs: prev.songs.map((s, j) => (j === i ? { ...s, capo } : s)) } : prev));
                   if (capo) setCapoCharts(true);
