@@ -623,7 +623,12 @@ function App() {
                   </span>
                 )}
                 {isPublisher && publicStore && (
-                  <PublishControl store={publicStore} doc={doc} onViewPublic={(id) => void goToPublic(id)} />
+                  <PublishControl
+                    store={publicStore}
+                    doc={doc}
+                    onViewPublic={(id) => void goToPublic(id)}
+                    onVersionNameChange={setVersionName}
+                  />
                 )}
                 <button onClick={() => setScreen('editor')}>Edit</button>
               </>
@@ -667,7 +672,12 @@ function App() {
               )}
               {step !== 'input' && <KeyControl songKey={key} onChange={setKey} />}
               {editingLibrarySong && isPublisher && publicStore && (
-                <PublishControl store={publicStore} doc={doc} onViewPublic={(id) => void goToPublic(id)} />
+                <PublishControl
+                  store={publicStore}
+                  doc={doc}
+                  onViewPublic={(id) => void goToPublic(id)}
+                  onVersionNameChange={setVersionName}
+                />
               )}
               {editingLibrarySong && (
                 <span className={`save-status save-status-${autosave.status}`} role="status">

@@ -259,9 +259,16 @@ export function SongLibrary({ store, message, onOpen, onNew, publicStore, onView
           store={publicStore}
           doc={publishing.doc}
           update={publishing.update}
-          onPublished={(id) => {
+          onPublished={(id, versionName) => {
             setPublished((prev) => new Map(prev).set(publishing.doc.id, { id, updatedAt: new Date().toISOString() }));
             setPublishing(null);
+            // The library song takes the name it was published under.
+            if (versionName !== publishing.doc.versionName) {
+              store
+                .save({ ...publishing.doc, versionName })
+                .then(refresh)
+                .catch(() => setError(`Published, but couldn't rename your copy to "${versionName}".`));
+            }
           }}
           onClose={() => setPublishing(null)}
         />
