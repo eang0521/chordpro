@@ -1571,6 +1571,11 @@ button.link-button.publish-view {
   margin-bottom: 0;
 }
 
+.set-search {
+  display: block;
+  margin-bottom: 12px;
+}
+
 /* On a phone, a song in a set has its number and title on one line and its key, capo and buttons
    on the next, rather than squeezing the title down to a letter. */
 @media (max-width: 560px) {

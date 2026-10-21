@@ -535,6 +535,7 @@ function App() {
         {!route && setStore && userId && screen === 'sets' && (
           <SetList
             store={setStore}
+            songStore={songStore}
             onOpen={(id) => {
               setOpenSet({ id });
               setScreen('set');

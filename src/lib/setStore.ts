@@ -42,6 +42,8 @@ export interface SetSummary {
   id: string;
   name: string;
   songCount: number;
+  /** The set's songs, in order (for finding a set by a song in it). */
+  songIds: string[];
   shared: boolean;
   /** ISO timestamp of the last save. */
   updatedAt: string;
@@ -87,6 +89,7 @@ export function createSupabaseSetStore(client: SupabaseClient): SetStore {
           id: row.id as string,
           name: row.name as string,
           songCount: readEntries(row.entries).length,
+          songIds: readEntries(row.entries).map((e) => e.songId),
           shared: row.share_token !== null,
           updatedAt: row.updated_at as string,
         }),
