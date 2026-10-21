@@ -1,6 +1,6 @@
 import type { ArrangementEntry, KeyName, SectionType } from '../types';
 import { transposeKey } from './musicTheory';
-import { chordMarkLabel } from './chordSlots';
+import { BEAT_MARK, chordMarkLabel } from './chordSlots';
 import { buildRows } from './lyricRows';
 import type { BlockMap } from './arrangement';
 import { deriveFlatSyllables } from './arrangement';
@@ -212,6 +212,14 @@ const CHORD_MIN_GAP_PT = 4; // keeps a wide chord from running into the next one
 const SLOT_GAP_PT = 14;
 // Room on each side of a chord that sits before a word or syllable rather than on it.
 const SLOT_PAD_PT = 1.5;
+// "/" beat marks sit closer to the chord they count and to each other ("G / / / | C / / /"); a bar
+// line still gets the full gap, so the measures stay apart.
+const BEAT_GAP_PT = 7;
+
+/** True for a "/" beat mark's label (with or without a bar line before it). */
+function isBeatLabel(label: string): boolean {
+  return label.replace(/^\|\s*/, '') === BEAT_MARK;
+}
 
 // Most spaces to add on each side of a gap when spreading lyrics apart for a chord.
 const MAX_SPREAD_SPACES = 40;
@@ -244,6 +252,8 @@ export function placeChords(tokens: ChartToken[], measure: TextMeasure, repeat?:
   let lyricsFromPt = 0;
   // Index of the line's last syllable with lyrics: slots after it are trailing chords.
   const lastLyric = tokens.reduce((last, tok, i) => (!tok.isSlot && tok.text ? i : last), -1);
+  // The trailing chord or beat mark just placed: where it ends, and whether it was a beat mark.
+  let prevTrailing: { end: number; beat: boolean } | null = null;
   tokens.forEach((tok, i) => {
     if (tok.isSlot) {
       // A chord with no lyric under it. Before a word or syllable — at the start of the line,
@@ -252,11 +262,15 @@ export function placeChords(tokens: ChartToken[], measure: TextMeasure, repeat?:
       // trailing chord, spaced out like counted beats.
       if (!tok.chordLabel) return;
       const trailing = i > lastLyric;
+      const beat = isBeatLabel(tok.chordLabel);
+      const tight = trailing && prevTrailing && (beat || prevTrailing.beat) && !tok.chordLabel.startsWith('|');
       const wordsEnd = lyricLine ? measure(lyricLine, LYRIC_SIZE_PT, 'bold') : 0;
-      const at = Math.max(lyricLine ? wordsEnd + (trailing ? SLOT_GAP_PT : SLOT_PAD_PT) : 0, nextFreePt);
+      const free = tight && prevTrailing ? prevTrailing.end + BEAT_GAP_PT : nextFreePt;
+      const at = Math.max(lyricLine ? wordsEnd + (trailing ? SLOT_GAP_PT : SLOT_PAD_PT) : 0, free);
       const end = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic');
       chords.push({ offsetPt: at, label: tok.chordLabel });
       nextFreePt = end + (trailing ? SLOT_GAP_PT : CHORD_MIN_GAP_PT);
+      prevTrailing = trailing ? { end, beat } : null;
       if (!trailing) lyricsFromPt = end + SLOT_PAD_PT;
       return;
     }
