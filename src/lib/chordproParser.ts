@@ -3,7 +3,7 @@ import { detectSectionHeader, hyphenateWord, normalizeApostrophes } from './syll
 import { keyFromName, parseChord, semitonesBetween } from './musicTheory';
 import { makeKeyChange } from './arrangement';
 import { makeId } from './id';
-import { BEAT_MARK, makeChordLine } from './chordSlots';
+import { BEAT_MARK, makeChordLine, splitParen } from './chordSlots';
 
 export interface ParsedChordProSong {
   title: string;
@@ -107,7 +107,7 @@ const REPEAT_RE = /(?:^|\s)\(?\s*(?:(\d{1,2})\s*[x×]|[x×]\s*(\d{1,2}))\s*\)?\s
 // plain lyrics don't count.
 const DIRECTIVE_LINE_RE = /^\s*\{\s*(?:title|t|subtitle|st|key|lyricist|composer|copyright|start_of_\w+|end_of_\w+|so[cvb]|eo[cvb]|comment|c|ci)\s*[:}]/im;
 const INLINE_CHORD_RE =
-  /\[\s*\|?\s*(?:[A-G][#b]?|[#b]?[1-7])(?:maj|min|m|dim|aug|sus|add|M|\d|[#b+\-°ø()])*(?:\/(?:[A-G][#b]?|[#b]?[1-7]))?\s*\]/;
+  /\[\s*\|?\s*\(?\s*(?:[A-G][#b]?|[#b]?[1-7])(?:maj|min|m|dim|aug|sus|add|M|\d|[#b+\-°ø()])*(?:\/(?:[A-G][#b]?|[#b]?[1-7]))?\s*\]/;
 
 /** True if pasted text looks like ChordPro, so it can be imported as a finished chart. */
 export function looksLikeChordPro(text: string): boolean {
@@ -291,7 +291,9 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
             label = label.slice(1).trim();
           }
           const beat = piece.isSlot && label === BEAT_MARK;
-          const chord = label && !beat ? parseChord(currentKey, label) : null;
+          // "[(G)]" is a chord in parentheses.
+          const { text: chordText, paren } = splitParen(label ?? '');
+          const chord = label && !beat ? parseChord(currentKey, chordText) : null;
           block.syllables.push({
             id: makeId(),
             text: piece.text,
@@ -300,6 +302,7 @@ export function parseChordProText(text: string, fallbackTitle: string, fallbackK
             ...(lineStart && pendingGap && block.syllables.length > 0 ? { gapBefore: true } : {}),
             chord,
             ...(pendingBar && (chord || beat) ? { bar: true } : {}),
+            ...(chord && paren ? { paren: true } : {}),
             ...(chord && piece.offset > 0 ? { chordOffset: piece.offset } : {}),
             ...(piece.isSlot ? { isChordSlot: true } : {}),
             ...(beat ? { beat: true } : {}),

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Chord, KeyName, ScaleDegree, SyllableToken } from '../types';
 import type { BlockMap } from '../lib/arrangement';
 import { updateBlockToken } from '../lib/arrangement';
-import { BEAT_MARK, insertTokens, lineEnd, makeChordLine, makeChordSlot, removeToken } from '../lib/chordSlots';
+import { BEAT_MARK, insertTokens, lineEnd, splitParen, makeChordLine, makeChordSlot, removeToken } from '../lib/chordSlots';
 import { chordsEqual, diatonicChord, formatChord, isDiatonicChord, parseChord, transposeKey } from '../lib/musicTheory';
 import { LyricFlow } from './LyricFlow';
 
@@ -17,11 +17,12 @@ interface Props {
   onSubmit: () => void;
 }
 
-/** A copied chord (or beat mark), kept with its bar line. */
+/** A copied chord (or beat mark), kept with its bar line and parentheses. */
 interface ChordMark {
   chord: Chord | null;
   bar: boolean;
   beat: boolean;
+  paren: boolean;
 }
 
 const DEGREES: ScaleDegree[] = [1, 2, 3, 4, 5, 6, 7];
@@ -143,9 +144,9 @@ export function ChordTapper({
   }
 
   // Placing a chord doubles as "move on" — no separate Space needed.
-  function placeChord(chord: Chord, bar?: boolean) {
+  function placeChord(chord: Chord, bar?: boolean, paren?: boolean) {
     if (index < 0) return;
-    updateRange(index, index, (tok) => ({ ...tok, chord, bar: bar ?? tok.bar, beat: undefined }));
+    updateRange(index, index, (tok) => ({ ...tok, chord, bar: bar ?? tok.bar, beat: undefined, paren: paren || undefined }));
     advance();
   }
 
@@ -156,13 +157,13 @@ export function ChordTapper({
       flash('Beat marks go on chord slots — press + to add one', true);
       return;
     }
-    updateRange(index, index, (tok) => ({ ...tok, chord: null, chordOffset: undefined, beat: true, bar: bar ?? tok.bar }));
+    updateRange(index, index, (tok) => ({ ...tok, chord: null, chordOffset: undefined, beat: true, paren: undefined, bar: bar ?? tok.bar }));
     advance();
   }
 
   function copySelection(): ChordMark[] | null {
     if (selCount === 0) return null;
-    const marks = syllables.slice(selStart, selEnd + 1).map((s) => ({ chord: s.chord, bar: !!s.bar, beat: !!s.beat }));
+    const marks = syllables.slice(selStart, selEnd + 1).map((s) => ({ chord: s.chord, bar: !!s.bar, beat: !!s.beat, paren: !!s.paren }));
     setClipboard(marks);
     return marks;
   }
@@ -175,7 +176,7 @@ export function ChordTapper({
   function cut() {
     const marks = copySelection();
     if (!marks) return;
-    updateRange(selStart, selEnd, (tok) => ({ ...tok, chord: null, bar: false, beat: undefined, chordOffset: undefined }));
+    updateRange(selStart, selEnd, (tok) => ({ ...tok, chord: null, bar: false, beat: undefined, paren: undefined, chordOffset: undefined }));
     flash(`Cut ${pluralize(marks.filter((m) => m.chord).length, 'chord')} from ${pluralize(marks.length, 'syllable')}`);
   }
 
@@ -194,6 +195,7 @@ export function ChordTapper({
       chord: clipboard[offset].chord,
       bar: clipboard[offset].bar,
       beat: clipboard[offset].beat && tok.isChordSlot ? true : undefined,
+      paren: clipboard[offset].chord && clipboard[offset].paren ? true : undefined,
       chordOffset: undefined,
     }));
     setAnchor(selStart);
@@ -219,7 +221,7 @@ export function ChordTapper({
       moveTo(index - 1);
       return;
     }
-    updateRange(selStart, selEnd, (tok) => ({ ...tok, chord: null, bar: false, beat: undefined, chordOffset: undefined }));
+    updateRange(selStart, selEnd, (tok) => ({ ...tok, chord: null, bar: false, beat: undefined, paren: undefined, chordOffset: undefined }));
   }
 
   /** Adds an empty chord slot (a chord with no lyric under it) right after the cursor. */
@@ -288,6 +290,16 @@ export function ChordTapper({
     updateRange(index, index, (tok) => ({ ...tok, bar: !tok.bar }));
   }
 
+  /** Puts the current chord in parentheses, "(G)", or takes them off. */
+  function toggleParen() {
+    if (index < 0) return;
+    if (!syllables[index].chord) {
+      flash('Parentheses go around a chord — place one here first', true);
+      return;
+    }
+    updateRange(index, index, (tok) => ({ ...tok, paren: tok.paren ? undefined : true }));
+  }
+
   function openTyping() {
     if (index < 0) return;
     setTyped('');
@@ -301,8 +313,9 @@ export function ChordTapper({
     }
     // A leading "|" puts a bar line before the chord, as in "| Csus".
     const bar = /^\s*\|/.test(typed);
-    const text = typed.replace(/^\s*\|\s*/, '');
-    if (text.trim() === BEAT_MARK) {
+    // Parentheses around it, "(G)", print it that way.
+    const { text, paren } = splitParen(typed.replace(/^\s*\|\s*/, ''));
+    if (text === BEAT_MARK) {
       setTyping(false);
       placeBeat(bar);
       return;
@@ -315,7 +328,7 @@ export function ChordTapper({
     const alreadyBound = isDiatonicChord(chord) || palette.some((c) => chordsEqual(c, chord));
     if (!alreadyBound && palette.length < PALETTE_KEYS.length) onPaletteChange([...palette, chord]);
     setTyping(false);
-    placeChord(chord, bar);
+    placeChord(chord, bar, paren);
   }
 
   useEffect(() => {
@@ -384,6 +397,11 @@ export function ChordTapper({
         placeBeat();
         return;
       }
+      if (e.key === '(' || e.key === ')') {
+        e.preventDefault();
+        toggleParen();
+        return;
+      }
       const degree = resolveDegree(e);
       if (degree != null) {
         e.preventDefault();
@@ -418,7 +436,8 @@ export function ChordTapper({
         current syllable &mdash; use it for chords at the end of a line &mdash; and <kbd>[</kbd> adds one at the
         start of the line, for a chord before the first word. <kbd>/</kbd> puts a beat mark on a chord slot, to
         count out the beats of the chord before it (<code>G / / / | C / / /</code>). <kbd>|</kbd> puts a bar
-        line before the current chord. <kbd>Backspace</kbd> on an empty slot removes it.{' '}
+        line before the current chord, and <kbd>(</kbd> puts it in parentheses, <code>(G)</code>, for a chord
+        leading into a turn or midtro that's harder to time. <kbd>Backspace</kbd> on an empty slot removes it.{' '}
         <strong>Copy and paste:</strong> drag across syllables (or <kbd>Shift</kbd>+click,{' '}
         <kbd>Shift</kbd>+<kbd>&larr;</kbd>/<kbd>&rarr;</kbd>) to highlight them, then <kbd>Ctrl</kbd>+<kbd>C</kbd>{' '}
         to copy their chords or <kbd>Ctrl</kbd>+<kbd>X</kbd> to cut them. Highlight where they should go and
@@ -462,7 +481,7 @@ export function ChordTapper({
               <input
                 autoFocus
                 value={typed}
-                placeholder="e.g. Asus, F#m/C#, 5sus, | C, /"
+                placeholder="e.g. Asus, F#m/C#, 5sus, | C, (G), /"
                 onChange={(e) => setTyped(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') setTyping(false);

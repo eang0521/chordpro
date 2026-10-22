@@ -7,14 +7,25 @@ import { formatChord, transposeKey } from './musicTheory';
 export const BEAT_MARK = '/';
 
 /** The chord (or beat mark) printed over a syllable, in the key it's played in, with a leading
- * "| " for a bar line; null when there's neither. */
+ * "| " for a bar line and in parentheses if marked so ("(G)"); null when there's neither. */
 export function chordMarkLabel(syl: SyllableToken, songKey: KeyName): string | null {
   const mark = syl.chord
-    ? formatChord(transposeKey(songKey, syl.keyShift ?? 0), syl.chord)
+    ? withParen(formatChord(transposeKey(songKey, syl.keyShift ?? 0), syl.chord), syl.paren)
     : syl.beat && syl.isChordSlot
       ? BEAT_MARK
       : null;
   return mark ? `${syl.bar ? '| ' : ''}${mark}` : null;
+}
+
+/** A chord's name, in parentheses when `paren` is set. */
+export function withParen(chord: string, paren: boolean | undefined): string {
+  return paren ? `(${chord})` : chord;
+}
+
+/** Splits parentheses off a typed or written chord: "(G)" is G in parentheses. */
+export function splitParen(text: string): { text: string; paren: boolean } {
+  const match = /^\(\s*(.*?)\s*\)$/.exec(text.trim());
+  return match ? { text: match[1], paren: true } : { text: text.trim(), paren: false };
 }
 
 /** How many empty chord slots a new chord-only line (or instrumental section) starts with. */

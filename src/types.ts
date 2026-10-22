@@ -43,6 +43,9 @@ export interface SyllableToken {
   chord: Chord | null;
   /** A bar line before this syllable's chord (or beat mark), as in "G C | Csus | C". */
   bar?: boolean;
+  /** The chord is printed in parentheses, "(G)": a chord leading into a turn or midtro whose
+   * timing is looser, or that's optional. */
+  paren?: boolean;
   /** On a chord slot with no chord: a "/" beat mark, counting out a beat of the chord before it
    * in an intro, turn or instrumental ("G / / / | C / / /"). */
   beat?: boolean;

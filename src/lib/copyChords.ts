@@ -55,14 +55,14 @@ export function previewLine(source: SyllableToken[], target: SyllableToken[], sh
   // Copied chords land at the start of their syllable: the target's words differ.
   const lyrics: SyllableToken[] = target
     .filter((t) => !t.isChordSlot)
-    .map((t) => ({ ...t, chord: null, bar: false, chordOffset: undefined }));
+    .map((t) => ({ ...t, chord: null, bar: false, paren: undefined, chordOffset: undefined }));
 
   let dropped = 0;
   sourceLyrics.forEach((tok, i) => {
     if (!tok.chord) return;
     const j = i + shift;
     if (j < 0 || j >= lyrics.length) dropped += 1;
-    else lyrics[j] = { ...lyrics[j], chord: tok.chord, bar: !!tok.bar };
+    else lyrics[j] = { ...lyrics[j], chord: tok.chord, bar: !!tok.bar, ...(tok.paren ? { paren: true } : {}) };
   });
 
   // Each source slot's place: how many lyric syllables come before it. Slots at either end of

@@ -140,6 +140,7 @@ function carryOverTokens(oldBlock: Block, newBlock: Block, report: CarryOverRepo
       ...tokens[ni],
       chord: old.chord,
       ...(old.bar ? { bar: true } : {}),
+      ...(old.paren ? { paren: true } : {}),
       ...(keepsLetter ? { chordOffset: old.chordOffset } : {}),
     };
     report.kept++;

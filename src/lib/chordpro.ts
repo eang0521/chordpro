@@ -1,6 +1,6 @@
 import type { Song } from '../types';
 import { formatChord, transposeKey } from './musicTheory';
-import { BEAT_MARK } from './chordSlots';
+import { BEAT_MARK, withParen } from './chordSlots';
 
 type WrappedSectionType = 'verse' | 'chorus' | 'bridge' | 'instrumental';
 
@@ -91,7 +91,8 @@ export function songToChordPro(song: Song): string {
     // A chord partway into the syllable goes back where it was written ("J[E]esus").
     const at = syl.chord ? Math.min(syl.chordOffset ?? 0, syl.text.length) : 0;
     currentLine += syl.text.slice(0, at);
-    if (syl.chord) currentLine += `[${formatChord(transposeKey(song.key, syl.keyShift ?? 0), syl.chord)}]`;
+    // A chord in parentheses keeps them inside its brackets: "[(G)]".
+    if (syl.chord) currentLine += `[${withParen(formatChord(transposeKey(song.key, syl.keyShift ?? 0), syl.chord), syl.paren)}]`;
     currentLine += syl.text.slice(at);
     markRepeat();
   });
