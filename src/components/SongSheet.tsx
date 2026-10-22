@@ -26,8 +26,10 @@ interface Props {
   actions: ReactNode;
   /** Messages about those actions (a failed save, say), shown under the toolbar. */
   notices?: ReactNode;
-  /** A guitarist's capo, for a song in a set: the chart shows the shapes they play. */
+  /** A guitarist's capo: the chart shows the shapes they play. */
   capo?: number;
+  /** Offers a capo picker on the chart. */
+  onCapoChange?: (capo: number) => void;
 }
 
 /**
@@ -50,6 +52,7 @@ export function SongSheet({
   actions,
   notices,
   capo,
+  onCapoChange,
 }: Props) {
   const [view, setView] = useState<'chart' | 'chordpro'>('chart');
   const flatSyllables = useMemo(() => deriveFlatSyllables(blocks, arrangement), [blocks, arrangement]);
@@ -96,6 +99,7 @@ export function SongSheet({
           onLineSpacingChange={onLineSpacingChange}
           credits={credits}
           capo={capo}
+          onCapoChange={onCapoChange}
         />
       )}
     </div>

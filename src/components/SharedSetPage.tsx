@@ -5,7 +5,8 @@ import { downloadSetPdf } from '../lib/setPdf';
 import { inChartMode } from '../lib/setStore';
 import { songKeysOf } from '../lib/chordChart';
 import { SongSheet } from './SongSheet';
-import { CapoChartsSwitch, CapoSelect, SetCharts } from './SetCharts';
+import { SetCharts } from './SetCharts';
+import { CapoChartsSwitch, CapoSelect } from './CapoControls';
 
 interface Props {
   store: SetStore;

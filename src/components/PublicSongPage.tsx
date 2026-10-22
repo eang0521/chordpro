@@ -32,6 +32,8 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
   const [key, setKey] = useState<KeyName>('C');
   const [fontId, setFontId] = useState('');
   const [lineSpacing, setLineSpacing] = useState(1);
+  // For a guitarist: the chart in the chord shapes played with a capo. Just for this view.
+  const [capo, setCapo] = useState(0);
   const [copying, setCopying] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -109,6 +111,8 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
           onFontIdChange={setFontId}
           lineSpacing={lineSpacing}
           onLineSpacingChange={setLineSpacing}
+          capo={capo}
+          onCapoChange={setCapo}
           back={back}
           versions={
             <VersionPicker

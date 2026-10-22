@@ -9,7 +9,8 @@ import { songKeysOf } from '../lib/chordChart';
 import { makeId } from '../lib/id';
 import { downloadSetPdf } from '../lib/setPdf';
 import { useAutosave } from '../hooks/useAutosave';
-import { CapoChartsSwitch, CapoSelect, SetCharts } from './SetCharts';
+import { SetCharts } from './SetCharts';
+import { CapoChartsSwitch, CapoSelect } from './CapoControls';
 
 interface Props {
   setStore: SetStore;

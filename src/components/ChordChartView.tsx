@@ -34,6 +34,7 @@ import {
 import { PAGE_FIT_SLACK_PT, TITLE_LINE_PT } from '../lib/chartLayout';
 import { fitLineSpacing, paginateByHeight } from '../lib/pagination';
 import { KeyControl } from './KeyControl';
+import { CapoSelect } from './CapoControls';
 import { transposeKey } from '../lib/musicTheory';
 
 interface Props {
@@ -53,9 +54,11 @@ interface Props {
   inline?: boolean;
   /** Just the pages, as they print, with no controls (a set's charts). Implies `inline`. */
   pagesOnly?: boolean;
-  /** A guitarist's capo (a song in a set): the chords are spelled as the shapes they play, and the
-   * header gives both keys (see keyHeaderText). */
+  /** A guitarist's capo: the chords are spelled as the shapes they play, and the header gives both
+   * keys (see keyHeaderText). */
   capo?: number;
+  /** Offers a capo picker beside the key, for a capo chart. */
+  onCapoChange?: (capo: number) => void;
 }
 
 const FIT_MAX_PAGES = 2;
@@ -175,6 +178,7 @@ export function ChordChartView({
   inline: inlineProp = false,
   pagesOnly = false,
   capo = 0,
+  onCapoChange,
 }: Props) {
   const inline = inlineProp || pagesOnly;
   const [generating, setGenerating] = useState(false);
@@ -335,6 +339,7 @@ export function ChordChartView({
           </h2>
           <div className="chart-panel-actions">
             <KeyControl songKey={songKey} onChange={onSongKeyChange} />
+            {onCapoChange && <CapoSelect capo={capo} keys={playedKeys} onChange={onCapoChange} />}
             <select className="chart-font-select" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
               {CHORD_FONT_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>
