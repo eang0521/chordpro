@@ -13,6 +13,8 @@ export interface OwnVersionActions {
   onDelete: () => Promise<void>;
   /** Makes the open version a version of another song. */
   onMove: (workId: string) => void;
+  /** Replaces the open version's chart with a public version's, keeping its own name. */
+  onRevert: (publicId: string) => Promise<void>;
 }
 
 interface Props {
@@ -38,7 +40,7 @@ const refValue = (ref: VersionRef) => `${ref.kind}:${ref.id}`;
 export function VersionPicker({ workId, current, currentName, songStore, publicStore, onSelect, ownActions }: Props) {
   const [own, setOwn] = useState<SongSummary[]>([]);
   const [shared, setShared] = useState<PublicSongSummary[]>([]);
-  const [dialog, setDialog] = useState<'new' | 'rename' | 'delete' | 'move' | null>(null);
+  const [dialog, setDialog] = useState<'new' | 'rename' | 'delete' | 'move' | 'revert' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,6 +108,11 @@ export function VersionPicker({ workId, current, currentName, songStore, publicS
           <button className="secondary" onClick={() => setDialog('move')} title="Group this with another song's versions">
             Move…
           </button>
+          {shared.length > 0 && (
+            <button className="secondary" onClick={() => setDialog('revert')} title="Replace your changes with a public version's chart">
+              Revert to public…
+            </button>
+          )}
           <button className="secondary danger" onClick={() => setDialog('delete')}>
             Delete version
           </button>
@@ -144,6 +151,19 @@ export function VersionPicker({ workId, current, currentName, songStore, publicS
           isLast={isLastOwn}
           onDelete={async () => {
             await ownActions.onDelete();
+            setDialog(null);
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {ownActions && dialog === 'revert' && (
+        <RevertDialog
+          name={versionLabel(currentName)}
+          versions={shared}
+          // The public version this one was copied from usually has the same name.
+          initial={(shared.find((v) => v.versionName.trim() === currentName.trim()) ?? shared[0]).id}
+          onRevert={async (publicId) => {
+            await ownActions.onRevert(publicId);
             setDialog(null);
           }}
           onClose={() => setDialog(null)}
@@ -254,6 +274,70 @@ function DeleteVersionDialog({
             }}
           >
             Delete version
+          </button>
+          <button className="secondary" autoFocus onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Confirms replacing the open version's chart with a public version's, picking which one when
+ * the song has several. */
+function RevertDialog({
+  name,
+  versions,
+  initial,
+  onRevert,
+  onClose,
+}: {
+  name: string;
+  versions: PublicSongSummary[];
+  initial: string;
+  onRevert: (publicId: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  useEscapeKey(onClose);
+  const [chosen, setChosen] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="arrangement-overlay" onClick={onClose}>
+      <div className="arrangement-panel dialog-panel" role="alertdialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <h2>Revert &ldquo;{name}&rdquo; to the public version?</h2>
+        <p className="hint">
+          Its lyrics, chords, arrangement, key and credits are replaced with the public version&rsquo;s, and your
+          changes to them are lost. It keeps its name and stays in your sets. This can&rsquo;t be undone.
+        </p>
+        {versions.length > 1 && (
+          <label className="field">
+            <span>Public version</span>
+            <select value={chosen} onChange={(e) => setChosen(e.target.value)}>
+              {versions.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {versionLabel(v.versionName)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {failed && <p className="hint library-error">That didn&rsquo;t work. Check your connection and try again.</p>}
+        <div className="actions">
+          <button
+            className="danger-solid"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              setFailed(false);
+              onRevert(chosen).catch(() => {
+                setFailed(true);
+                setBusy(false);
+              });
+            }}
+          >
+            {busy ? 'Reverting…' : 'Revert'}
           </button>
           <button className="secondary" autoFocus onClick={onClose}>
             Cancel

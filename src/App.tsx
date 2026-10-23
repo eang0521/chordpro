@@ -428,6 +428,18 @@ function App() {
     await openSong(copy.id);
   }
 
+  /** Replaces the open library version's chart with a public version's, as it is now. It keeps
+   * its own id (so sets still use it), name and song. Rejects if it couldn't be done. */
+  async function revertToPublic(publicId: string) {
+    if (!songStore || !publicStore) return;
+    // Save any edits still pending first, so they can't land on top of the reverted chart.
+    if (!(await leaveLibrarySong())) return;
+    const pub = await publicStore.get(publicId);
+    if (!pub) throw new Error('That public version is gone.');
+    await songStore.save({ ...pub.doc, id: songId, workId, versionName, step: 'export' });
+    await openSong(songId);
+  }
+
   /** Deletes the open library version, then opens another of the user's versions of the same
    * song, or goes back to My Songs if that was the last. */
   async function deleteVersion() {
@@ -610,7 +622,7 @@ function App() {
                 songStore={songStore}
                 publicStore={publicStore}
                 onSelect={openVersion}
-                ownActions={{ onNew: newVersion, onRename: setVersionName, onDelete: deleteVersion, onMove: setWorkId }}
+                ownActions={{ onNew: newVersion, onRename: setVersionName, onDelete: deleteVersion, onMove: setWorkId, onRevert: revertToPublic }}
               />
             }
             actions={
