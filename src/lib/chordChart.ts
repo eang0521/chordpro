@@ -197,8 +197,11 @@ export function flattenSections(sections: DocSection[]): SectionDisplayRow[] {
 
 export interface PlacedLine {
   lyricLine: string;
-  /** Each chord's left edge, in points from the start of the lyric text. */
+  /** Each chord's left edge, in points from the start of the line (where unindented lyrics start). */
   chords: { offsetPt: number; label: string }[];
+  /** How far in the lyrics start, in points, when the line opens with a chord before its first
+   * word (see LEAD_IN_PT). */
+  indentPt?: number;
 }
 
 /** True for a line of chords with no lyrics (a turn, an intro...), which prints as a single
@@ -215,6 +218,10 @@ const SLOT_PAD_PT = 1.5;
 // "/" beat marks sit closer to the chord they count and to each other ("G / / / | C / / /"); a bar
 // line still gets the full gap, so the measures stay apart.
 const BEAT_GAP_PT = 7;
+// A line that starts with a chord before its first word ("[A] Before the throne") starts its words
+// this far in whatever the chord, so "A" and "Asus" lines line up. A longer chord just overlaps the
+// start of the words a little.
+const LEAD_IN_PT = 15;
 
 /** True for a "/" beat mark's label (with or without a bar line before it). */
 function isBeatLabel(label: string): boolean {
@@ -250,6 +257,12 @@ export function placeChords(tokens: ChartToken[], measure: TextMeasure, repeat?:
   // Where the next syllable may start: past a chord that comes before it (a chord slot), so that
   // chord clearly reads as before the syllable rather than on it.
   let lyricsFromPt = 0;
+  // How far in the words start: LEAD_IN_PT once a chord before the first word has been placed.
+  let indentPt = 0;
+  let pendingIndent = 0;
+  // Lyric widths are measured from the line's start, so they include the indent.
+  const lyricWidth = (text: string) => indentPt + measure(text, LYRIC_SIZE_PT, 'bold');
+  const indentedMeasure: TextMeasure = (text, sizePt, style) => indentPt + measure(text, sizePt, style);
   // Index of the line's last syllable with lyrics: slots after it are trailing chords.
   const lastLyric = tokens.reduce((last, tok, i) => (!tok.isSlot && tok.text ? i : last), -1);
   // The trailing chord or beat mark just placed: where it ends, and whether it was a beat mark.
@@ -264,31 +277,37 @@ export function placeChords(tokens: ChartToken[], measure: TextMeasure, repeat?:
       const trailing = i > lastLyric;
       const beat = isBeatLabel(tok.chordLabel);
       const tight = trailing && prevTrailing && (beat || prevTrailing.beat) && !tok.chordLabel.startsWith('|');
-      const wordsEnd = lyricLine ? measure(lyricLine, LYRIC_SIZE_PT, 'bold') : 0;
+      const wordsEnd = lyricLine ? lyricWidth(lyricLine) : 0;
       const free = tight && prevTrailing ? prevTrailing.end + BEAT_GAP_PT : nextFreePt;
       const at = Math.max(lyricLine ? wordsEnd + (trailing ? SLOT_GAP_PT : SLOT_PAD_PT) : 0, free);
       const end = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic');
       chords.push({ offsetPt: at, label: tok.chordLabel });
       nextFreePt = end + (trailing ? SLOT_GAP_PT : CHORD_MIN_GAP_PT);
       prevTrailing = trailing ? { end, beat } : null;
-      if (!trailing) lyricsFromPt = end + SLOT_PAD_PT;
+      // Before the line's first word, the words start at the lead-in; elsewhere, just past the chord.
+      if (!trailing && lyricLine) lyricsFromPt = end + SLOT_PAD_PT;
+      if (!trailing && !lyricLine) pendingIndent = LEAD_IN_PT;
       return;
     }
     // Inside a word, a gap opened in the lyrics gets a hyphen ("e - ter - nal", "i - magine").
     const withinWord = !tok.isWordStart && lyricLine !== '';
     if (tok.isWordStart && i !== 0 && lyricLine) lyricLine += ' ';
+    if (pendingIndent && !lyricLine) {
+      indentPt = pendingIndent;
+      pendingIndent = 0;
+    }
     // Not enough room after the previous chord (or a chord slot just before): spread the lyrics
     // instead of pushing this syllable's chord off it.
     // A chord written partway into the syllable ("J[E]esus") sits over that letter, not its start.
     const before = tok.chordLabel && tok.chordOffset ? tok.text.slice(0, tok.chordOffset) : '';
     const beforeWidth = before
-      ? measure(lyricLine + before, LYRIC_SIZE_PT, 'bold') - measure(lyricLine, LYRIC_SIZE_PT, 'bold')
+      ? lyricWidth(lyricLine + before) - lyricWidth(lyricLine)
       : 0;
     const startAt = Math.max(lyricsFromPt, tok.chordLabel ? nextFreePt - beforeWidth : 0);
-    if (measure(lyricLine, LYRIC_SIZE_PT, 'bold') < startAt) lyricLine = spreadTo(lyricLine, startAt, withinWord, measure);
+    if (lyricWidth(lyricLine) < startAt) lyricLine = spreadTo(lyricLine, startAt, withinWord, indentedMeasure);
     lyricsFromPt = 0;
     if (tok.chordLabel) {
-      const at = Math.max(measure(lyricLine + before, LYRIC_SIZE_PT, 'bold'), nextFreePt);
+      const at = Math.max(lyricWidth(lyricLine + before), nextFreePt);
       chords.push({ offsetPt: at, label: tok.chordLabel });
       nextFreePt = at + measure(tok.chordLabel, CHORD_SIZE_PT, 'italic') + CHORD_MIN_GAP_PT;
     }
@@ -299,16 +318,16 @@ export function placeChords(tokens: ChartToken[], measure: TextMeasure, repeat?:
     // as they reach the end of the section.
     const label = `${repeat}x`;
     const last = chords[chords.length - 1];
-    const lyricsEnd = lyricLine.trim() ? measure(lyricLine, LYRIC_SIZE_PT, 'bold') + SLOT_GAP_PT : 0;
+    const lyricsEnd = lyricLine.trim() ? lyricWidth(lyricLine) + SLOT_GAP_PT : 0;
     const chordsEnd = last ? last.offsetPt + measure(last.label, CHORD_SIZE_PT, 'italic') + SLOT_GAP_PT : 0;
     chords.push({ offsetPt: Math.max(lyricsEnd, chordsEnd), label });
   }
-  return { lyricLine, chords };
+  return { lyricLine, chords, ...(indentPt ? { indentPt } : {}) };
 }
 
 /** How far a placed line reaches: the end of its lyrics or of its last chord, whichever is further. */
 function placedWidth(line: PlacedLine, measure: TextMeasure): number {
-  const lyrics = line.lyricLine.trim() ? measure(line.lyricLine, LYRIC_SIZE_PT, 'bold') : 0;
+  const lyrics = line.lyricLine.trim() ? (line.indentPt ?? 0) + measure(line.lyricLine, LYRIC_SIZE_PT, 'bold') : 0;
   const last = line.chords[line.chords.length - 1];
   return Math.max(lyrics, last ? last.offsetPt + measure(last.label, CHORD_SIZE_PT, 'italic') : 0);
 }

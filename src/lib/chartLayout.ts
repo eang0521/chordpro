@@ -13,6 +13,8 @@ export const PAGE_FIT_SLACK_PT = 1;
 /** One printed line-pair: optional chords above a lyric line, positioned in points. */
 export interface PrintedLine {
   lyricLine: string;
+  /** How far in the lyrics start, in points (see PlacedLine). */
+  indentPt?: number;
   chords: { offsetPt: number; label: string }[];
 }
 

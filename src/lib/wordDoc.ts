@@ -103,7 +103,7 @@ export async function generateWordDoc(
       })),
     );
     pieces.forEach(({ placed, gapBefore }, i) => {
-      const { lyricLine, chords } = placed;
+      const { lyricLine, chords, indentPt } = placed;
       const isLast = i === pieces.length - 1;
       const withLabel = i === 0 && section.label;
       // Word measures tab stops from the left margin, so offset by the label column.
@@ -149,8 +149,16 @@ export async function generateWordDoc(
           // Hanging indent: the label sits at the margin on the first line, and the lyrics (plus
           // any wrapped continuation) start at the label column.
           indent: withLabel ? { left: labelCol, hanging: labelCol } : { left: labelCol },
-          tabStops: [{ type: TabStopType.LEFT, position: labelCol }],
-          children: withLabel ? [labelRun(section.label), new TextRun({ children: [new Tab()] }), lyricRun(lyricLine)] : [lyricRun(lyricLine)],
+          // Indented lyrics (after a chord before the first word) start at a tab stop that far in.
+          tabStops: [
+            { type: TabStopType.LEFT, position: labelCol },
+            ...(indentPt ? [{ type: TabStopType.LEFT, position: labelCol + twips(indentPt) }] : []),
+          ],
+          children: [
+            ...(withLabel ? [labelRun(section.label), new TextRun({ children: [new Tab()] })] : []),
+            ...(indentPt ? [new TextRun({ children: [new Tab()] })] : []),
+            lyricRun(lyricLine),
+          ],
         }),
       );
     });

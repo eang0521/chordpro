@@ -217,7 +217,7 @@ async function addSongPages(
           if (li === 0 && item.label) {
             draw(page, item.label.toUpperCase(), MARGIN_SIDE, baselineIn(lineTop, lyricLine, LABEL_SIZE_PT), LABEL_SIZE_PT, 'bold');
           }
-          draw(page, line.lyricLine, MARGIN_SIDE + labelCol, baselineIn(lineTop, lyricLine, LYRIC_SIZE_PT), LYRIC_SIZE_PT, 'bold');
+          draw(page, line.lyricLine, MARGIN_SIDE + labelCol + (line.indentPt ?? 0), baselineIn(lineTop, lyricLine, LYRIC_SIZE_PT), LYRIC_SIZE_PT, 'bold');
           lineTop += lyricLine;
         });
       }

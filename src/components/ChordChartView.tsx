@@ -80,7 +80,7 @@ type PageItem = { kind: 'header' } | { kind: 'row'; display: SectionDisplayRow }
 /** Chords sit at the same measured offsets the Word export uses for its tab stops, absolutely
  * positioned over unspread lyric text, so the preview matches the doc letter for letter. */
 function renderLinePair(placed: PlacedLine, key: number): ReactNode {
-  const { lyricLine, chords } = placed;
+  const { lyricLine, chords, indentPt } = placed;
   if (isChordOnly(placed)) {
     // A chord-only line (a turn, an intro...) takes the lyric line's place, in chord type.
     return (
@@ -109,7 +109,10 @@ function renderLinePair(placed: PlacedLine, key: number): ReactNode {
           ))}
         </div>
       )}
-      <div className="chart-syllable">{lyricLine || ' '}</div>
+      {/* The lyrics' own font is the lyric size, so the indent in em is in lyric points. */}
+      <div className="chart-syllable" style={indentPt ? { paddingLeft: `${indentPt / LYRIC_SIZE_PT}em` } : undefined}>
+        {lyricLine || ' '}
+      </div>
     </div>
   );
 }
