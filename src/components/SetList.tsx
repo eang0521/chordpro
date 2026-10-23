@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SetStore, SetSummary } from '../lib/setStore';
 import type { SongStore } from '../lib/songStore';
 import { formatEdited } from '../lib/dates';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface Props {
   store: SetStore;
@@ -60,6 +61,7 @@ export function SetList({ store, songStore, onOpen, onNew }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SetSummary | null>(null);
+  useEscapeKey(confirmDelete ? () => setConfirmDelete(null) : null);
 
   const refresh = useCallback(async () => {
     try {

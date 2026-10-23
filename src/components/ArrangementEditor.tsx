@@ -14,6 +14,7 @@ import {
 } from '../lib/arrangement';
 import { makeInstrumentalBlock } from '../lib/chordSlots';
 import { KEY_NAMES, semitonesBetween, transposeKey } from '../lib/musicTheory';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface Props {
   blocks: BlockMap;
@@ -52,6 +53,7 @@ function previewText(block: Block): string {
 }
 
 export function ArrangementEditor({ blocks, arrangement, songKey, onChange, onClose }: Props) {
+  useEscapeKey(onClose);
   const [draggedAt, setDraggedAt] = useState<number | null>(null);
 
   function move(from: number, to: number) {

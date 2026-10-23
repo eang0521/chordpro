@@ -46,6 +46,7 @@ import { VersionPicker } from './components/VersionPicker';
 import { rememberVersion, type VersionRef } from './lib/lastVersion';
 import { useAuth, signOut } from './hooks/useAuth';
 import { useAutosave } from './hooks/useAutosave';
+import { useEscapeKey } from './hooks/useEscapeKey';
 import './App.css';
 
 const songStore = supabase ? createSupabaseSongStore(supabase) : null;
@@ -145,6 +146,7 @@ function App() {
   const [showArrangement, setShowArrangement] = useState(false);
   const [showChart, setShowChart] = useState(false);
   const [showCopyChords, setShowCopyChords] = useState(false);
+  useEscapeKey(showCredits ? () => setShowCredits(false) : null);
   // Saved with the song, and shared with ExportView so the chord chart's font/spacing choice
   // stays the same regardless of which screen you download the .docx from.
   const [chartFontId, setChartFontId] = useState<string>(initialDraft.chartFontId);

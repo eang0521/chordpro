@@ -36,6 +36,7 @@ import { fitLineSpacing, paginateByHeight } from '../lib/pagination';
 import { KeyControl } from './KeyControl';
 import { CapoSelect } from './CapoControls';
 import { transposeKey } from '../lib/musicTheory';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface Props {
   title: string;
@@ -188,6 +189,7 @@ export function ChordChartView({
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pageMode, setPageMode] = useState(inline);
   const [fitMessage, setFitMessage] = useState<string | null>(null);
+  useEscapeKey(inline ? null : (onClose ?? null));
   const shapeKey = capoShapeKey(songKey, capo);
   const sections = useMemo(
     () => groupIntoSections(buildChartRows(blocks, arrangement, shapeKey)),

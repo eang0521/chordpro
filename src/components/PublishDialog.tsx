@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import type { PublicSongStore } from '../lib/publicSongStore';
 import type { SongDocument } from '../lib/songDocument';
 import { creditLines } from '../lib/credits';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface Props {
   store: PublicSongStore;
@@ -19,6 +20,7 @@ interface Props {
  * the editor's Publish button and the Your songs list. The version must be named first, so the
  * public versions of a song can be told apart (rather than each showing as "Original"). */
 export function PublishDialog({ store, doc, update, onPublished, onClose }: Props) {
+  useEscapeKey(onClose);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [versionName, setVersionName] = useState(doc.versionName);

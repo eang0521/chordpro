@@ -179,6 +179,9 @@ button.secondary:hover:not(:disabled) {
   padding: 4px 6px;
   font-family: 'Cascadia Code', Consolas, monospace;
   font-size: 0.95rem;
+  /* The ch-based width set in SyllableEditor is for the text alone; with border-box the padding
+     and border came out of it and clipped the last letter. */
+  box-sizing: content-box;
 }
 
 .syllable-word-input:focus {
@@ -528,19 +531,29 @@ button.secondary:hover:not(:disabled) {
   align-items: safe center;
 }
 
-/* The page is wider than the controls' row, so give the title its own line above them. */
-.chart-inline .arrangement-panel-header {
+/* The controls' row is wider than the page (and the dialog), so give the title its own line
+   above them and let them wrap. */
+.chart-inline .arrangement-panel-header,
+.chart-panel .arrangement-panel-header {
   flex-wrap: wrap;
 }
 
-.chart-inline .arrangement-panel-header h2 {
+.chart-inline .arrangement-panel-header h2,
+.chart-panel .arrangement-panel-header h2 {
   flex: 1 1 100%;
   margin: 0;
 }
 
-.chart-inline .chart-panel-actions {
+.chart-inline .chart-panel-actions,
+.chart-panel .chart-panel-actions {
   flex: 1 1 100%;
   min-width: 0;
+}
+
+/* In page layout the dialog is as wide as the page; without this the unwrapped controls'
+   row would set its width instead. */
+.chart-panel-wide .arrangement-panel-header > * {
+  contain: inline-size;
 }
 
 /* Beats button.secondary, whose colors would otherwise hide which one is on. */

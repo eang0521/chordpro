@@ -6,6 +6,7 @@ import type { PublicSongStore, PublishedCopy } from '../lib/publicSongStore';
 import { PublishDialog } from './PublishDialog';
 import { KEY_NAMES, semitonesBetween } from '../lib/musicTheory';
 import { formatEdited } from '../lib/dates';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface Props {
   store: SongStore;
@@ -80,6 +81,7 @@ export function SongLibrary({ store, message, onOpen, onNew, publicStore, onView
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SongRow | null>(null);
+  useEscapeKey(confirmDelete ? () => setConfirmDelete(null) : null);
   const [sortOrder, setSortOrder] = useState<SortOrder>(loadSort);
   // Which of these songs are public, by library song id (empty for non-publishers).
   const [published, setPublished] = useState<Map<string, PublishedCopy>>(new Map());

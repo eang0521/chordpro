@@ -3,6 +3,7 @@ import type { SongStore, SongSummary } from '../lib/songStore';
 import type { PublicSongStore, PublicSongSummary } from '../lib/publicSongStore';
 import { versionLabel } from '../lib/songDocument';
 import type { VersionRef } from '../lib/lastVersion';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 /** What can be done to the open version when it's one of the user's own. */
 export interface OwnVersionActions {
@@ -180,6 +181,7 @@ function NameDialog({
   onClose: () => void;
 }) {
   const [name, setName] = useState(initial);
+  useEscapeKey(onClose);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -229,6 +231,7 @@ function DeleteVersionDialog({
   onDelete: () => Promise<void>;
   onClose: () => void;
 }) {
+  useEscapeKey(onClose);
   const [failed, setFailed] = useState(false);
   return (
     <div className="arrangement-overlay" onClick={onClose}>
@@ -283,6 +286,7 @@ function MoveDialog({
   onMove: (workId: string) => void;
   onClose: () => void;
 }) {
+  useEscapeKey(onClose);
   const [choices, setChoices] = useState<SongChoice[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [query, setQuery] = useState('');

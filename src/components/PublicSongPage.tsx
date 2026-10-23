@@ -6,6 +6,7 @@ import { NewerSongVersionError, type SongStore } from '../lib/songStore';
 import { rememberVersion, type VersionRef } from '../lib/lastVersion';
 import { SongSheet } from './SongSheet';
 import { VersionPicker } from './VersionPicker';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface Props {
   store: PublicSongStore;
@@ -37,6 +38,7 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
   const [copying, setCopying] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  useEscapeKey(confirmRemove ? () => setConfirmRemove(false) : null);
   const [removeFailed, setRemoveFailed] = useState(false);
 
   useEffect(() => {

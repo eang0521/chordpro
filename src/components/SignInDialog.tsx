@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react';
 import { sendSignInLink } from '../hooks/useAuth';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface Props {
   onClose: () => void;
 }
 
 export function SignInDialog({ onClose }: Props) {
+  useEscapeKey(onClose);
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);

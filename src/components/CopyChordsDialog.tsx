@@ -5,6 +5,7 @@ import { blockIdsOf } from '../lib/arrangement';
 import type { LineMapping } from '../lib/copyChords';
 import { applyCopy, defaultMappings, previewLine, splitLines } from '../lib/copyChords';
 import { chordMarkLabel } from '../lib/chordSlots';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface Props {
   blocks: BlockMap;
@@ -49,6 +50,7 @@ function pluralize(n: number, word: string): string {
 }
 
 export function CopyChordsDialog({ blocks, arrangement, songKey, onApply, onClose }: Props) {
+  useEscapeKey(onClose);
   // Each block once, in the order it first appears in the song.
   const blockIds = useMemo(
     () => [...new Set(blockIdsOf(arrangement))].filter((id) => blocks[id] && blocks[id].syllables.length > 0),
