@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Section, WordGroup } from '../lib/syllables';
 import { groupSectionsByLine, joinSyllablesForEditing, splitEditedWord } from '../lib/syllables';
 import { overrideKind, rememberSyllableEdits, spellingSplit, wordCore } from '../lib/syllableOverrides';
+import { StepHelp } from './StepHelp';
 
 interface Props {
   initialGroups: WordGroup[];
@@ -44,17 +45,24 @@ export function SyllableEditor({ initialGroups, sections, onBack, onSubmit }: Pr
   return (
     <div className="panel">
       <h2>2. Review syllables</h2>
-      <p className="hint">
-        Each word was auto-split with a &middot; between syllables. Click into a word to fix it &mdash;
-        add or remove &middot; marks to change where it breaks. Highlighted words are often sung
-        differently from how they&rsquo;re spelled (eve&middot;ry, not ev&middot;e&middot;ry) or are ones you
-        re-split before &mdash; hover one to see the other way, and check it fits the melody. Words you
-        re-split here are remembered for your next song. Section headings (Verse, Chorus,
-        Bridge, etc.) are detected automatically and aren't tapped or charted. An instrumental heading
-        (Intro, Turn, Midtro, Tag, Outro, ...) with no lyrics under it becomes a line of empty chord
-        slots to fill in on the next step. A blank line between two lines of a section keeps them in the
-        section but prints a space between them. A line like &ldquo;Key change to D&rdquo; becomes a key change.
+      <p className="hint step-intro">
+        Each word is split with a &middot; between syllables. Click into a word and add or remove &middot; marks
+        to fix where it breaks. Highlighted words are worth a second look.
       </p>
+      <StepHelp id="syllables">
+        <p className="hint">
+          Highlighted words are often sung differently from how they&rsquo;re spelled (eve&middot;ry, not
+          ev&middot;e&middot;ry) or are ones you re-split before &mdash; hover one to see the other way, and check it
+          fits the melody. Words you re-split here are remembered for your next song.
+        </p>
+        <p className="hint">
+          Section headings (Verse, Chorus, Bridge, etc.) are detected automatically and aren&rsquo;t tapped or
+          charted. An instrumental heading (Intro, Turn, Midtro, Tag, Outro, ...) with no lyrics under it becomes a
+          line of empty chord slots to fill in on the next step. A blank line between two lines of a section keeps
+          them in the section but prints a space between them. A line like &ldquo;Key change to D&rdquo; becomes a
+          key change.
+        </p>
+      </StepHelp>
       <div className="syllable-editor">
         {lineIndexes.map((lineIndex) => (
           <div key={lineIndex}>

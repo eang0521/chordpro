@@ -36,27 +36,60 @@
   height: 1.4em;
 }
 
+/* The editor's steps, in a row above it: done ones can be clicked to go back to. */
 .steps {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px 18px;
   list-style: none;
-  margin: 0;
+  margin: 0 0 16px;
   padding: 0;
+  font-size: 0.9rem;
+  color: var(--text-dim);
 }
 
-.steps li {
-  width: 26px;
-  height: 26px;
+.step-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+button.step-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+
+button.step-link:hover:not(:disabled) {
+  background: none;
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.step-number {
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 1px solid var(--border);
-  color: var(--text-dim);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+}
+
+.steps li.done .step-number {
+  border-color: var(--ink-line);
+  color: var(--text);
 }
 
 .steps li.active {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.steps li.active .step-number {
   border-color: var(--accent);
   color: var(--accent);
   background: var(--accent-dim);
@@ -78,6 +111,33 @@
   color: var(--text-dim);
   font-size: 0.92rem;
   line-height: 1.5;
+}
+
+/* A step's one-line instructions, with the rest folded under StepHelp. */
+.hint.step-intro {
+  margin-bottom: 6px;
+}
+
+.step-help {
+  margin-bottom: 16px;
+  font-size: 0.92rem;
+}
+
+.step-help summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 700;
+  width: fit-content;
+}
+
+.step-help-body {
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+  margin-top: 4px;
+}
+
+.step-help-body .hint {
+  margin: 8px 0;
 }
 
 .field {
@@ -550,6 +610,11 @@ button.secondary:hover:not(:disabled) {
   min-width: 0;
 }
 
+/* Done closes the dialog, apart from the chart's own controls. */
+.chart-done {
+  margin-left: auto;
+}
+
 /* In page layout the dialog is as wide as the page; without this the unwrapped controls'
    row would set its width instead. */
 .chart-panel-wide .arrangement-panel-header > * {
@@ -785,6 +850,27 @@ button.secondary.chart-toggle-active:hover:not(:disabled) {
 .chordpro-output:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* Export: the downloads first, then the ChordPro text and its tools, then the way out. */
+.export-downloads {
+  align-items: center;
+  margin: 0 0 8px;
+}
+
+.export-subheading {
+  margin: 24px 0 4px;
+  font-size: 1rem;
+}
+
+.export-text-actions {
+  margin-top: 10px;
+}
+
+.export-footer {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-top: 24px;
 }
 
 /* Key / transpose control */
@@ -1096,6 +1182,52 @@ button.link-button {
   text-decoration: underline;
 }
 
+/* A row's "⋯" menu (RowMenu): its actions drop down under the button, over the rows below. */
+.row-menu {
+  position: relative;
+}
+
+button.row-menu-toggle {
+  padding: 4px 12px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.row-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 160px;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  background: var(--panel-bg);
+  border: 1px solid var(--ink-line);
+  border-radius: 4px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+button.row-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 8px 12px;
+  font-size: 0.9rem;
+}
+
+button.row-menu-item:hover:not(:disabled) {
+  background: var(--hover-bg);
+  border: none;
+}
+
+button.row-menu-item.danger {
+  color: var(--danger);
+}
+
 button.secondary.danger {
   color: var(--danger);
   border-color: var(--danger);
@@ -1196,7 +1328,8 @@ button.danger-solid:hover:not(:disabled) {
   padding: 6px 10px 6px 6px;
 }
 
-button.library-open {
+button.library-open,
+a.library-open {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -1208,9 +1341,12 @@ button.library-open {
   color: var(--text);
   text-align: left;
   padding: 8px 10px;
+  border-radius: 4px;
+  text-decoration: none;
 }
 
-button.library-open:hover:not(:disabled) {
+button.library-open:hover:not(:disabled),
+a.library-open:hover {
   background: var(--hover-bg);
 }
 
@@ -1268,15 +1404,6 @@ button.library-open:hover:not(:disabled) {
 
   .library-header-actions {
     justify-content: flex-start;
-  }
-
-  .library-item {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .library-actions {
-    padding: 0 0 4px 10px;
   }
 }
 
@@ -1337,6 +1464,22 @@ button.library-open:hover:not(:disabled) {
 @media (max-width: 560px) {
   .toolbar-spacer {
     display: none;
+  }
+
+  /* Smaller buttons on a phone, so the controls above a song take a couple of rows, not a screen. */
+  .toolbar button,
+  .toolbar select,
+  .chart-inline button,
+  .chart-inline select,
+  .chart-panel button,
+  .chart-panel select {
+    padding: 6px 10px;
+    font-size: 0.85rem;
+  }
+
+  .toolbar,
+  .chart-panel-actions {
+    gap: 8px;
   }
 }
 
@@ -1531,6 +1674,14 @@ button.link-button.publish-view {
   background: var(--field-bg);
   border: 1px solid var(--border);
   border-radius: 4px;
+}
+
+.set-entry[draggable='true'] {
+  cursor: grab;
+}
+
+.set-entry.dragging {
+  opacity: 0.4;
 }
 
 .set-entry-number {

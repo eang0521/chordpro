@@ -4,7 +4,6 @@ import { lastVersion } from '../lib/lastVersion';
 
 interface Props {
   store: PublicSongStore;
-  onOpen: (id: string) => void;
 }
 
 const titleOf = (song: PublicSongSummary) => song.title.trim() || 'Untitled';
@@ -27,7 +26,7 @@ function groupByWork(songs: PublicSongSummary[]): SongRow[] {
   });
 }
 
-export function PublicSongList({ store, onOpen }: Props) {
+export function PublicSongList({ store }: Props) {
   const [songs, setSongs] = useState<PublicSongSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -90,14 +89,15 @@ export function PublicSongList({ store, onOpen }: Props) {
         <ul className="library-list">
           {shown.map((song) => (
             <li key={song.id} className="library-item">
-              <button className="library-open" onClick={() => onOpen(song.id)}>
+              {/* A link to the song's own address, so it can be opened in a new tab or copied. */}
+              <a className="library-open" href={`#/public/${song.id}`}>
                 <span className="library-title">{titleOf(song)}</span>
                 <span className="library-meta">
                   {song.keys.length > 0 && <span>Key {song.keys.join('-')}</span>}
                   {song.versions.length > 1 && <span>{song.versions.length} versions</span>}
                   {song.writers && <span>{song.writers}</span>}
                 </span>
-              </button>
+              </a>
             </li>
           ))}
         </ul>

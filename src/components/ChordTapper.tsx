@@ -5,6 +5,7 @@ import { updateBlockToken } from '../lib/arrangement';
 import { BEAT_MARK, insertTokens, lineEnd, splitParen, makeChordLine, makeChordSlot, removeToken } from '../lib/chordSlots';
 import { chordsEqual, diatonicChord, formatChord, isDiatonicChord, parseChord, transposeKey } from '../lib/musicTheory';
 import { LyricFlow } from './LyricFlow';
+import { StepHelp } from './StepHelp';
 
 interface Props {
   syllables: SyllableToken[];
@@ -335,8 +336,8 @@ export function ChordTapper({
     if (typing) return;
     function handleKey(e: KeyboardEvent) {
       // Leave keys alone while a dialog (arrange sections, copy chords, ...) is open over the
-      // tapper, or while typing in a field such as the key picker.
-      if (e.target instanceof Element && e.target.closest('.arrangement-overlay, input, select, textarea')) return;
+      // tapper, or while typing in a field such as the key picker (or opening the tips).
+      if (e.target instanceof Element && e.target.closest('.arrangement-overlay, input, select, textarea, summary')) return;
       if (e.altKey) return;
       // Shift+arrows highlight like dragging, and copy/paste/undo work on a highlight: none of
       // these should yank the lyrics around. Every other key taps through the song.
@@ -424,25 +425,29 @@ export function ChordTapper({
   return (
     <div className="panel">
       <h2>3. Place chords</h2>
-      <p className="hint">
-        Press <kbd>Space</kbd> (or <kbd>&rarr;</kbd>) to move to the next syllable &mdash; skip any syllable that
-        doesn't need a chord. On a highlighted syllable, press <kbd>1</kbd>&ndash;<kbd>7</kbd> for a chord, or{' '}
-        <kbd>Enter</kbd> to type any chord (<code>Asus</code>, <code>D2</code>, <code>F#m/C#</code>, or numbers
-        like <code>5sus</code>, <code>1/3</code>). Typed chords get a letter key below so you can reuse them.
-        Placing a chord moves on automatically. <kbd>Backspace</kbd> clears a chord.
+      <p className="hint step-intro">
+        <kbd>Space</kbd> moves to the next syllable, <kbd>1</kbd>&ndash;<kbd>7</kbd> places a chord,{' '}
+        <kbd>Enter</kbd> types any chord, and <kbd>Backspace</kbd> clears one.
       </p>
-      <p className="hint">
-        <strong>Instrumentals:</strong> <kbd>+</kbd> adds a chord slot (a chord with no lyric under it) after the
-        current syllable &mdash; use it for chords at the end of a line &mdash; and <kbd>[</kbd> adds one at the
-        start of the line, for a chord before the first word. <kbd>/</kbd> puts a beat mark on a chord slot, to
-        count out the beats of the chord before it (<code>G / / / | C / / /</code>). <kbd>|</kbd> puts a bar
-        line before the current chord, and <kbd>(</kbd> puts it in parentheses, <code>(G)</code>, for a chord
-        leading into a turn or midtro that's harder to time. <kbd>Backspace</kbd> on an empty slot removes it.{' '}
-        <strong>Copy and paste:</strong> drag across syllables (or <kbd>Shift</kbd>+click,{' '}
-        <kbd>Shift</kbd>+<kbd>&larr;</kbd>/<kbd>&rarr;</kbd>) to highlight them, then <kbd>Ctrl</kbd>+<kbd>C</kbd>{' '}
-        to copy their chords or <kbd>Ctrl</kbd>+<kbd>X</kbd> to cut them. Highlight where they should go and
-        press <kbd>Ctrl</kbd>+<kbd>V</kbd>. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.
-      </p>
+      <StepHelp id="chords" label="All shortcuts">
+        <p className="hint">
+          <kbd>&rarr;</kbd> also moves on &mdash; skip any syllable that doesn&rsquo;t need a chord. Typed chords
+          (<code>Asus</code>, <code>D2</code>, <code>F#m/C#</code>, or numbers like <code>5sus</code>,{' '}
+          <code>1/3</code>) get a letter key below so you can reuse them. Placing a chord moves on automatically.
+        </p>
+        <p className="hint">
+          <strong>Instrumentals:</strong> <kbd>+</kbd> adds a chord slot (a chord with no lyric under it) after the
+          current syllable &mdash; use it for chords at the end of a line &mdash; and <kbd>[</kbd> adds one at the
+          start of the line, for a chord before the first word. <kbd>/</kbd> puts a beat mark on a chord slot, to
+          count out the beats of the chord before it (<code>G / / / | C / / /</code>). <kbd>|</kbd> puts a bar
+          line before the current chord, and <kbd>(</kbd> puts it in parentheses, <code>(G)</code>, for a chord
+          leading into a turn or midtro that's harder to time. <kbd>Backspace</kbd> on an empty slot removes it.{' '}
+          <strong>Copy and paste:</strong> drag across syllables (or <kbd>Shift</kbd>+click,{' '}
+          <kbd>Shift</kbd>+<kbd>&larr;</kbd>/<kbd>&rarr;</kbd>) to highlight them, then <kbd>Ctrl</kbd>+<kbd>C</kbd>{' '}
+          to copy their chords or <kbd>Ctrl</kbd>+<kbd>X</kbd> to cut them. Highlight where they should go and
+          press <kbd>Ctrl</kbd>+<kbd>V</kbd>. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.
+        </p>
+      </StepHelp>
       <div className="chord-keys">
         {DEGREES.map((d) => (
           <ChordKey key={d} hotkey={String(d)} label={formatChord(cursorKey, diatonicChord(d))} onPlace={() => placeChord(diatonicChord(d))} disabled={index < 0} />

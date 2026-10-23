@@ -4,6 +4,7 @@ import { newSongId, versionLabel, type SongDocument } from '../lib/songDocument'
 import { lastVersion } from '../lib/lastVersion';
 import type { PublicSongStore, PublishedCopy } from '../lib/publicSongStore';
 import { PublishDialog } from './PublishDialog';
+import { RowMenu } from './RowMenu';
 import { KEY_NAMES, semitonesBetween } from '../lib/musicTheory';
 import { formatEdited } from '../lib/dates';
 import { useEscapeKey } from '../hooks/useEscapeKey';
@@ -230,26 +231,20 @@ export function SongLibrary({ store, message, onOpen, onNew, publicStore, onView
                 </span>
               </button>
               <div className="library-actions">
-                {publicStore && song.versions.length === 1 && published.has(song.id) && onViewPublic && (
-                  <button className="secondary" onClick={() => onViewPublic(published.get(song.id)!.id)}>
-                    View public
-                  </button>
-                )}
-                {publicStore && song.versions.length === 1 && (
-                  <button className="secondary" disabled={busyId === song.id} onClick={() => void startPublish(song)}>
-                    {published.has(song.id) ? 'Update public' : 'Publish'}
-                  </button>
-                )}
-                <button className="secondary" disabled={busyId === song.id} onClick={() => void duplicate(song)}>
-                  Duplicate
-                </button>
-                <button
-                  className="secondary danger"
+                <RowMenu
+                  label={`Actions for ${song.title || 'Untitled'}`}
                   disabled={busyId === song.id}
-                  onClick={() => setConfirmDelete(song)}
-                >
-                  Delete
-                </button>
+                  items={[
+                    ...(publicStore && song.versions.length === 1 && published.has(song.id) && onViewPublic
+                      ? [{ label: 'View public', onSelect: () => onViewPublic(published.get(song.id)!.id) }]
+                      : []),
+                    ...(publicStore && song.versions.length === 1
+                      ? [{ label: published.has(song.id) ? 'Update public' : 'Publish', onSelect: () => void startPublish(song) }]
+                      : []),
+                    { label: 'Duplicate', onSelect: () => void duplicate(song) },
+                    { label: 'Delete', danger: true, onSelect: () => setConfirmDelete(song) },
+                  ]}
+                />
               </div>
             </li>
           ))}

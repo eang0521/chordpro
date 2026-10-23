@@ -105,40 +105,25 @@ export function ExportView({
       ) : (
         <>
           <h2>4. Export</h2>
-          <p className="hint">
-            Your ChordPro file, ready to copy or download &mdash; edit it directly if you need to tweak anything.
-            Click "Apply to chart" to re-sync the visual chart and Word doc export with your edits.
-          </p>
+          <p className="hint">Download the chord chart to print or share, or the ChordPro file for other apps.</p>
         </>
       )}
-      <textarea
-        className="chordpro-output"
-        value={text}
-        readOnly={readOnly}
-        onChange={(e) => setText(e.target.value)}
-        spellCheck={false}
-      />
-      <div className="actions">
-        {!readOnly && (
-          <button className="secondary" onClick={onBack}>
-            &larr; Back
-          </button>
-        )}
-        <button className="secondary" onClick={copy}>
-          {copied ? 'Copied!' : 'Copy to clipboard'}
+      <div className="actions export-downloads">
+        <button disabled={generatingPdf} onClick={downloadPdf}>
+          {generatingPdf ? 'Generating…' : 'Download PDF'}
         </button>
-        <button onClick={download}>Download .cho</button>
-        {!readOnly && (
-          <>
-            <button className="secondary" onClick={resetText}>
-              Reset edits
-            </button>
-            <button className="secondary" onClick={applyEdits}>
-              {applied ? 'Applied!' : 'Apply to chart'}
-            </button>
-          </>
-        )}
-        <select className="chart-font-select" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
+        <button className="secondary" disabled={generatingDocx} onClick={downloadDocx}>
+          {generatingDocx ? 'Generating…' : 'Download .docx'}
+        </button>
+        <button className="secondary" onClick={download}>
+          Download .cho
+        </button>
+        <select
+          className="chart-font-select"
+          aria-label="Chart font"
+          value={fontId}
+          onChange={(e) => onFontIdChange(e.target.value)}
+        >
           {CHORD_FONT_OPTIONS.map((opt) => (
             <option key={opt.id} value={opt.id}>
               {opt.label}
@@ -159,18 +144,48 @@ export function ExportView({
             }}
           />
         </label>
-        <button className="secondary" disabled={generatingDocx} onClick={downloadDocx}>
-          {generatingDocx ? 'Generating…' : 'Download .docx'}
-        </button>
-        <button className="secondary" disabled={generatingPdf} onClick={downloadPdf}>
-          {generatingPdf ? 'Generating…' : 'Download PDF'}
+      </div>
+
+      <h3 className="export-subheading">ChordPro text</h3>
+      {!readOnly && (
+        <p className="hint">
+          Edit it here to tweak anything, then Apply to chart so the chart and the PDF and Word downloads match.
+        </p>
+      )}
+      <textarea
+        className="chordpro-output"
+        value={text}
+        readOnly={readOnly}
+        onChange={(e) => setText(e.target.value)}
+        spellCheck={false}
+      />
+      <div className="actions export-text-actions">
+        <button className="secondary" onClick={copy}>
+          {copied ? 'Copied!' : 'Copy to clipboard'}
         </button>
         {!readOnly && (
+          <>
+            <button className="secondary" onClick={applyEdits}>
+              {applied ? 'Applied!' : 'Apply to chart'}
+            </button>
+            <button className="secondary" onClick={resetText}>
+              Reset edits
+            </button>
+          </>
+        )}
+      </div>
+
+      {!readOnly && (
+        <div className="actions export-footer">
+          <button className="secondary" onClick={onBack}>
+            &larr; Back
+          </button>
+          <span className="toolbar-spacer" />
           <button className="secondary" onClick={onStartOver}>
             Start a new song
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -31,7 +31,7 @@ export function CapoSelect({ capo, keys, onChange }: { capo: number; keys: KeyNa
       <select value={capo} onChange={(e) => onChange(Number(e.target.value))}>
         {Array.from({ length: MAX_CAPO + 1 }, (_, c) => (
           <option key={c} value={c}>
-            {c ? `${c} (${keys.map((k) => capoShapeKey(k, c)).join('-')})` : '0'}
+            {c ? `${c} (${keys.map((k) => capoShapeKey(k, c)).join('-')})` : 'None'}
           </option>
         ))}
       </select>

@@ -99,6 +99,9 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
   const update = (change: Partial<SongSet>) => setSet((prev) => (prev ? { ...prev, ...change } : prev));
   const setEntries = (fn: (entries: SetEntry[]) => SetEntry[]) => setSet((prev) => (prev ? { ...prev, entries: fn(prev.entries) } : prev));
 
+  // The song being dragged to a new place in the set, if any.
+  const [draggedAt, setDraggedAt] = useState<number | null>(null);
+
   function move(from: number, to: number) {
     setEntries((entries) => {
       if (to < 0 || to >= entries.length) return entries;
@@ -226,7 +229,21 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
             {set.entries.map((entry, i) => {
               const song = songsById.get(entry.songId);
               return (
-                <li key={`${entry.songId}-${i}`} className="set-entry">
+                <li
+                  key={`${entry.songId}-${i}`}
+                  className={`set-entry ${draggedAt === i ? 'dragging' : ''}`}
+                  draggable
+                  onDragStart={() => setDraggedAt(i)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    if (draggedAt !== null) move(draggedAt, i);
+                    setDraggedAt(null);
+                  }}
+                  onDragEnd={() => setDraggedAt(null)}
+                >
+                  <span className="arrangement-card-handle" title="Drag to reorder" aria-hidden>
+                    &#8942;&#8942;
+                  </span>
                   <span className="set-entry-number">{i + 1}</span>
                   <span className="set-entry-title">
                     {song ? titleOf(song) : songs ? <em className="set-entry-missing">Deleted song</em> : '…'}

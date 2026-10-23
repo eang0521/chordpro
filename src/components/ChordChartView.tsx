@@ -37,6 +37,10 @@ import { KeyControl } from './KeyControl';
 import { CapoSelect } from './CapoControls';
 import { transposeKey } from '../lib/musicTheory';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useMediaQuery } from '../hooks/useMediaQuery';
+
+// Matches the phone layout in App.css.
+const NARROW_QUERY = '(max-width: 560px)';
 
 interface Props {
   title: string;
@@ -190,6 +194,9 @@ export function ChordChartView({
   const [pageMode, setPageMode] = useState(inline);
   const [fitMessage, setFitMessage] = useState<string | null>(null);
   useEscapeKey(inline ? null : (onClose ?? null));
+  // On a phone the page-setup controls fold under Options, so the chart isn't pushed off the screen.
+  const narrow = useMediaQuery(NARROW_QUERY);
+  const [showOptions, setShowOptions] = useState(false);
   const shapeKey = capoShapeKey(songKey, capo);
   const sections = useMemo(
     () => groupIntoSections(buildChartRows(blocks, arrangement, shapeKey)),
@@ -345,46 +352,60 @@ export function ChordChartView({
           <div className="chart-panel-actions">
             <KeyControl songKey={songKey} onChange={onSongKeyChange} />
             {onCapoChange && <CapoSelect capo={capo} keys={playedKeys} onChange={onCapoChange} />}
-            <select className="chart-font-select" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
-              {CHORD_FONT_OPTIONS.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <label className="chart-line-spacing">
-              <span>Line spacing</span>
-              <input
-                type="number"
-                min={MIN_LINE_SPACING}
-                max={MAX_LINE_SPACING}
-                step={0.05}
-                value={lineSpacing}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (!Number.isNaN(v)) onLineSpacingChange(clampLineSpacing(v));
-                  setFitMessage(null);
-                }}
-              />
-            </label>
-            <button className="secondary" onClick={fitToPage} title="Set the line spacing so the song fits on 1 page, or 2 if it must">
-              Fit to page
-            </button>
-            <button className={`secondary ${pageMode ? 'chart-toggle-active' : ''}`} onClick={() => setPageMode((v) => !v)}>
-              {pageMode ? 'Compact view' : 'Show page layout'}
-            </button>
-            <button className="secondary" disabled={generating} onClick={downloadDocx}>
-              {generating ? 'Generating…' : 'Download .docx'}
-            </button>
-            <button className="secondary" disabled={generatingPdf} onClick={downloadPdf}>
+            <span className="capo-switch" role="group" aria-label="Chart view">
+              <button className={`secondary ${pageMode ? 'chart-toggle-active' : ''}`} aria-pressed={pageMode} onClick={() => setPageMode(true)}>
+                Page
+              </button>
+              <button className={`secondary ${pageMode ? '' : 'chart-toggle-active'}`} aria-pressed={!pageMode} onClick={() => setPageMode(false)}>
+                Compact
+              </button>
+            </span>
+            <button disabled={generatingPdf} onClick={downloadPdf}>
               {generatingPdf ? 'Generating…' : 'Download PDF'}
             </button>
+            {narrow && (
+              <button className="secondary" aria-expanded={showOptions} onClick={() => setShowOptions((v) => !v)}>
+                Options {showOptions ? '▴' : '▾'}
+              </button>
+            )}
             {!inline && (
-              <button className="secondary" onClick={onClose}>
+              <button className="secondary chart-done" onClick={onClose}>
                 Done
               </button>
             )}
           </div>
+          {(!narrow || showOptions) && (
+            <div className="chart-panel-actions chart-panel-options">
+              <select className="chart-font-select" aria-label="Chart font" value={fontId} onChange={(e) => onFontIdChange(e.target.value)}>
+                {CHORD_FONT_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <label className="chart-line-spacing">
+                <span>Line spacing</span>
+                <input
+                  type="number"
+                  min={MIN_LINE_SPACING}
+                  max={MAX_LINE_SPACING}
+                  step={0.05}
+                  value={lineSpacing}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    if (!Number.isNaN(v)) onLineSpacingChange(clampLineSpacing(v));
+                    setFitMessage(null);
+                  }}
+                />
+              </label>
+              <button className="secondary" onClick={fitToPage} title="Set the line spacing so the song fits on 1 page, or 2 if it must">
+                Fit to page
+              </button>
+              <button className="secondary" disabled={generating} onClick={downloadDocx}>
+                {generating ? 'Generating…' : 'Download .docx'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

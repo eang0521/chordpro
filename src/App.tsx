@@ -97,6 +97,13 @@ function rememberMenuOpen(open: boolean) {
   }
 }
 
+const STEPS: { step: Step; label: string }[] = [
+  { step: 'input', label: 'Lyrics' },
+  { step: 'edit-syllables', label: 'Syllables' },
+  { step: 'chords', label: 'Chords' },
+  { step: 'export', label: 'Export' },
+];
+
 const initialDraft = loadLocalDraft() ?? emptySongDocument();
 removeOldDrafts();
 
@@ -480,15 +487,6 @@ function App() {
             R4E ChordPro
           </h1>
           <div className="header-right">
-            {showEditor && (
-              <ol className="steps">
-                {(['input', 'edit-syllables', 'chords', 'export'] as Step[]).map((s, i) => (
-                  <li key={s} className={s === step ? 'active' : undefined}>
-                    {i + 1}
-                  </li>
-                ))}
-              </ol>
-            )}
             {auth.status === 'signedOut' && (
               <button className="secondary" onClick={() => setShowSignIn(true)}>
                 Sign in
@@ -570,7 +568,7 @@ function App() {
           />
         )}
         {route?.kind === 'public' && publicStore && !route.songId && (
-          <PublicSongList store={publicStore} onOpen={(id) => void goToPublic(id)} />
+          <PublicSongList store={publicStore} />
         )}
 
         {!route && songStore && userId && screen === 'library' && (
@@ -650,53 +648,76 @@ function App() {
               </p>
             )}
 
-            <div className="toolbar">
-              <button
-                className="secondary"
-                disabled={arrangement.length === 0}
-                onClick={() => setShowArrangement(true)}
-              >
-                Arrange sections
-              </button>
-              <button className="secondary" disabled={arrangement.length === 0} onClick={() => setShowChart(true)}>
-                View chart
-              </button>
-              <button
-                className="secondary"
-                disabled={new Set(blockIdsOf(arrangement)).size < 2}
-                onClick={() => setShowCopyChords(true)}
-              >
-                Copy chords
-              </button>
-              {step !== 'input' && (
-                <button className="secondary" onClick={() => setShowCredits(true)}>
-                  Credits
-                </button>
-              )}
-              {step !== 'input' && <KeyControl songKey={key} onChange={setKey} />}
-              {editingLibrarySong && isPublisher && publicStore && (
-                <PublishControl
-                  store={publicStore}
-                  doc={doc}
-                  onViewPublic={(id) => void goToPublic(id)}
-                  onVersionNameChange={setVersionName}
-                />
-              )}
-              {editingLibrarySong && (
-                <span className={`save-status save-status-${autosave.status}`} role="status">
-                  {autosave.status === 'saved' && 'Saved'}
-                  {autosave.status === 'saving' && 'Saving…'}
-                  {autosave.status === 'error' && (
-                    <>
-                      Couldn&rsquo;t save{' '}
-                      <button className="link-button" onClick={() => void autosave.flush()}>
-                        Retry
+            {/* Earlier steps can be revisited; later ones are reached by finishing this one, since
+                moving on is what builds them (splitting the lyrics, laying out the chords). */}
+            <ol className="steps" aria-label="Steps">
+              {STEPS.map((s, i) => {
+                const current = s.step === step;
+                const done = i < STEPS.findIndex((x) => x.step === step);
+                return (
+                  <li key={s.step} className={current ? 'active' : done ? 'done' : undefined} aria-current={current ? 'step' : undefined}>
+                    {done ? (
+                      <button className="step-link" onClick={() => setStep(s.step)}>
+                        <span className="step-number">{i + 1}</span> {s.label}
                       </button>
-                    </>
-                  )}
-                </span>
-              )}
-            </div>
+                    ) : (
+                      <span className="step-link">
+                        <span className="step-number">{i + 1}</span> {s.label}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+
+            {/* Tools appear once there's something for them to work on. */}
+            {(arrangement.length > 0 || step !== 'input' || editingLibrarySong) && (
+              <div className="toolbar">
+                {arrangement.length > 0 && (
+                  <button className="secondary" onClick={() => setShowArrangement(true)}>
+                    Arrange sections
+                  </button>
+                )}
+                {arrangement.length > 0 && (
+                  <button className="secondary" onClick={() => setShowChart(true)}>
+                    View chart
+                  </button>
+                )}
+                {new Set(blockIdsOf(arrangement)).size >= 2 && (
+                  <button className="secondary" onClick={() => setShowCopyChords(true)}>
+                    Copy chords
+                  </button>
+                )}
+                {step !== 'input' && (
+                  <button className="secondary" onClick={() => setShowCredits(true)}>
+                    Credits
+                  </button>
+                )}
+                {step !== 'input' && <KeyControl songKey={key} onChange={setKey} />}
+                {editingLibrarySong && isPublisher && publicStore && (
+                  <PublishControl
+                    store={publicStore}
+                    doc={doc}
+                    onViewPublic={(id) => void goToPublic(id)}
+                    onVersionNameChange={setVersionName}
+                  />
+                )}
+                {editingLibrarySong && (
+                  <span className={`save-status save-status-${autosave.status}`} role="status">
+                    {autosave.status === 'saved' && 'Saved'}
+                    {autosave.status === 'saving' && 'Saving…'}
+                    {autosave.status === 'error' && (
+                      <>
+                        Couldn&rsquo;t save{' '}
+                        <button className="link-button" onClick={() => void autosave.flush()}>
+                          Retry
+                        </button>
+                      </>
+                    )}
+                  </span>
+                )}
+              </div>
+            )}
 
             {showArrangement && (
               <ArrangementEditor blocks={blocks} arrangement={arrangement} songKey={key} onChange={(b, a) => { setBlocks(b); setArrangement(a); }} onClose={() => setShowArrangement(false)} />
