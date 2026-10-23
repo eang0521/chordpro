@@ -108,6 +108,14 @@ function matchBlocks(oldBlocks: Block[], newBlocks: Block[]): Map<string, Block>
   return matches;
 }
 
+/** Whether the slot run starting at `start` opens a lyric line (words follow it on the same line)
+ * rather than being a line of chords of its own. */
+function leadingLyric(tokens: SyllableToken[], start: number): boolean {
+  let i = start + 1;
+  while (i < tokens.length && tokens[i].isChordSlot && !tokens[i].isLineStart) i++;
+  return i < tokens.length && !tokens[i].isChordSlot && !tokens[i].isLineStart;
+}
+
 /** The new block's tokens with the old block's chords, bar lines and chord slots carried over. */
 function carryOverTokens(oldBlock: Block, newBlock: Block, report: CarryOverReport): SyllableToken[] {
   const withBlock = (tok: SyllableToken): SyllableToken => ({ ...tok, blockId: newBlock.id });
@@ -148,11 +156,15 @@ function carryOverTokens(oldBlock: Block, newBlock: Block, report: CarryOverRepo
 
   // Chord slots go back after the lyric they followed. A slot run that starts its own line (a
   // chord-only line) goes after the end of that lyric's line, so it doesn't split a lyric line.
+  // A run that starts a lyric line instead (a chord before the first word, "[G] You're the
+  // way") goes back in front of the line its words are on now, and starts that line again.
   const inserts = new Map<number, SyllableToken[]>(); // new token index -> slots after it (-1: at the start)
+  // New tokens that a leading slot run now goes in front of, so they no longer start their line.
+  const ledLines = new Set<number>();
   let lyricIndex = -1;
   let anchor = -1;
   let slotAt: number | null = null; // where the run of slots being placed goes
-  oldBlock.syllables.forEach((old) => {
+  oldBlock.syllables.forEach((old, k) => {
     if (!old.isChordSlot) {
       lyricIndex++;
       const mapped = map[lyricIndex];
@@ -160,21 +172,31 @@ function carryOverTokens(oldBlock: Block, newBlock: Block, report: CarryOverRepo
       slotAt = null;
       return;
     }
+    let slot = withBlock(old);
     if (slotAt === null) {
       slotAt = anchor;
-      if (old.isLineStart && slotAt >= 0) {
+      const leadsInto = old.isLineStart ? leadingLyric(oldBlock.syllables, k) : false;
+      const lineIndex = leadsInto ? map[lyricIndex + 1] : null;
+      if (lineIndex !== null && lineIndex !== undefined) {
+        let start = lineIndex;
+        while (start > 0 && !tokens[start].isLineStart) start--;
+        slotAt = start - 1;
+        ledLines.add(start);
+        // The new lyrics decide where the blank lines are, so the line's gap moves onto the slot.
+        slot = { ...slot, gapBefore: tokens[start].gapBefore ? true : undefined };
+      } else if (old.isLineStart && slotAt >= 0) {
         while (slotAt + 1 < tokens.length && !tokens[slotAt + 1].isLineStart) slotAt++;
       }
     }
     const list = inserts.get(slotAt) ?? [];
-    list.push(withBlock(old));
+    list.push(slot);
     inserts.set(slotAt, list);
     if (old.chord) report.kept++;
   });
 
   const result: SyllableToken[] = [...(inserts.get(-1) ?? [])];
   tokens.forEach((tok, i) => {
-    result.push(tok);
+    result.push(ledLines.has(i) ? { ...tok, isLineStart: false, gapBefore: undefined } : tok);
     result.push(...(inserts.get(i) ?? []));
   });
   return result.map((tok, i) => ({ ...tok, localIndex: i }));
