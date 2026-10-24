@@ -28,6 +28,16 @@ const SEPARABLE_PREFIXES = ['under', 'over', 'out', 'down', 'back', 'off', 'up']
 // Words that start with one of those prefixes without being built on it (u-pon, not "up-on").
 const NOT_PREFIXED = new Set(['upon']);
 
+// What follows "fore" in words built on it (fore-taste, fore-told), which split there. "fore-"
+// isn't a general prefix above because so many words only look like it (for-est, for-eign,
+// for-ev-er), so only these do.
+const FORE_STEMS = new Set([
+  'taste', 'tastes', 'tasted', 'tell', 'tells', 'told', 'see', 'sees', 'seen', 'saw', 'sight',
+  'shadow', 'shadows', 'shadowed', 'shadowing', 'knew', 'know', 'knows', 'known', 'knowledge',
+  'cast', 'casts', 'head', 'heads', 'most', 'runner', 'runners', 'father', 'fathers', 'front',
+  'ground', 'hand', 'warn', 'warned', 'word', 'thought', 'ordained',
+]);
+
 // A small closed set of words where "-ed" keeps its own syllable as an adjective (naked,
 // wicked, ...) even though the general silent-"-ed" rule below would otherwise drop it —
 // there's essentially no common verb reading of these to conflict with.
@@ -165,6 +175,8 @@ export function syllabifyCore(core: string): string[] {
   // "right" keeps its whole "ght" before "-eous" (right-eous, not "righ-teous").
   const ghteous = lower.indexOf('ghteous');
   if (ghteous > 0) return [...syllabifyCore(core.slice(0, ghteous + 3)), ...syllabifyCore(core.slice(ghteous + 3))];
+
+  if (lower.startsWith('fore') && FORE_STEMS.has(lower.slice(4))) return [core.slice(0, 4), ...syllabifyCore(core.slice(4))];
 
   for (const prefix of NOT_PREFIXED.has(lower) ? [] : SEPARABLE_PREFIXES) {
     if (lower.length <= prefix.length || !lower.startsWith(prefix)) continue;
