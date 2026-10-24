@@ -204,6 +204,22 @@ export function syllabifyCore(core: string): string[] {
     }
   }
 
+  // "ui" before "n" or "d" is two vowel sounds too (ru-in, ru-ined, flu-id, dru-id, gen-u-ine),
+  // though it's one elsewhere (fruit, suit, build). Not after "g" or "q", where the "u" just
+  // glides into the "i" (guide, pen-guin, squid).
+  for (let g = 0; g < groups.length; g++) {
+    const [start, end] = groups[g];
+    for (let k = start; k < end; k++) {
+      if (letters[k].toLowerCase() !== 'u' || letters[k + 1].toLowerCase() !== 'i' || k + 1 !== end) continue;
+      const after = letters[k + 2]?.toLowerCase() ?? '';
+      const before = k > 0 ? letters[k - 1].toLowerCase() : '';
+      if ((after === 'n' || after === 'd') && before !== 'g' && before !== 'q') {
+        groups.splice(g, 1, [start, k], [k + 1, end]);
+        break;
+      }
+    }
+  }
+
   // A final "-gue"/"-que" is silent after a vowel or "n" (league, vague, tongue, unique,
   // technique): its "ue" belongs to the syllable before. After another consonant it's sung
   // (ar-gue), so that stays as it is.
