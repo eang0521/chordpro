@@ -428,6 +428,13 @@ function App() {
     await openSong(copy.id);
   }
 
+  /** Renames the open library version and saves it straight away, before it's published under
+   * that name: saved after, it would be newer than its public copy and show as edited since. */
+  async function renameForPublish(name: string) {
+    if (!(await autosave.saveNow({ ...doc, versionName: name }))) throw new Error("Couldn't save the new name.");
+    setVersionName(name);
+  }
+
   /** Replaces the open library version's chart with a public version's, as it is now. It keeps
    * its own id (so sets still use it), name and song. Rejects if it couldn't be done. */
   async function revertToPublic(publicId: string) {
@@ -640,7 +647,7 @@ function App() {
                     store={publicStore}
                     doc={doc}
                     onViewPublic={(id) => void goToPublic(id)}
-                    onVersionNameChange={setVersionName}
+                    onRename={renameForPublish}
                   />
                 )}
                 <button onClick={() => setScreen('editor')}>Edit</button>
@@ -711,7 +718,7 @@ function App() {
                     store={publicStore}
                     doc={doc}
                     onViewPublic={(id) => void goToPublic(id)}
-                    onVersionNameChange={setVersionName}
+                    onRename={renameForPublish}
                   />
                 )}
                 {editingLibrarySong && (

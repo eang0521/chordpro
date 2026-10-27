@@ -225,7 +225,7 @@ export function SongLibrary({ store, message, onOpen, onNew, publicStore, onView
                   {song.versions.length === 1 && published.has(song.id) && (
                     <span className="library-public">
                       Public
-                      {song.updatedAt > published.get(song.id)!.updatedAt && ' (edited since)'}
+                      {Date.parse(song.updatedAt) > Date.parse(published.get(song.id)!.updatedAt) && ' (edited since)'}
                     </span>
                   )}
                 </span>
@@ -256,16 +256,21 @@ export function SongLibrary({ store, message, onOpen, onNew, publicStore, onView
           store={publicStore}
           doc={publishing.doc}
           update={publishing.update}
-          onPublished={(id, versionName) => {
+          // The library song takes the name before it's published, so it isn't newer than its
+          // public copy.
+          onRename={(versionName) => store.save({ ...publishing.doc, versionName })}
+          onPublished={(id) => {
             setPublished((prev) => new Map(prev).set(publishing.doc.id, { id, updatedAt: new Date().toISOString() }));
             setPublishing(null);
-            // The library song takes the name it was published under.
-            if (versionName !== publishing.doc.versionName) {
-              store
-                .save({ ...publishing.doc, versionName })
-                .then(refresh)
-                .catch(() => setError(`Published, but couldn't rename your copy to "${versionName}".`));
-            }
+            void refresh();
+            // The database's own publish time, which the edited-since check compares against
+            // (this device's clock may not match it).
+            publicStore
+              .listPublished()
+              .then(setPublished)
+              .catch(() => {
+                // Keeps the time above until the list is next loaded.
+              });
           }}
           onClose={() => setPublishing(null)}
         />

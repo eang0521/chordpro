@@ -8,8 +8,8 @@ interface Props {
   /** The open library song, as it is right now. */
   doc: SongDocument;
   onViewPublic: (publicId: string) => void;
-  /** Renames the open version to the name it was just published under. */
-  onVersionNameChange: (name: string) => void;
+  /** Renames the open version, and saves it, before it's published under that name. */
+  onRename: (name: string) => Promise<void>;
 }
 
 /**
@@ -17,7 +17,7 @@ interface Props {
  * snapshot already there. Later edits stay private until published again. Mount it keyed by
  * song id, so it looks up the right song's status.
  */
-export function PublishControl({ store, doc, onViewPublic, onVersionNameChange }: Props) {
+export function PublishControl({ store, doc, onViewPublic, onRename }: Props) {
   // undefined while checking; null when this song isn't published.
   const [published, setPublished] = useState<PublishedCopy | null | undefined>(undefined);
   const [confirming, setConfirming] = useState(false);
@@ -52,8 +52,8 @@ export function PublishControl({ store, doc, onViewPublic, onVersionNameChange }
           store={store}
           doc={doc}
           update={!!published}
-          onPublished={(id, versionName) => {
-            if (versionName !== doc.versionName) onVersionNameChange(versionName);
+          onRename={onRename}
+          onPublished={(id) => {
             setPublished({ id, updatedAt: new Date().toISOString() });
             setConfirming(false);
           }}

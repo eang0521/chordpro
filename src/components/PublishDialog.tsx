@@ -11,7 +11,10 @@ interface Props {
   doc: SongDocument;
   /** Already public, so this updates the snapshot rather than adding it. */
   update: boolean;
-  /** With the version name it was published under, which the library song should take too. */
+  /** Saves the library song under a new version name. Called before publishing, so the library
+   * song isn't newer than its public copy (which would show it as edited since). */
+  onRename: (versionName: string) => Promise<void>;
+  /** With the version name it was published under. */
   onPublished: (publicId: string, versionName: string) => void;
   onClose: () => void;
 }
@@ -19,7 +22,7 @@ interface Props {
 /** Confirms publishing (or updating) a library song's public snapshot, then does it. Shared by
  * the editor's Publish button and the Your songs list. The version must be named first, so the
  * public versions of a song can be told apart (rather than each showing as "Original"). */
-export function PublishDialog({ store, doc, update, onPublished, onClose }: Props) {
+export function PublishDialog({ store, doc, update, onRename, onPublished, onClose }: Props) {
   useEscapeKey(onClose);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -32,6 +35,7 @@ export function PublishDialog({ store, doc, update, onPublished, onClose }: Prop
     setBusy(true);
     setFailed(false);
     try {
+      if (name !== doc.versionName) await onRename(name);
       onPublished(await store.publish({ ...doc, versionName: name }), name);
     } catch {
       setFailed(true);

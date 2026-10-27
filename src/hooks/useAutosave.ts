@@ -78,5 +78,16 @@ export function useAutosave<T extends { id: string }>(doc: T | null, save: (doc:
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  return { status, flush };
+  /** Saves `next` (the open song with a change not yet in state) right away, instead of
+   * waiting. Once the state catches up it counts as saved, so it isn't written a second time.
+   * Resolves like flush. */
+  const saveNow = useCallback(
+    (next: T): Promise<boolean> => {
+      pending.current = next;
+      return flush();
+    },
+    [flush],
+  );
+
+  return { status, flush, saveNow };
 }
