@@ -938,6 +938,105 @@ button.secondary.chart-toggle-active:hover:not(:disabled) {
   padding-bottom: 8px;
 }
 
+/* The sections to copy onto: a checkbox each, with quick picks under them. */
+.copy-chords-targets {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.copy-chords-targets legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.copy-chords-target-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.copy-chords-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.copy-chords-quick {
+  display: flex;
+  gap: 14px;
+  margin-top: 6px;
+  font-size: 0.85rem;
+}
+
+.copy-chords-summary-warn {
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+/* One tab per section being copied onto, to step through and check each. */
+.copy-target-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+button.copy-target-tab {
+  position: relative;
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+button.copy-target-tab.ok span[aria-hidden] {
+  color: var(--accent);
+}
+
+button.copy-target-tab.warn span[aria-hidden] {
+  color: var(--danger);
+}
+
+button.copy-target-tab:hover:not(:disabled) {
+  background: var(--hover-bg);
+  border-color: var(--ink-line);
+}
+
+button.copy-target-tab.active,
+button.copy-target-tab.active:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* Not looked at yet. */
+.copy-target-unseen {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.copy-target-heading {
+  margin: 16px 0 8px;
+  font-size: 1rem;
+}
+
+.copy-target-nav {
+  justify-content: space-between;
+}
+
 .copy-chords-alert {
   border: 1px solid var(--danger);
   background: var(--danger-bg);
