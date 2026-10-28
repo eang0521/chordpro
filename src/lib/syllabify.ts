@@ -216,6 +216,18 @@ export function syllabifyCore(core: string): string[] {
     }
   }
 
+  // "io" as a word's first vowels is two sounds (Zi-on, li-on, ri-ot, pri-or, vi-o-lin), though
+  // later in a word it's usually one (na-tion, re-li-gion, mil-lion).
+  if (groups.length > 0) {
+    const [start, end] = groups[0];
+    for (let k = start; k < end; k++) {
+      if (letters[k].toLowerCase() === 'i' && letters[k + 1].toLowerCase() === 'o' && k + 1 === end) {
+        groups.splice(0, 1, [start, k], [k + 1, end]);
+        break;
+      }
+    }
+  }
+
   // "ui" before "n" or "d" is two vowel sounds too (ru-in, ru-ined, flu-id, dru-id, gen-u-ine),
   // though it's one elsewhere (fruit, suit, build). Not after "g" or "q", where the "u" just
   // glides into the "i" (guide, pen-guin, squid).
@@ -303,9 +315,12 @@ export function syllabifyCore(core: string): string[] {
   ) {
     // "-ed" is silent after most stems (filled, called, walked, loved) but forms its own
     // syllable when the stem ends in t/d (wanted, needed) — the double consonant sound
-    // would otherwise be unpronounceable.
+    // would otherwise be unpronounceable. "-red" after another consonant keeps it too (ha-tred,
+    // kin-dred, hun-dred), unlike after a vowel (feared, cared, hired).
     const stemFinal = letters[last[0] - 1].toLowerCase();
-    if (stemFinal !== 't' && stemFinal !== 'd') groups.pop();
+    const beforeR = last[0] >= 2 ? letters[last[0] - 2].toLowerCase() : '';
+    const consonantRed = stemFinal === 'r' && beforeR !== '' && beforeR !== 'r' && !isVowelAt(letters, last[0] - 2);
+    if (stemFinal !== 't' && stemFinal !== 'd' && !consonantRed) groups.pop();
   } else if (
     last[0] === last[1] &&
     last[1] === n - 2 &&
