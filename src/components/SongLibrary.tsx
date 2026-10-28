@@ -172,7 +172,17 @@ export function SongLibrary({ store, message, onOpen, onNew, publicStore, onView
   return (
     <div className="panel library">
       <div className="library-header">
-        <h2>Your songs</h2>
+        <h2>
+          Your songs{' '}
+          {/* Songs as listed below (a song's versions count once), and the versions when there
+              are more of them. */}
+          {sortedSongs && songs && (
+            <span className="library-count">
+              {sortedSongs.length} {sortedSongs.length === 1 ? 'song' : 'songs'}
+              {songs.length > sortedSongs.length && ` · ${songs.length} versions`}
+            </span>
+          )}
+        </h2>
         <div className="library-header-actions">
           {sortedSongs && sortedSongs.length > 1 && (
             <label className="library-sort">

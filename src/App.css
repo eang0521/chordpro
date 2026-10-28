@@ -1379,6 +1379,13 @@ button.danger-solid:hover:not(:disabled) {
   margin: 0;
 }
 
+.library-count {
+  color: var(--text-dim);
+  font-weight: 400;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
 .library-header-actions {
   display: flex;
   align-items: center;
