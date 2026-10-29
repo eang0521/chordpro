@@ -23,7 +23,7 @@ export const supabase: SupabaseClient | null =
     : null;
 
 /** Where sign-in links send people back to: this app's own page, so it works the
- * same from Vercel, GitHub Pages and the local dev server (all must be in Supabase's redirect URLs). */
+ * same from Vercel and the local dev server (both must be in Supabase's redirect URLs). */
 export function authRedirectUrl(): string {
   return new URL(import.meta.env.BASE_URL, window.location.origin).href;
 }

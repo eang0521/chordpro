@@ -1,6 +1,6 @@
 # Setting up accounts and the song library (Supabase)
 
-R4E ChordPro (Rehearsing for Eternity) is a static site, hosted on Vercel (GitHub Pages still works too). Signed-in
+R4E ChordPro (Rehearsing for Eternity) is a static site, hosted on Vercel. Signed-in
 users' songs live in a Supabase project that the browser talks to directly; row-level security
 keeps each person's songs private.
 Until the project's URL and key are filled in (step 5), the app runs signed-out only, exactly as
@@ -17,9 +17,7 @@ Everything here is done by hand in the Vercel and Supabase dashboards. It's all 
 3. The production address is `https://r4e-chordpro.vercel.app` (under the project's **Domains**).
 
 From then on every push to `main` deploys to that address, and every other branch gets its own
-preview address. The site is served from the root there (`/`), while GitHub Pages serves it
-under `/chordpro/`; `vite.config.ts` picks the right one. Once you're happy with Vercel you can
-switch GitHub Pages off (**Settings → Pages**) and delete `.github/workflows/deploy.yml`.
+preview address.
 
 ## 1. Create the Supabase project
 
@@ -56,9 +54,8 @@ fine for you and a few friends; if more people use it, set up your own SMTP unde
 - **Site URL**: `https://r4e-chordpro.vercel.app/`
 - **Redirect URLs**: add
   - `https://r4e-chordpro.vercel.app/`
-  - `http://localhost:5173/chordpro/`
-  - optionally `http://localhost:4173/chordpro/` for `npm run preview`
-  - optionally `https://eang0521.github.io/chordpro/`, while GitHub Pages is still up
+  - `http://localhost:5173/`
+  - optionally `http://localhost:4173/` for `npm run preview`
   - optionally `https://*-eang0521s-projects.vercel.app/**` to sign in on branch previews (check
     the exact team name in a preview address; Supabase allows the `*` and `**` wildcards)
 
