@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ArrangementEntry, Chord, KeyName, SongCredits, Step } from './types';
 import type { Section, WordGroup } from './lib/syllables';
 import { parseLyricsToWordGroups, wordGroupsToBlocks } from './lib/syllables';
@@ -28,10 +28,10 @@ import {
 import { supabase } from './lib/supabaseClient';
 import { createSupabaseSongStore } from './lib/supabaseSongStore';
 import { NewerSongVersionError } from './lib/songStore';
-import { createSupabasePublicSongStore } from './lib/publicSongStore';
+import { createSupabasePublicSongStore, type PublishedCopy } from './lib/publicSongStore';
 import { PublicSongList } from './components/PublicSongList';
 import { PublicSongPage } from './components/PublicSongPage';
-import { PublishControl } from './components/PublishControl';
+import { PublishDialog } from './components/PublishDialog';
 import { SideMenu, SideMenuToggle } from './components/SideMenu';
 import { SongSheet } from './components/SongSheet';
 import { SetList } from './components/SetList';
@@ -52,8 +52,6 @@ import './App.css';
 const songStore = supabase ? createSupabaseSongStore(supabase) : null;
 const publicStore = supabase ? createSupabasePublicSongStore(supabase) : null;
 const setStore = supabase ? createSupabaseSetStore(supabase) : null;
-// Module-level so useAutosave gets the same function every render.
-const saveToLibrary = (doc: SongDocument) => songStore!.save(doc);
 
 // The library song open on this device, so a reload reopens it instead of dropping back to
 // the list. Per device on purpose: each device can be working on a different song.
@@ -134,6 +132,10 @@ function App() {
   const [uploadFailed, setUploadFailed] = useState(false);
   const [route, setRoute] = useState<Route>(() => (publicStore ? parseRoute(window.location.hash) : null));
   const [isPublisher, setIsPublisher] = useState(false);
+  // The open library song's public copy: null when it isn't published (or the user can't
+  // publish), undefined while that's being looked up.
+  const [publicCopy, setPublicCopy] = useState<PublishedCopy | null | undefined>(null);
+  const [showPublish, setShowPublish] = useState(false);
   const [menuOpen, setMenuOpen] = useState(initialMenuOpen);
 
   const [songId, setSongId] = useState(initialDraft.id);
@@ -188,7 +190,44 @@ function App() {
   // Open to view or to edit: either way it's saved, since a key, font or spacing change on the
   // chart belongs to the song.
   const libraryOpen = source === 'cloud' && (screen === 'editor' || screen === 'view');
+  // What saving needs to know about the open song's public copy, read when each save runs.
+  const publicSync = useRef({ isPublisher, songId, publicCopy });
+  useEffect(() => {
+    publicSync.current = { isPublisher, songId, publicCopy };
+  }, [isPublisher, songId, publicCopy]);
+
+  /** Saves a library song, and keeps its public copy (if it's published) the same, so a public
+   * version is edited like any other. Stable, as useAutosave needs. */
+  const saveToLibrary = useCallback(async (next: SongDocument) => {
+    await songStore!.save(next);
+    const sync = publicSync.current;
+    if (!publicStore || !sync.isPublisher) return;
+    // Looked up when it isn't known yet for this song, so an early save isn't left out.
+    const known = sync.songId === next.id && sync.publicCopy !== undefined;
+    const copy = known ? sync.publicCopy : await publicStore.findPublished(next.id);
+    if (copy) await publicStore.updatePublished(next, copy.id);
+  }, []);
   const autosave = useAutosave(libraryOpen ? doc : null, saveToLibrary);
+
+  useEffect(() => {
+    if (source !== 'cloud' || !isPublisher || !publicStore) {
+      // Follows the open song, which is what an effect is for.
+      // oxlint-disable-next-line react/set-state-in-effect
+      setPublicCopy(null);
+      return;
+    }
+    let cancelled = false;
+    setPublicCopy(undefined);
+    publicStore
+      .findPublished(songId)
+      .then((found) => !cancelled && setPublicCopy(found))
+      .catch(() => {
+        // Stays unknown, so each save looks it up again.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [source, isPublisher, songId]);
 
   useEffect(() => {
     if (source !== 'local') return;
@@ -400,8 +439,8 @@ function App() {
     setRoute(null);
   }
 
-  /** A private, editable copy of a public song, as the user's own version of the same song
-   * (keeping its version name), opened in My Songs. */
+  /** A private, editable copy of a public song, as a new draft version of the same song, opened
+   * in My Songs. */
   async function copyPublicSong(publicDoc: SongDocument) {
     if (!songStore) return;
     const copy: SongDocument = { ...publicDoc, id: newSongId(), step: 'export' };
@@ -420,7 +459,7 @@ function App() {
     void openSong(version.id);
   }
 
-  /** Copies the open library version under a new name, as another version of the same song. */
+  /** Copies the open library version under a new name, as a new draft of the same song. */
   async function newVersion(name: string) {
     if (!songStore) return;
     const copy: SongDocument = { ...doc, id: newSongId(), versionName: name };
@@ -428,29 +467,26 @@ function App() {
     await openSong(copy.id);
   }
 
-  /** Renames the open library version and saves it straight away, before it's published under
-   * that name: saved after, it would be newer than its public copy and show as edited since. */
+  /** Renames the open library version and saves it straight away, as it's published under
+   * that name. */
   async function renameForPublish(name: string) {
     if (!(await autosave.saveNow({ ...doc, versionName: name }))) throw new Error("Couldn't save the new name.");
     setVersionName(name);
   }
 
-  /** Replaces the open library version's chart with a public version's, as it is now. It keeps
-   * its own id (so sets still use it), name and song. Rejects if it couldn't be done. */
-  async function revertToPublic(publicId: string) {
-    if (!songStore || !publicStore) return;
-    // Save any edits still pending first, so they can't land on top of the reverted chart.
-    if (!(await leaveLibrarySong())) return;
-    const pub = await publicStore.get(publicId);
-    if (!pub) throw new Error('That public version is gone.');
-    await songStore.save({ ...pub.doc, id: songId, workId, versionName, step: 'export' });
-    await openSong(songId);
+  /** Takes the open library version out of the public songs, back to a draft. */
+  async function unpublishVersion() {
+    if (!publicStore) return;
+    const copy = publicCopy ?? (await publicStore.findPublished(songId));
+    if (copy) await publicStore.unpublish(copy.id);
+    setPublicCopy(null);
   }
 
-  /** Deletes the open library version, then opens another of the user's versions of the same
-   * song, or goes back to My Songs if that was the last. */
+  /** Deletes the open library version (and its public copy, if it's published), then opens
+   * another of the user's versions of the same song, or goes back to My Songs if that was the last. */
   async function deleteVersion() {
     if (!songStore || !(await leaveLibrarySong())) return;
+    if (isPublisher) await unpublishVersion();
     await songStore.delete(songId);
     const others = (await songStore.listVersions(workId)).filter((v) => v.id !== songId);
     if (others.length > 0) await openSong(others[0].id);
@@ -581,6 +617,7 @@ function App() {
             userId={userId}
             onBack={() => void goToPublic()}
             onCopyToLibrary={copyPublicSong}
+            onEdit={(id) => openVersion({ kind: 'own', id })}
             onSignIn={() => setShowSignIn(true)}
             songStore={userId ? songStore : null}
             onSelectVersion={openVersion}
@@ -597,7 +634,6 @@ function App() {
             onOpen={(id) => void openSong(id)}
             onNew={() => void newLibrarySong()}
             publicStore={isPublisher ? publicStore : null}
-            onViewPublic={(id) => void goToPublic(id)}
           />
         )}
 
@@ -621,15 +657,25 @@ function App() {
             }
             versions={
               <VersionPicker
-                // Reloads the list when a version is added, removed or moved to another song.
-                key={`${songId}:${workId}`}
+                // Reloads the list when a version is added, removed, moved to another song,
+                // published or unpublished.
+                key={`${songId}:${workId}:${publicCopy?.id ?? ''}`}
                 workId={workId}
                 current={{ kind: 'own', id: songId }}
                 currentName={versionName}
                 songStore={songStore}
                 publicStore={publicStore}
                 onSelect={openVersion}
-                ownActions={{ onNew: newVersion, onRename: setVersionName, onDelete: deleteVersion, onMove: setWorkId, onRevert: revertToPublic }}
+                onCreate={newVersion}
+                ownActions={{
+                  publicId: publicCopy?.id ?? null,
+                  onRename: setVersionName,
+                  onDelete: deleteVersion,
+                  onMove: setWorkId,
+                  ...(isPublisher && publicStore && publicCopy !== undefined
+                    ? { onPublish: () => setShowPublish(true), onUnpublish: unpublishVersion }
+                    : {}),
+                }}
               />
             }
             actions={
@@ -642,15 +688,24 @@ function App() {
                     </button>
                   </span>
                 )}
-                {isPublisher && publicStore && (
-                  <PublishControl
-                    store={publicStore}
-                    doc={doc}
-                    onViewPublic={(id) => void goToPublic(id)}
-                    onRename={renameForPublish}
-                  />
+                {publicCopy && (
+                  <button className="link-button publish-view" onClick={() => void goToPublic(publicCopy.id)}>
+                    View public page
+                  </button>
                 )}
                 <button onClick={() => setScreen('editor')}>Edit</button>
+                {showPublish && publicStore && (
+                  <PublishDialog
+                    store={publicStore}
+                    doc={doc}
+                    onRename={renameForPublish}
+                    onPublished={(id) => {
+                      setPublicCopy({ id, updatedAt: new Date().toISOString() });
+                      setShowPublish(false);
+                    }}
+                    onClose={() => setShowPublish(false)}
+                  />
+                )}
               </>
             }
           />
@@ -713,13 +768,10 @@ function App() {
                   </button>
                 )}
                 {step !== 'input' && <KeyControl songKey={key} onChange={setKey} />}
-                {editingLibrarySong && isPublisher && publicStore && (
-                  <PublishControl
-                    store={publicStore}
-                    doc={doc}
-                    onViewPublic={(id) => void goToPublic(id)}
-                    onRename={renameForPublish}
-                  />
+                {editingLibrarySong && publicCopy && (
+                  <span className="library-public" title="This version is public, so your changes show there as they save.">
+                    Public &middot; changes go live
+                  </span>
                 )}
                 {editingLibrarySong && (
                   <span className={`save-status save-status-${autosave.status}`} role="status">

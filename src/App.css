@@ -1618,6 +1618,11 @@ button.link-button.publish-view {
   color: var(--accent);
 }
 
+.toolbar .library-public {
+  align-self: center;
+  font-size: 0.85rem;
+}
+
 /* Side menu: beside the page on a wide screen (the page moves over to make room), sliding over
    it on a narrower one. */
 .side-menu {

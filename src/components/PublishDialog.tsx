@@ -9,20 +9,16 @@ interface Props {
   store: PublicSongStore;
   /** The library song to publish, exactly as it should appear publicly. */
   doc: SongDocument;
-  /** Already public, so this updates the snapshot rather than adding it. */
-  update: boolean;
-  /** Saves the library song under a new version name. Called before publishing, so the library
-   * song isn't newer than its public copy (which would show it as edited since). */
+  /** Saves the library song under a new version name, so both copies carry it. */
   onRename: (versionName: string) => Promise<void>;
   /** With the version name it was published under. */
   onPublished: (publicId: string, versionName: string) => void;
   onClose: () => void;
 }
 
-/** Confirms publishing (or updating) a library song's public snapshot, then does it. Shared by
- * the editor's Publish button and the Your songs list. The version must be named first, so the
- * public versions of a song can be told apart (rather than each showing as "Original"). */
-export function PublishDialog({ store, doc, update, onRename, onPublished, onClose }: Props) {
+/** Confirms publishing a library song (a draft), then does it. The version must be named first,
+ * so the public versions of a song can be told apart (rather than each showing as "Original"). */
+export function PublishDialog({ store, doc, onRename, onPublished, onClose }: Props) {
   useEscapeKey(onClose);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -52,13 +48,10 @@ export function PublishDialog({ store, doc, update, onRename, onPublished, onClo
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => void publish(e)}
       >
-        <h2>
-          {update ? 'Update the public version of' : 'Publish'} &ldquo;{doc.title.trim() || 'Untitled'}&rdquo;?
-        </h2>
+        <h2>Publish &ldquo;{doc.title.trim() || 'Untitled'}&rdquo;?</h2>
         <p className="hint">
-          {update
-            ? 'The public page will show this song exactly as it is now.'
-            : 'Anyone with the link can view and download it, signed in or not. It stays a snapshot: later edits stay private until you update it.'}
+          Anyone can find, view and download it, signed in or not. You can keep editing it: your changes go live as
+          they save. For bigger changes, make a new version to work on first.
         </p>
         <label className="field">
           <span>Version name</span>
@@ -77,7 +70,7 @@ export function PublishDialog({ store, doc, update, onRename, onPublished, onClo
         {failed && <p className="hint library-error">Couldn&rsquo;t publish it. Check your connection and try again.</p>}
         <div className="actions">
           <button type="submit" disabled={busy || !versionName.trim()}>
-            {busy ? 'Publishing…' : update ? 'Update' : 'Publish'}
+            {busy ? 'Publishing…' : 'Publish'}
           </button>
           <button type="button" className="secondary" onClick={onClose}>
             Cancel

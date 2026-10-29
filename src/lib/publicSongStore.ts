@@ -11,6 +11,9 @@ export interface PublicSongSummary {
   /** The song it's a version of, shared with every other version (public or private). */
   workId: string;
   versionName: string;
+  /** The library song it was published from, which its publisher edits it through (null if
+   * that song is gone). */
+  sourceSongId: string | null;
   title: string;
   keys: KeyName[];
   /** The "Words and music by ..." line, or ''. */
@@ -31,12 +34,15 @@ export interface PublicSong {
   doc: SongDocument;
   /** User id of whoever published it (null if that account was deleted). */
   publisherId: string | null;
+  /** The library song it was published from (null if that song is gone). */
+  sourceSongId: string | null;
 }
 
 /**
  * The public song database: readable by anyone, writable only by publishers (enforced by
  * row-level security in supabase/migrations/0002_public_songs.sql, not just by the UI).
- * Each public song is a snapshot of one of its publisher's library songs.
+ * Each public song is a copy of one of its publisher's library songs, kept up to date as that
+ * song is saved (see updatePublished), so to its publisher the two are one version.
  */
 export interface PublicSongStore {
   /** Every public version of every song, one entry per version. */
@@ -52,7 +58,22 @@ export interface PublicSongStore {
   listPublished(): Promise<Map<string, PublishedCopy>>;
   /** Publishes a library song, or updates its existing public copy. Returns the public id. */
   publish(doc: SongDocument): Promise<string>;
+  /** Brings a library song's public copy (by its public id) up to date with it. */
+  updatePublished(doc: SongDocument, publicId: string): Promise<void>;
   unpublish(id: string): Promise<void>;
+}
+
+/** The columns of a public song that come from the library song it's a copy of. */
+function publicFields(doc: SongDocument, publicId: string) {
+  return {
+    work_id: doc.workId,
+    version_name: doc.versionName.trim(),
+    title: doc.title.trim(),
+    keys: songKeysOf(doc.blocks, doc.arrangement, doc.key),
+    writers: writersLine(doc.credits),
+    // Opens on the finished chart, whatever step the publisher was on.
+    document: { ...doc, id: publicId, step: 'export' },
+  };
 }
 
 export function createSupabasePublicSongStore(client: SupabaseClient): PublicSongStore {
@@ -70,11 +91,12 @@ export function createSupabasePublicSongStore(client: SupabaseClient): PublicSon
     return data ? { id: data.id as string, updatedAt: data.updated_at as string } : null;
   }
 
-  const SUMMARY = 'id, work_id, version_name, title, keys, writers, updated_at, published_at';
+  const SUMMARY = 'id, work_id, version_name, source_song_id, title, keys, writers, updated_at, published_at';
   const toSummary = (row: Record<string, unknown>): PublicSongSummary => ({
     id: row.id as string,
     workId: row.work_id as string,
     versionName: row.version_name as string,
+    sourceSongId: (row.source_song_id as string | null) ?? null,
     title: row.title as string,
     keys: (row.keys ?? []) as KeyName[],
     writers: row.writers as string,
@@ -97,7 +119,10 @@ export function createSupabasePublicSongStore(client: SupabaseClient): PublicSon
     },
 
     async get(id) {
-      const { data, error } = await table().select('document, publisher, work_id, version_name').eq('id', id).maybeSingle();
+      const { data, error } = await table()
+        .select('document, publisher, source_song_id, work_id, version_name')
+        .eq('id', id)
+        .maybeSingle();
       if (error) throw error;
       if (!data) return null;
       const result = upgradeSongDocument(data.document);
@@ -108,6 +133,7 @@ export function createSupabasePublicSongStore(client: SupabaseClient): PublicSon
       return {
         doc: { ...result.doc, id, workId: data.work_id as string, versionName: data.version_name as string },
         publisherId: (data.publisher as string | null) ?? null,
+        sourceSongId: (data.source_song_id as string | null) ?? null,
       };
     },
 
@@ -137,19 +163,14 @@ export function createSupabasePublicSongStore(client: SupabaseClient): PublicSon
     async publish(doc) {
       const existing = await findPublished(doc.id);
       const id = existing?.id ?? newSongId();
-      const { error } = await table().upsert({
-        id,
-        source_song_id: doc.id,
-        work_id: doc.workId,
-        version_name: doc.versionName.trim(),
-        title: doc.title.trim(),
-        keys: songKeysOf(doc.blocks, doc.arrangement, doc.key),
-        writers: writersLine(doc.credits),
-        // Opens on the finished chart, whatever step the publisher was on.
-        document: { ...doc, id, step: 'export' },
-      });
+      const { error } = await table().upsert({ id, source_song_id: doc.id, ...publicFields(doc, id) });
       if (error) throw error;
       return id;
+    },
+
+    async updatePublished(doc, publicId) {
+      const { error } = await table().update(publicFields(doc, publicId)).eq('id', publicId);
+      if (error) throw error;
     },
 
     async unpublish(id) {

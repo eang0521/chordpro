@@ -3,18 +3,20 @@ import type { SongStore, SongSummary } from '../lib/songStore';
 import type { PublicSongStore, PublicSongSummary } from '../lib/publicSongStore';
 import { versionLabel } from '../lib/songDocument';
 import type { VersionRef } from '../lib/lastVersion';
+import { RowMenu } from './RowMenu';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 
 /** What can be done to the open version when it's one of the user's own. */
 export interface OwnVersionActions {
-  /** Copies the open version under a new name, as another of the user's versions. */
-  onNew: (name: string) => Promise<void>;
+  /** The open version's public copy, when it's published. */
+  publicId: string | null;
   onRename: (name: string) => void;
   onDelete: () => Promise<void>;
   /** Makes the open version a version of another song. */
   onMove: (workId: string) => void;
-  /** Replaces the open version's chart with a public version's, keeping its own name. */
-  onRevert: (publicId: string) => Promise<void>;
+  /** Only for publishers. Publish opens the publish dialog. */
+  onPublish?: () => void;
+  onUnpublish?: () => Promise<void>;
 }
 
 interface Props {
@@ -26,21 +28,31 @@ interface Props {
   songStore: SongStore | null;
   publicStore: PublicSongStore | null;
   onSelect: (version: VersionRef) => void;
+  /** Copies the open version as a new draft of the user's own. Not given when signed out. */
+  onCreate?: (name: string) => Promise<void>;
   /** Only when the open version is the user's own. */
   ownActions?: OwnVersionActions;
+}
+
+/** One version in the dropdown. A version the user published is listed once, as their own. */
+interface Entry {
+  ref: VersionRef;
+  name: string;
+  isPublic: boolean;
 }
 
 const refValue = (ref: VersionRef) => `${ref.kind}:${ref.id}`;
 
 /**
- * The version dropdown on a song page: the song's public versions plus the signed-in user's own,
- * with New version / Rename / Delete / Make this a version of… for the user's own. Mount it keyed
- * by the open version, so it reloads the list after a version is added, removed or regrouped.
+ * The version dropdown on a song page: every version of the song in one list (the public ones
+ * and the signed-in user's drafts), with Create new version, Publish, and the rest in a ⋯ menu.
+ * Mount it keyed by the open version and its public id, so it reloads the list after a version
+ * is added, removed, regrouped, published or unpublished.
  */
-export function VersionPicker({ workId, current, currentName, songStore, publicStore, onSelect, ownActions }: Props) {
+export function VersionPicker({ workId, current, currentName, songStore, publicStore, onSelect, onCreate, ownActions }: Props) {
   const [own, setOwn] = useState<SongSummary[]>([]);
   const [shared, setShared] = useState<PublicSongSummary[]>([]);
-  const [dialog, setDialog] = useState<'new' | 'rename' | 'delete' | 'move' | 'revert' | null>(null);
+  const [dialog, setDialog] = useState<'new' | 'rename' | 'delete' | 'move' | 'unpublish' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,12 +70,42 @@ export function VersionPicker({ workId, current, currentName, songStore, publicS
     };
   }, [songStore, publicStore, workId]);
 
-  const nameOf = (ref: VersionRef, saved: string) =>
-    versionLabel(ref.kind === current.kind && ref.id === current.id ? currentName : saved);
+  const publicId = ownActions?.publicId ?? null;
+  const isCurrent = (ref: VersionRef) => ref.kind === current.kind && ref.id === current.id;
   // The open version is always listed, even before the list loads (or if it was just made).
   const ownList = current.kind === 'own' && !own.some((v) => v.id === current.id) ? [{ id: current.id, versionName: currentName }, ...own] : own;
-  const publicList =
-    current.kind === 'public' && !shared.some((v) => v.id === current.id) ? [{ id: current.id, versionName: currentName }, ...shared] : shared;
+  const publicList: { id: string; versionName: string; sourceSongId: string | null }[] =
+    current.kind === 'public' && !shared.some((v) => v.id === current.id)
+      ? [{ id: current.id, versionName: currentName, sourceSongId: null }, ...shared]
+      : shared;
+  // A public version that's the public copy of one of the user's own versions is listed once,
+  // as theirs, so choosing it opens the copy they edit.
+  const ownedBy = (v: { sourceSongId: string | null }) =>
+    v.sourceSongId && ownList.some((o) => o.id === v.sourceSongId) ? v.sourceSongId : null;
+  const isPublic = (ownId: string) => (current.kind === 'own' && ownId === current.id ? !!publicId : publicList.some((p) => ownedBy(p) === ownId));
+
+  const nameOf = (ref: VersionRef, saved: string) => (isCurrent(ref) ? currentName : saved);
+  // The public versions first, oldest first (the user's own among them), then their drafts.
+  const entries: Entry[] = [
+    ...publicList.map((v): Entry => {
+      const mine = ownedBy(v);
+      const ref: VersionRef = mine ? { kind: 'own', id: mine } : { kind: 'public', id: v.id };
+      const saved = mine ? (ownList.find((o) => o.id === mine)?.versionName ?? v.versionName) : v.versionName;
+      return { ref, name: nameOf(ref, saved), isPublic: true };
+    }),
+    ...ownList
+      .filter((v) => !publicList.some((p) => ownedBy(p) === v.id))
+      .map((v): Entry => {
+        const ref: VersionRef = { kind: 'own', id: v.id };
+        return { ref, name: nameOf(ref, v.versionName), isPublic: isPublic(v.id) };
+      }),
+  ];
+  // Opened by its public link, the user's own public version still shows as theirs.
+  const openCopy = current.kind === 'public' ? publicList.find((v) => v.id === current.id) : undefined;
+  const openCopyOwner = openCopy ? ownedBy(openCopy) : null;
+  const selected: VersionRef = openCopyOwner ? { kind: 'own', id: openCopyOwner } : current;
+  // Only worth saying which is which when some aren't public.
+  const tagged = entries.some((e) => !e.isPublic);
   const isLastOwn = current.kind === 'own' && ownList.length <= 1;
 
   return (
@@ -71,62 +113,53 @@ export function VersionPicker({ workId, current, currentName, songStore, publicS
       <label className="version-picker">
         <span>Version</span>
         <select
-          value={refValue(current)}
+          value={refValue(selected)}
           onChange={(e) => {
             const [kind, id] = e.target.value.split(':') as [VersionRef['kind'], string];
             onSelect({ kind, id });
           }}
         >
-          {ownList.length > 0 && (
-            <optgroup label="Your versions">
-              {ownList.map((v) => (
-                <option key={v.id} value={refValue({ kind: 'own', id: v.id })}>
-                  {nameOf({ kind: 'own', id: v.id }, v.versionName)}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {publicList.length > 0 && (
-            <optgroup label="Public versions">
-              {publicList.map((v) => (
-                <option key={v.id} value={refValue({ kind: 'public', id: v.id })}>
-                  {nameOf({ kind: 'public', id: v.id }, v.versionName)}
-                </option>
-              ))}
-            </optgroup>
-          )}
+          {entries.map((e) => (
+            <option key={refValue(e.ref)} value={refValue(e.ref)}>
+              {`${versionLabel(e.name)}${tagged ? (e.isPublic ? ' · Public' : ' · Draft') : ''}`}
+            </option>
+          ))}
         </select>
       </label>
-      {ownActions && (
+      {(onCreate || ownActions) && (
         <span className="version-actions">
-          <button className="secondary" onClick={() => setDialog('new')}>
-            New version
-          </button>
-          <button className="secondary" onClick={() => setDialog('rename')}>
-            Rename
-          </button>
-          <button className="secondary" onClick={() => setDialog('move')} title="Group this with another song's versions">
-            Move…
-          </button>
-          {shared.length > 0 && (
-            <button className="secondary" onClick={() => setDialog('revert')} title="Replace your changes with a public version's chart">
-              Revert to public…
+          {onCreate && (
+            <button className="secondary" onClick={() => setDialog('new')}>
+              Create new version
             </button>
           )}
-          <button className="secondary danger" onClick={() => setDialog('delete')}>
-            Delete version
-          </button>
+          {ownActions?.onPublish && !publicId && (
+            <button className="secondary" onClick={ownActions.onPublish}>
+              Publish
+            </button>
+          )}
+          {ownActions && (
+            <RowMenu
+              label="More version actions"
+              items={[
+                { label: 'Rename', onSelect: () => setDialog('rename') },
+                { label: 'Move to another song…', onSelect: () => setDialog('move') },
+                ...(publicId && ownActions.onUnpublish ? [{ label: 'Unpublish', onSelect: () => setDialog('unpublish') }] : []),
+                { label: 'Delete version', danger: true, onSelect: () => setDialog('delete') },
+              ]}
+            />
+          )}
         </span>
       )}
 
-      {ownActions && dialog === 'new' && (
+      {onCreate && dialog === 'new' && (
         <NameDialog
-          heading="New version"
-          hint={`A copy of “${versionLabel(currentName)}” to change as you like. The original stays as it is.`}
+          heading="Create new version"
+          hint={`A copy of “${versionLabel(currentName)}” to change as you like. It starts as a draft only you can see, and the original stays as it is.`}
           initial=""
           action="Create"
           onSave={async (name) => {
-            await ownActions.onNew(name);
+            await onCreate(name);
             setDialog(null);
           }}
           onClose={() => setDialog(null)}
@@ -135,7 +168,7 @@ export function VersionPicker({ workId, current, currentName, songStore, publicS
       {ownActions && dialog === 'rename' && (
         <NameDialog
           heading="Rename version"
-          hint="e.g. Original Hymn, Passion, Acoustic. A public copy keeps its old name until you update it."
+          hint={`e.g. Original Hymn, Passion, Acoustic.${publicId ? ' It’s public, so the new name shows there too.' : ''}`}
           initial={currentName}
           action="Rename"
           onSave={async (name) => {
@@ -149,6 +182,7 @@ export function VersionPicker({ workId, current, currentName, songStore, publicS
         <DeleteVersionDialog
           name={versionLabel(currentName)}
           isLast={isLastOwn}
+          isPublic={!!publicId}
           onDelete={async () => {
             await ownActions.onDelete();
             setDialog(null);
@@ -156,14 +190,11 @@ export function VersionPicker({ workId, current, currentName, songStore, publicS
           onClose={() => setDialog(null)}
         />
       )}
-      {ownActions && dialog === 'revert' && (
-        <RevertDialog
+      {ownActions?.onUnpublish && dialog === 'unpublish' && (
+        <UnpublishDialog
           name={versionLabel(currentName)}
-          versions={shared}
-          // The public version this one was copied from usually has the same name.
-          initial={(shared.find((v) => v.versionName.trim() === currentName.trim()) ?? shared[0]).id}
-          onRevert={async (publicId) => {
-            await ownActions.onRevert(publicId);
+          onUnpublish={async () => {
+            await ownActions.onUnpublish!();
             setDialog(null);
           }}
           onClose={() => setDialog(null)}
@@ -243,11 +274,13 @@ function NameDialog({
 function DeleteVersionDialog({
   name,
   isLast,
+  isPublic,
   onDelete,
   onClose,
 }: {
   name: string;
   isLast: boolean;
+  isPublic: boolean;
   onDelete: () => Promise<void>;
   onClose: () => void;
 }) {
@@ -261,8 +294,10 @@ function DeleteVersionDialog({
           {isLast
             ? 'It’s your only version of this song, so the song leaves My Songs too. '
             : 'Your other versions of this song stay. '}
-          Public versions aren&rsquo;t affected, and any set that uses this version will show it as deleted. This
-          can&rsquo;t be undone.
+          {isPublic
+            ? 'It’s public, so it’s removed from the public songs too. '
+            : 'Public versions aren’t affected. '}
+          Any set that uses this version will show it as deleted. This can&rsquo;t be undone.
         </p>
         {failed && <p className="hint library-error">Couldn&rsquo;t delete it. Try again.</p>}
         <div className="actions">
@@ -284,45 +319,19 @@ function DeleteVersionDialog({
   );
 }
 
-/** Confirms replacing the open version's chart with a public version's, picking which one when
- * the song has several. */
-function RevertDialog({
-  name,
-  versions,
-  initial,
-  onRevert,
-  onClose,
-}: {
-  name: string;
-  versions: PublicSongSummary[];
-  initial: string;
-  onRevert: (publicId: string) => Promise<void>;
-  onClose: () => void;
-}) {
+/** Confirms taking the open version out of the public songs, back to a draft. */
+function UnpublishDialog({ name, onUnpublish, onClose }: { name: string; onUnpublish: () => Promise<void>; onClose: () => void }) {
   useEscapeKey(onClose);
-  const [chosen, setChosen] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   return (
     <div className="arrangement-overlay" onClick={onClose}>
       <div className="arrangement-panel dialog-panel" role="alertdialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <h2>Revert &ldquo;{name}&rdquo; to the public version?</h2>
+        <h2>Unpublish &ldquo;{name}&rdquo;?</h2>
         <p className="hint">
-          Its lyrics, chords, arrangement, key and credits are replaced with the public version&rsquo;s, and your
-          changes to them are lost. It keeps its name and stays in your sets. This can&rsquo;t be undone.
+          It goes back to being a draft only you can see, and its public link stops working. Copies other people
+          made of it aren&rsquo;t affected. You can publish it again later.
         </p>
-        {versions.length > 1 && (
-          <label className="field">
-            <span>Public version</span>
-            <select value={chosen} onChange={(e) => setChosen(e.target.value)}>
-              {versions.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {versionLabel(v.versionName)}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
         {failed && <p className="hint library-error">That didn&rsquo;t work. Check your connection and try again.</p>}
         <div className="actions">
           <button
@@ -331,13 +340,13 @@ function RevertDialog({
             onClick={() => {
               setBusy(true);
               setFailed(false);
-              onRevert(chosen).catch(() => {
+              onUnpublish().catch(() => {
                 setFailed(true);
                 setBusy(false);
               });
             }}
           >
-            {busy ? 'Reverting…' : 'Revert'}
+            {busy ? 'Unpublishing…' : 'Unpublish'}
           </button>
           <button className="secondary" autoFocus onClick={onClose}>
             Cancel

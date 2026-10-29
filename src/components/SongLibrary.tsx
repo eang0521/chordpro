@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SongStore, SongSummary } from '../lib/songStore';
-import { newSongId, versionLabel, type SongDocument } from '../lib/songDocument';
+import { newSongId, versionLabel } from '../lib/songDocument';
 import { lastVersion } from '../lib/lastVersion';
 import type { PublicSongStore, PublishedCopy } from '../lib/publicSongStore';
-import { PublishDialog } from './PublishDialog';
 import { RowMenu } from './RowMenu';
 import { KEY_NAMES, semitonesBetween } from '../lib/musicTheory';
 import { formatEdited } from '../lib/dates';
@@ -15,10 +14,8 @@ interface Props {
   message: string | null;
   onOpen: (id: string) => void;
   onNew: () => void;
-  /** Given only to publishers: adds Publish / Update public buttons to each one-version song
-   * (a song with several versions publishes them from its own page). */
+  /** Given only to publishers: marks which songs are public (they publish from a song's page). */
   publicStore?: PublicSongStore | null;
-  onViewPublic?: (publicId: string) => void;
 }
 
 
@@ -77,7 +74,7 @@ function sortSongs<T extends SongSummary>(songs: T[], order: SortOrder): T[] {
   return sorted;
 }
 
-export function SongLibrary({ store, message, onOpen, onNew, publicStore, onViewPublic }: Props) {
+export function SongLibrary({ store, message, onOpen, onNew, publicStore }: Props) {
   const [songs, setSongs] = useState<SongSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -86,7 +83,6 @@ export function SongLibrary({ store, message, onOpen, onNew, publicStore, onView
   const [sortOrder, setSortOrder] = useState<SortOrder>(loadSort);
   // Which of these songs are public, by library song id (empty for non-publishers).
   const [published, setPublished] = useState<Map<string, PublishedCopy>>(new Map());
-  const [publishing, setPublishing] = useState<{ doc: SongDocument; update: boolean } | null>(null);
   const sortedSongs = useMemo(() => (songs ? sortSongs(groupByWork(songs), sortOrder) : null), [songs, sortOrder]);
 
   function changeSort(order: SortOrder) {
@@ -120,25 +116,12 @@ export function SongLibrary({ store, message, onOpen, onNew, publicStore, onView
       .listPublished()
       .then((found) => !cancelled && setPublished(found))
       .catch(() => {
-        // Without it every song just offers Publish; publishing again updates the same copy.
+        // Without it the songs just aren't marked as public.
       });
     return () => {
       cancelled = true;
     };
   }, [publicStore]);
-
-  async function startPublish(song: SongSummary) {
-    setBusyId(song.id);
-    try {
-      const doc = await store.get(song.id);
-      if (!doc) throw new Error('missing');
-      setPublishing({ doc, update: published.has(song.id) });
-    } catch {
-      setError(`Couldn't open "${song.title || 'Untitled'}" to publish it.`);
-    } finally {
-      setBusyId(null);
-    }
-  }
 
   async function duplicate(song: SongSummary) {
     setBusyId(song.id);
@@ -160,7 +143,12 @@ export function SongLibrary({ store, message, onOpen, onNew, publicStore, onView
     setConfirmDelete(null);
     setBusyId(song.id);
     try {
-      for (const version of song.versions) await store.delete(version.id);
+      // A public version goes with it: its public copy can't be edited once it's gone.
+      for (const version of song.versions) {
+        const copy = published.get(version.id);
+        if (copy && publicStore) await publicStore.unpublish(copy.id);
+        await store.delete(version.id);
+      }
       await refresh();
     } catch {
       setError(`Couldn't delete "${song.title || 'Untitled'}".`);
@@ -232,12 +220,7 @@ export function SongLibrary({ store, message, onOpen, onNew, publicStore, onView
                       {song.versions.filter((v) => published.has(v.id)).length} public
                     </span>
                   )}
-                  {song.versions.length === 1 && published.has(song.id) && (
-                    <span className="library-public">
-                      Public
-                      {Date.parse(song.updatedAt) > Date.parse(published.get(song.id)!.updatedAt) && ' (edited since)'}
-                    </span>
-                  )}
+                  {song.versions.length === 1 && published.has(song.id) && <span className="library-public">Public</span>}
                 </span>
               </button>
               <div className="library-actions">
@@ -245,12 +228,6 @@ export function SongLibrary({ store, message, onOpen, onNew, publicStore, onView
                   label={`Actions for ${song.title || 'Untitled'}`}
                   disabled={busyId === song.id}
                   items={[
-                    ...(publicStore && song.versions.length === 1 && published.has(song.id) && onViewPublic
-                      ? [{ label: 'View public', onSelect: () => onViewPublic(published.get(song.id)!.id) }]
-                      : []),
-                    ...(publicStore && song.versions.length === 1
-                      ? [{ label: published.has(song.id) ? 'Update public' : 'Publish', onSelect: () => void startPublish(song) }]
-                      : []),
                     { label: 'Duplicate', onSelect: () => void duplicate(song) },
                     { label: 'Delete', danger: true, onSelect: () => setConfirmDelete(song) },
                   ]}
@@ -259,31 +236,6 @@ export function SongLibrary({ store, message, onOpen, onNew, publicStore, onView
             </li>
           ))}
         </ul>
-      )}
-
-      {publishing && publicStore && (
-        <PublishDialog
-          store={publicStore}
-          doc={publishing.doc}
-          update={publishing.update}
-          // The library song takes the name before it's published, so it isn't newer than its
-          // public copy.
-          onRename={(versionName) => store.save({ ...publishing.doc, versionName })}
-          onPublished={(id) => {
-            setPublished((prev) => new Map(prev).set(publishing.doc.id, { id, updatedAt: new Date().toISOString() }));
-            setPublishing(null);
-            void refresh();
-            // The database's own publish time, which the edited-since check compares against
-            // (this device's clock may not match it).
-            publicStore
-              .listPublished()
-              .then(setPublished)
-              .catch(() => {
-                // Keeps the time above until the list is next loaded.
-              });
-          }}
-          onClose={() => setPublishing(null)}
-        />
       )}
 
       {confirmDelete && (
@@ -295,8 +247,7 @@ export function SongLibrary({ store, message, onOpen, onNew, publicStore, onView
                 ? `All ${confirmDelete.versions.length} of your versions will be removed from your library on every device. To remove just one, open the song and use Delete version.`
                 : 'It will be removed from your library on every device.'}{' '}
               This can&rsquo;t be undone.
-              {confirmDelete.versions.some((v) => published.has(v.id)) &&
-                ' Public versions stay published; remove them from their public pages if you want them gone too.'}
+              {confirmDelete.versions.some((v) => published.has(v.id)) && ' Its public versions are removed from the public songs too.'}
             </p>
             <div className="actions">
               <button className="danger-solid" onClick={() => void remove(confirmDelete)}>

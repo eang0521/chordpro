@@ -14,8 +14,10 @@ interface Props {
   /** The signed-in user, or null when signed out. */
   userId: string | null;
   onBack: () => void;
-  /** Makes an editable copy in the user's own library. */
+  /** Makes an editable copy in the user's own library, as a new draft version. */
   onCopyToLibrary: (doc: SongDocument) => Promise<void>;
+  /** Opens the user's own library song this was published from, to edit it. */
+  onEdit: (songId: string) => void;
   onSignIn: () => void;
   /** The signed-in user's library, so their own versions of this song join the dropdown. */
   songStore: SongStore | null;
@@ -27,7 +29,7 @@ interface Props {
  * the ChordPro text a click away. Changing the key, font or spacing here only changes what
  * you see and download — nothing is saved back to the public song.
  */
-export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onSignIn, songStore, onSelectVersion }: Props) {
+export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onEdit, onSignIn, songStore, onSelectVersion }: Props) {
   const [song, setSong] = useState<PublicSong | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [key, setKey] = useState<KeyName>('C');
@@ -35,8 +37,6 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
   const [lineSpacing, setLineSpacing] = useState(1);
   // For a guitarist: the chart in the chord shapes played with a capo. Just for this view.
   const [capo, setCapo] = useState(0);
-  const [copying, setCopying] = useState(false);
-  const [copyFailed, setCopyFailed] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   useEscapeKey(confirmRemove ? () => setConfirmRemove(false) : null);
   const [removeFailed, setRemoveFailed] = useState(false);
@@ -69,18 +69,13 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
 
   const doc = song?.doc;
 
-  async function copyToLibrary() {
+  async function createVersion(versionName: string) {
     if (!doc) return;
-    setCopying(true);
-    setCopyFailed(false);
-    try {
-      // The key, font and spacing as shown here, so the copy starts out the way it was viewed.
-      await onCopyToLibrary({ ...doc, key, chartFontId: fontId, lineSpacing });
-    } catch {
-      setCopyFailed(true);
-      setCopying(false);
-    }
+    // The key, font and spacing as shown here, so the copy starts out the way it was viewed.
+    await onCopyToLibrary({ ...doc, key, chartFontId: fontId, lineSpacing, versionName });
   }
+
+  const isMine = !!userId && song?.publisherId === userId;
 
   async function remove() {
     setRemoveFailed(false);
@@ -124,26 +119,23 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
               songStore={songStore}
               publicStore={store}
               onSelect={onSelectVersion}
+              onCreate={userId ? createVersion : undefined}
             />
           }
           notices={
             <>
-              {copyFailed && <p className="hint library-error">Couldn&rsquo;t copy it to your songs. Try again.</p>}
               {removeFailed && <p className="hint library-error">Couldn&rsquo;t remove it. Try again.</p>}
             </>
           }
           actions={
             <>
-              {userId ? (
-                <button onClick={() => void copyToLibrary()} disabled={copying}>
-                  {copying ? 'Copying…' : 'Copy to My Songs'}
-                </button>
-              ) : (
+              {!userId && (
                 <button className="secondary" onClick={onSignIn}>
-                  Sign in to copy and edit
+                  Sign in to make your own version
                 </button>
               )}
-              {userId && song?.publisherId === userId && (
+              {isMine && song.sourceSongId && <button onClick={() => onEdit(song.sourceSongId!)}>Edit</button>}
+              {isMine && (
                 <button className="secondary danger" onClick={() => setConfirmRemove(true)}>
                   Remove from public songs
                 </button>
@@ -163,8 +155,8 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onS
           <div className="arrangement-panel dialog-panel" role="alertdialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <h2>Remove &ldquo;{doc.title || 'Untitled'}&rdquo; from public songs?</h2>
             <p className="hint">
-              Nobody will be able to find it here any more. Your own copy in My Songs isn&rsquo;t affected, and you can
-              publish it again later.
+              Nobody will be able to find it here any more. Your own version in My Songs stays, as a draft, and you
+              can publish it again later.
             </p>
             <div className="actions">
               <button className="danger-solid" onClick={() => void remove()}>
