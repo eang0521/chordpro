@@ -694,20 +694,22 @@ function App() {
                   </button>
                 )}
                 <button onClick={() => setScreen('editor')}>Edit</button>
-                {showPublish && publicStore && (
-                  <PublishDialog
-                    store={publicStore}
-                    doc={doc}
-                    onRename={renameForPublish}
-                    onPublished={(id) => {
-                      setPublicCopy({ id, updatedAt: new Date().toISOString() });
-                      setShowPublish(false);
-                    }}
-                    onClose={() => setShowPublish(false)}
-                  />
-                )}
               </>
             }
+          />
+        )}
+
+        {/* Publish is offered on the song's page and on the editor's last step. */}
+        {showPublish && libraryOpen && publicStore && (
+          <PublishDialog
+            store={publicStore}
+            doc={doc}
+            onRename={renameForPublish}
+            onPublished={(id) => {
+              setPublicCopy({ id, updatedAt: new Date().toISOString() });
+              setShowPublish(false);
+            }}
+            onClose={() => setShowPublish(false)}
           />
         )}
 
@@ -772,6 +774,12 @@ function App() {
                   <span className="library-public" title="This version is public, so your changes show there as they save.">
                     Public &middot; changes go live
                   </span>
+                )}
+                {/* A finished draft can be published straight from here. */}
+                {editingLibrarySong && step === 'export' && isPublisher && publicStore && publicCopy === null && (
+                  <button className="secondary" onClick={() => setShowPublish(true)}>
+                    Publish
+                  </button>
                 )}
                 {editingLibrarySong && (
                   <span className={`save-status save-status-${autosave.status}`} role="status">
