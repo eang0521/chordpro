@@ -3,12 +3,13 @@ import type { ReactNode } from 'react';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from '../lib/arrangement';
 import type { PlacedLine, SectionDisplayRow } from '../lib/chordChart';
-import { buildChartRows, capoShapeKey, flattenSections, groupIntoSections, isChordOnly, keyHeaderText, layoutLine, pageLabelText, songKeys } from '../lib/chordChart';
+import { capoShapeKey, chartSections, differingVersesText, flattenSections, isChordOnly, keyHeaderText, layoutLine, pageLabelText, songKeys } from '../lib/chordChart';
 import { generateWordDoc } from '../lib/wordDoc';
 import { generatePdf } from '../lib/pdfDoc';
 import { chartFilename, downloadBlob } from '../lib/download';
 import { CHORD_FONT_OPTIONS, getChordFontOption, loadChordFont } from '../lib/chordFonts';
 import { creditLines } from '../lib/credits';
+import type { PrintOptions } from '../lib/pageLayout';
 import {
   CHORD_SIZE_PT,
   CONTENT_WIDTH_PX,
@@ -19,9 +20,10 @@ import {
   LYRIC_SIZE_PT,
   MARGIN_SIDE_PX,
   MARGIN_TOP_PX,
-  PAGE_HEIGHT_PX,
   PAGE_WIDTH_PX,
+  collapsesVerseChords,
   creditFooter,
+  pageHeightTwips,
   labelColumnTwips,
   measureInFont,
   twipsToPreviewPx,
@@ -35,6 +37,7 @@ import { PAGE_FIT_SLACK_PT, TITLE_LINE_PT } from '../lib/chartLayout';
 import { fitLineSpacing, paginateByHeight } from '../lib/pagination';
 import { KeyControl } from './KeyControl';
 import { CapoSelect } from './CapoControls';
+import { PrintOptionsControls } from './PrintOptionsControls';
 import { transposeKey } from '../lib/musicTheory';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -52,6 +55,9 @@ interface Props {
   onFontIdChange: (id: string) => void;
   lineSpacing: number;
   onLineSpacingChange: (value: number) => void;
+  /** Full or half sheet, and whether a half sheet collapses the verse chords. */
+  printOptions: PrintOptions;
+  onPrintOptionsChange: (value: PrintOptions) => void;
   credits: SongCredits;
   /** Closes the dialog. Not used when `inline`. */
   onClose?: () => void;
@@ -181,6 +187,8 @@ export function ChordChartView({
   onFontIdChange,
   lineSpacing,
   onLineSpacingChange,
+  printOptions,
+  onPrintOptionsChange,
   credits,
   onClose,
   inline: inlineProp = false,
@@ -198,10 +206,13 @@ export function ChordChartView({
   const narrow = useMediaQuery(NARROW_QUERY);
   const [showOptions, setShowOptions] = useState(false);
   const shapeKey = capoShapeKey(songKey, capo);
-  const sections = useMemo(
-    () => groupIntoSections(buildChartRows(blocks, arrangement, shapeKey)),
-    [blocks, arrangement, shapeKey],
-  );
+  const collapse = collapsesVerseChords(printOptions);
+  const collapsed = useMemo(() => chartSections(blocks, arrangement, shapeKey, collapse), [blocks, arrangement, shapeKey, collapse]);
+  const sections = collapsed.sections;
+  // Verses whose chords don't match the first verse's, which collapsing hides all the same.
+  const collapseWarning = differingVersesText(collapsed);
+  // A half sheet is laid out as a taller page of the same width (see pageHeightTwips).
+  const pageHeightPx = twipsToPreviewPx(pageHeightTwips(printOptions.paper));
   const displayRows = useMemo(() => flattenSections(sections), [sections]);
   const keyHeader = keyHeaderText(sections, shapeKey, capo);
   // The keys the song is played in (not the capo shapes), for the file names.
@@ -244,7 +255,7 @@ export function ChordChartView({
     [title, font.wordFont, fontLoads],
   );
   const marginBottomPx = twipsToPreviewPx(footer.marginBottomTwips);
-  const contentHeightPx = PAGE_HEIGHT_PX - MARGIN_TOP_PX - marginBottomPx;
+  const contentHeightPx = pageHeightPx - MARGIN_TOP_PX - marginBottomPx;
 
   // Measure each page item's real rendered height (in a hidden, page-content-width container) so
   // we can greedily pack them into US-Letter pages, matching the margins the Word export uses.
@@ -332,7 +343,7 @@ export function ChordChartView({
   async function downloadPdf() {
     setGeneratingPdf(true);
     try {
-      const blob = await generatePdf(title, songKey, blocks, arrangement, fontId, lineSpacing, credits, capo);
+      const blob = await generatePdf(title, songKey, blocks, arrangement, fontId, lineSpacing, credits, capo, printOptions);
       downloadBlob(blob, chartFilename(title, playedKeys, 'pdf'));
     } finally {
       setGeneratingPdf(false);
@@ -401,7 +412,13 @@ export function ChordChartView({
               <button className="secondary" onClick={fitToPage} title="Set the line spacing so the song fits on 1 page, or 2 if it must">
                 Fit to page
               </button>
-              <button className="secondary" disabled={generating} onClick={downloadDocx}>
+              <PrintOptionsControls value={printOptions} onChange={(value) => { onPrintOptionsChange(value); setFitMessage(null); }} />
+              <button
+                className="secondary"
+                disabled={generating}
+                onClick={downloadDocx}
+                title={printOptions.paper === 'half' ? 'The Word file is always a full sheet, with every chord' : undefined}
+              >
                 {generating ? 'Generating…' : 'Download .docx'}
               </button>
             </div>
@@ -410,6 +427,7 @@ export function ChordChartView({
       )}
 
       {fitMessage && <p className="hint chart-fit-message">{fitMessage}</p>}
+      {collapseWarning && !pagesOnly && <p className="hint chart-collapse-warning" role="alert">{collapseWarning}</p>}
 
       {displayRows.length === 0 && <p className="hint">Nothing to show yet &mdash; split some lyrics into syllables first.</p>}
 
@@ -431,12 +449,12 @@ export function ChordChartView({
         <div className="chart-pages" ref={pagesRef}>
           {pages.map((indices, pageIndex) => (
             // Takes the shrunk page's size, since a CSS scale leaves the page's layout box full size.
-            <div className="chart-page-frame" style={{ width: PAGE_WIDTH_PX * pageScale, height: PAGE_HEIGHT_PX * pageScale }} key={pageIndex}>
+            <div className="chart-page-frame" style={{ width: PAGE_WIDTH_PX * pageScale, height: pageHeightPx * pageScale }} key={pageIndex}>
               <div
                 className="chart-page"
                 style={{
                   width: PAGE_WIDTH_PX,
-                  height: PAGE_HEIGHT_PX,
+                  height: pageHeightPx,
                   ...(pageScale < 1 ? { transform: `scale(${pageScale})`, transformOrigin: 'top left' } : {}),
                 }}
               >

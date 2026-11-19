@@ -160,6 +160,7 @@ function App() {
   // stays the same regardless of which screen you download the .docx from.
   const [chartFontId, setChartFontId] = useState<string>(initialDraft.chartFontId);
   const [chartLineSpacing, setChartLineSpacing] = useState(initialDraft.lineSpacing);
+  const [printOptions, setPrintOptions] = useState(initialDraft.printOptions);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   // What happened to the earlier chords when the sections were rebuilt from edited lyrics.
   const [carryReport, setCarryReport] = useState<CarryOverReport | null>(null);
@@ -182,8 +183,9 @@ function App() {
       credits,
       workId,
       versionName,
+      printOptions,
     }),
-    [songId, step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette, chartFontId, chartLineSpacing, credits, workId, versionName],
+    [songId, step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette, chartFontId, chartLineSpacing, credits, workId, versionName, printOptions],
   );
 
   const editingLibrarySong = source === 'cloud' && screen === 'editor';
@@ -250,6 +252,7 @@ function App() {
     setPalette(next.palette);
     setChartFontId(next.chartFontId);
     setChartLineSpacing(next.lineSpacing);
+    setPrintOptions(next.printOptions);
     setCredits(next.credits);
     setWorkId(next.workId);
     setVersionName(next.versionName);
@@ -650,6 +653,8 @@ function App() {
             onFontIdChange={setChartFontId}
             lineSpacing={chartLineSpacing}
             onLineSpacingChange={setChartLineSpacing}
+            printOptions={printOptions}
+            onPrintOptionsChange={setPrintOptions}
             back={
               <button className="secondary" onClick={() => void showLibrary()}>
                 &larr; My songs
@@ -838,6 +843,8 @@ function App() {
                 onFontIdChange={setChartFontId}
                 lineSpacing={chartLineSpacing}
                 onLineSpacingChange={setChartLineSpacing}
+                printOptions={printOptions}
+                onPrintOptionsChange={setPrintOptions}
                 credits={credits}
                 onClose={() => setShowChart(false)}
               />
@@ -930,6 +937,8 @@ function App() {
                 onFontIdChange={setChartFontId}
                 lineSpacing={chartLineSpacing}
                 onLineSpacingChange={setChartLineSpacing}
+                printOptions={printOptions}
+                onPrintOptionsChange={setPrintOptions}
                 onApplyChordPro={applyChordProEdits}
                 onBack={() => setStep('chords')}
                 onStartOver={startOver}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { KeyName } from '../types';
 import type { PublicSong, PublicSongStore } from '../lib/publicSongStore';
 import type { SongDocument } from '../lib/songDocument';
+import { DEFAULT_PRINT_OPTIONS } from '../lib/pageLayout';
 import { NewerSongVersionError, type SongStore } from '../lib/songStore';
 import { rememberVersion, type VersionRef } from '../lib/lastVersion';
 import { SongSheet } from './SongSheet';
@@ -35,6 +36,7 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onE
   const [key, setKey] = useState<KeyName>('C');
   const [fontId, setFontId] = useState('');
   const [lineSpacing, setLineSpacing] = useState(1);
+  const [printOptions, setPrintOptions] = useState(DEFAULT_PRINT_OPTIONS);
   // For a guitarist: the chart in the chord shapes played with a capo. Just for this view.
   const [capo, setCapo] = useState(0);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -56,6 +58,7 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onE
         setKey(loaded.doc.key);
         setFontId(loaded.doc.chartFontId);
         setLineSpacing(loaded.doc.lineSpacing);
+        setPrintOptions(loaded.doc.printOptions);
       })
       .catch((err) => {
         if (!cancelled) {
@@ -72,7 +75,7 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onE
   async function createVersion(versionName: string) {
     if (!doc) return;
     // The key, font and spacing as shown here, so the copy starts out the way it was viewed.
-    await onCopyToLibrary({ ...doc, key, chartFontId: fontId, lineSpacing, versionName });
+    await onCopyToLibrary({ ...doc, key, chartFontId: fontId, lineSpacing, printOptions, versionName });
   }
 
   const isMine = !!userId && song?.publisherId === userId;
@@ -108,6 +111,8 @@ export function PublicSongPage({ store, id, userId, onBack, onCopyToLibrary, onE
           onFontIdChange={setFontId}
           lineSpacing={lineSpacing}
           onLineSpacingChange={setLineSpacing}
+          printOptions={printOptions}
+          onPrintOptionsChange={setPrintOptions}
           capo={capo}
           onCapoChange={setCapo}
           back={back}

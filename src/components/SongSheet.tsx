@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from '../lib/arrangement';
+import type { PrintOptions } from '../lib/pageLayout';
 import { deriveFlatSyllables } from '../lib/arrangement';
 import { ChordChartView } from './ChordChartView';
 import { ExportView } from './ExportView';
@@ -18,6 +19,8 @@ interface Props {
   onFontIdChange: (id: string) => void;
   lineSpacing: number;
   onLineSpacingChange: (value: number) => void;
+  printOptions: PrintOptions;
+  onPrintOptionsChange: (value: PrintOptions) => void;
   /** The way back, at the start of the toolbar. */
   back: ReactNode;
   /** The version dropdown, beside the way back. */
@@ -47,6 +50,8 @@ export function SongSheet({
   onFontIdChange,
   lineSpacing,
   onLineSpacingChange,
+  printOptions,
+  onPrintOptionsChange,
   back,
   versions,
   actions,
@@ -84,6 +89,8 @@ export function SongSheet({
           onFontIdChange={onFontIdChange}
           lineSpacing={lineSpacing}
           onLineSpacingChange={onLineSpacingChange}
+          printOptions={printOptions}
+          onPrintOptionsChange={onPrintOptionsChange}
         />
       ) : (
         <ChordChartView
@@ -97,6 +104,8 @@ export function SongSheet({
           onFontIdChange={onFontIdChange}
           lineSpacing={lineSpacing}
           onLineSpacingChange={onLineSpacingChange}
+          printOptions={printOptions}
+          onPrintOptionsChange={onPrintOptionsChange}
           credits={credits}
           capo={capo}
           onCapoChange={onCapoChange}

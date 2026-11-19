@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ArrangementEntry, Song } from '../types';
 import { songToChordPro } from '../lib/chordpro';
 import type { BlockMap } from '../lib/arrangement';
 import { generateWordDoc } from '../lib/wordDoc';
 import { generatePdf } from '../lib/pdfDoc';
 import { chartFilename, downloadBlob } from '../lib/download';
-import { songKeysOf } from '../lib/chordChart';
+import { chartSections, differingVersesText, songKeysOf } from '../lib/chordChart';
 import { CHORD_FONT_OPTIONS } from '../lib/chordFonts';
-import { MAX_LINE_SPACING, MIN_LINE_SPACING, clampLineSpacing } from '../lib/pageLayout';
+import type { PrintOptions } from '../lib/pageLayout';
+import { MAX_LINE_SPACING, MIN_LINE_SPACING, clampLineSpacing, collapsesVerseChords } from '../lib/pageLayout';
+import { PrintOptionsControls } from './PrintOptionsControls';
 import { creditLines } from '../lib/credits';
 
 interface Props {
@@ -18,6 +20,8 @@ interface Props {
   onFontIdChange: (id: string) => void;
   lineSpacing: number;
   onLineSpacingChange: (value: number) => void;
+  printOptions: PrintOptions;
+  onPrintOptionsChange: (value: PrintOptions) => void;
   // Not needed (and never called) in read-only mode.
   onApplyChordPro?: (text: string) => void;
   onBack?: () => void;
@@ -34,6 +38,8 @@ export function ExportView({
   onFontIdChange,
   lineSpacing,
   onLineSpacingChange,
+  printOptions,
+  onPrintOptionsChange,
   onApplyChordPro,
   onBack,
   onStartOver,
@@ -44,6 +50,11 @@ export function ExportView({
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [applied, setApplied] = useState(false);
   const [text, setText] = useState(() => songToChordPro(song));
+  const collapse = collapsesVerseChords(printOptions);
+  const collapseWarning = useMemo(
+    () => (collapse ? differingVersesText(chartSections(blocks, arrangement, song.key, true)) : null),
+    [collapse, blocks, arrangement, song.key],
+  );
   const filename = (extension: string) => chartFilename(song.title, songKeysOf(blocks, arrangement, song.key), extension);
 
   function resetText() {
@@ -84,7 +95,7 @@ export function ExportView({
   async function downloadPdf() {
     setGeneratingPdf(true);
     try {
-      const blob = await generatePdf(song.title, song.key, blocks, arrangement, fontId, lineSpacing, song.credits);
+      const blob = await generatePdf(song.title, song.key, blocks, arrangement, fontId, lineSpacing, song.credits, 0, printOptions);
       downloadBlob(blob, filename('pdf'));
     } finally {
       setGeneratingPdf(false);
@@ -112,7 +123,12 @@ export function ExportView({
         <button disabled={generatingPdf} onClick={downloadPdf}>
           {generatingPdf ? 'Generating…' : 'Download PDF'}
         </button>
-        <button className="secondary" disabled={generatingDocx} onClick={downloadDocx}>
+        <button
+          className="secondary"
+          disabled={generatingDocx}
+          onClick={downloadDocx}
+          title={printOptions.paper === 'half' ? 'The Word file is always a full sheet, with every chord' : undefined}
+        >
           {generatingDocx ? 'Generating…' : 'Download .docx'}
         </button>
         <button className="secondary" onClick={download}>
@@ -144,7 +160,9 @@ export function ExportView({
             }}
           />
         </label>
+        <PrintOptionsControls value={printOptions} onChange={onPrintOptionsChange} />
       </div>
+      {collapseWarning && <p className="hint chart-collapse-warning" role="alert">{collapseWarning}</p>}
 
       <h3 className="export-subheading">ChordPro text</h3>
       {!readOnly && (

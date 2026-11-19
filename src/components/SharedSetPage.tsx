@@ -71,6 +71,8 @@ export function SharedSetPage({ store, token }: Props) {
         onFontIdChange={(chartFontId) => change({ chartFontId })}
         lineSpacing={doc.lineSpacing}
         onLineSpacingChange={(lineSpacing) => change({ lineSpacing })}
+        printOptions={doc.printOptions}
+        onPrintOptionsChange={(printOptions) => change({ printOptions })}
         capo={capoCharts ? doc.capo : 0}
         back={
           <button className="secondary" onClick={() => setOpen(null)}>

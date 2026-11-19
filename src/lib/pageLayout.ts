@@ -41,6 +41,38 @@ export const LABEL_GAP_TWIPS = 200;
 
 export const CONTENT_WIDTH_TWIPS = PAGE_WIDTH_TWIPS - 2 * MARGIN_SIDE_TWIPS;
 
+/** The sheet a chart prints on: US Letter, or a half sheet of it (5.5 x 8.5in). */
+export type PaperSize = 'letter' | 'half';
+
+/** How a song's chart prints, saved with the song. */
+export interface PrintOptions {
+  paper: PaperSize;
+  /** On a half sheet: chords on the first verse only, to save room. */
+  collapseVerseChords: boolean;
+}
+
+export const DEFAULT_PRINT_OPTIONS: PrintOptions = { paper: 'letter', collapseVerseChords: false };
+
+// A half sheet is laid out as a letter-width page of the same shape (so every size, margin and
+// wrap is the full sheet's) and then shrunk by this much, so it prints as the full chart, smaller.
+export const HALF_SHEET_SCALE = 5.5 / 8.5;
+
+/** How much the laid-out page is shrunk to print: 1 for a full sheet. */
+export function printScale(paper: PaperSize): number {
+  return paper === 'half' ? HALF_SHEET_SCALE : 1;
+}
+
+/** The page's height as laid out (before `printScale`): a half sheet is 8.5in tall at 5.5in wide,
+ * so at the letter width it's 8.5in / HALF_SHEET_SCALE (about 13.1in) tall. */
+export function pageHeightTwips(paper: PaperSize): number {
+  return paper === 'half' ? Math.round((8.5 * 1440) / HALF_SHEET_SCALE) : PAGE_HEIGHT_TWIPS;
+}
+
+/** True when the verse chords really are collapsed: only on a half sheet. */
+export function collapsesVerseChords(options: PrintOptions): boolean {
+  return options.paper === 'half' && options.collapseVerseChords;
+}
+
 // Credits footer (writers and copyright), small and centered at the foot of every page.
 export const CREDIT_SIZE_PT = 8;
 export const CREDIT_LINE_PT = 10;

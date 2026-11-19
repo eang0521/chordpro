@@ -1,5 +1,6 @@
 import type { ArrangementEntry, Chord, KeyName, SongCredits, Step } from '../types';
-import { clampLineSpacing } from './pageLayout';
+import type { PrintOptions } from './pageLayout';
+import { DEFAULT_PRINT_OPTIONS, clampLineSpacing } from './pageLayout';
 import type { Section, WordGroup } from './syllables';
 import type { BlockMap } from './arrangement';
 import { DEFAULT_CHORD_FONT_ID } from './chordFonts';
@@ -7,7 +8,7 @@ import { EMPTY_CREDITS } from './credits';
 
 /** Bump this, and add a step to upgradeSongDocument, whenever the saved shape changes — songs
  * saved by older versions are migrated on load instead of being thrown away. */
-export const SONG_SCHEMA_VERSION = 3;
+export const SONG_SCHEMA_VERSION = 4;
 
 /**
  * Everything needed to reopen a song exactly where it was left, in the format it is saved in
@@ -34,6 +35,8 @@ export interface SongDocument {
    * song's is its own id), and this version's name ('' for an unnamed one, shown as "Original"). */
   workId: string;
   versionName: string;
+  /** Added in version 4: full or half sheet, and whether a half sheet collapses verse chords. */
+  printOptions: PrintOptions;
 }
 
 /** A version's name as shown in the app. */
@@ -76,6 +79,7 @@ export function emptySongDocument(id = newSongId()): SongDocument {
     credits: EMPTY_CREDITS,
     workId: id,
     versionName: '',
+    printOptions: DEFAULT_PRINT_OPTIONS,
   };
 }
 
@@ -103,11 +107,16 @@ function readCredits(raw: unknown): SongCredits {
   };
 }
 
+function readPrintOptions(raw: unknown): PrintOptions {
+  if (!isRecord(raw)) return DEFAULT_PRINT_OPTIONS;
+  return { paper: raw.paper === 'half' ? 'half' : 'letter', collapseVerseChords: raw.collapseVerseChords === true };
+}
+
 /**
  * Turns anything previously saved into a current SongDocument, or says why it can't.
  * Version 0 is the single local draft from before the library existed ('chordpro-draft-v4'):
  * the same song fields with no id, no version and no chart settings. Version 2 added credits,
- * version 3 versions.
+ * version 3 versions, version 4 print options.
  */
 export function upgradeSongDocument(raw: unknown): UpgradeResult {
   if (!isRecord(raw)) return { ok: false, reason: 'invalid' };
@@ -137,6 +146,8 @@ export function upgradeSongDocument(raw: unknown): UpgradeResult {
     // song stores fill both in from their own columns, which win over the document.)
     workId: typeof raw.workId === 'string' && raw.workId ? raw.workId : base.id,
     versionName: typeof raw.versionName === 'string' ? raw.versionName : '',
+    // Version 3 and earlier printed on a full sheet.
+    printOptions: readPrintOptions(raw.printOptions),
   };
   // Future migrations go here, one `if (version < N)` step each, oldest first.
   return { ok: true, doc };

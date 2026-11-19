@@ -665,7 +665,11 @@ button.secondary.chart-toggle-active:hover:not(:disabled) {
   color: var(--text-dim);
 }
 
-.chart-line-spacing input {
+.chart-check input {
+  margin: 0;
+}
+
+.chart-line-spacing:not(.chart-check) input {
   /* Wider than the text alone needs — the browser's native up/down spinner arrows eat into the
      box's width, so a tight ch-based width still clips the second decimal place (e.g. "0.85"). */
   width: 10ch;
@@ -1128,6 +1132,11 @@ button.copy-target-tab.active:hover:not(:disabled) {
 
 .chart-fit-message {
   margin: 8px 0 0;
+}
+
+.chart-collapse-warning {
+  margin: 8px 0 0;
+  color: var(--danger);
 }
 
 /* A chord-only line (turn, intro...) sits where the lyric line would, at the lyric line's

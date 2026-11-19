@@ -33,6 +33,8 @@ export function SetCharts({ songs }: Props) {
             onFontIdChange={noop}
             lineSpacing={doc.lineSpacing}
             onLineSpacingChange={noop}
+            printOptions={doc.printOptions}
+            onPrintOptionsChange={noop}
             credits={doc.credits}
             capo={doc.capo}
           />

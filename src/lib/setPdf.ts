@@ -17,6 +17,7 @@ export async function downloadSetPdf(name: string, songs: SetSongDocument[]): Pr
       lineSpacing: doc.lineSpacing,
       credits: doc.credits,
       capo: doc.capo,
+      printOptions: doc.printOptions,
     })),
   );
   // Drops the characters Windows and macOS don't allow in file names.

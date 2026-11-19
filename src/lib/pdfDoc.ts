@@ -2,10 +2,10 @@ import type { PDFFont } from 'pdf-lib';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from './arrangement';
 import { PAGE_FIT_SLACK_PT, TITLE_LINE_PT, layoutChartItems } from './chartLayout';
-import { buildChartRows, capoShapeKey, groupIntoSections, isChordOnly, keyHeaderText, pageLabelText } from './chordChart';
+import { capoShapeKey, chartSections, isChordOnly, keyHeaderText, pageLabelText } from './chordChart';
 import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
 import { creditLines } from './credits';
-import type { TextMeasure } from './pageLayout';
+import type { PrintOptions, TextMeasure } from './pageLayout';
 import {
   CHORD_LINE_PT,
   CHORD_SIZE_PT,
@@ -20,18 +20,19 @@ import {
   LYRIC_SIZE_PT,
   MARGIN_SIDE_TWIPS,
   MARGIN_TOP_TWIPS,
-  PAGE_HEIGHT_TWIPS,
   PAGE_WIDTH_TWIPS,
+  collapsesVerseChords,
   creditFooter,
   labelColumnTwips,
   measureInFont,
+  pageHeightTwips,
+  printScale,
   titleSizePt,
 } from './pageLayout';
 import { paginateByHeight } from './pagination';
 
 const pt = (twips: number) => twips / 20;
 const PAGE_WIDTH = pt(PAGE_WIDTH_TWIPS);
-const PAGE_HEIGHT = pt(PAGE_HEIGHT_TWIPS);
 const MARGIN_SIDE = pt(MARGIN_SIDE_TWIPS);
 const MARGIN_TOP = pt(MARGIN_TOP_TWIPS);
 
@@ -61,6 +62,9 @@ export interface PdfSong {
   credits?: SongCredits;
   /** A guitarist's capo: the chart shows the chord shapes they play (see keyHeaderText). */
   capo?: number;
+  /** Full or half sheet (each page laid out at the letter width, then shrunk to fit), and
+   * whether a half sheet collapses the verse chords. Full sheet when unset. */
+  printOptions?: PrintOptions;
 }
 
 type PdfStyle = '' | 'bold' | 'italic';
@@ -82,8 +86,9 @@ export async function generatePdf(
   lineSpacing = 1,
   credits?: SongCredits,
   capo = 0,
+  printOptions?: PrintOptions,
 ): Promise<Blob> {
-  return generateSongsPdf(title, [{ title, key, blocks, arrangement, fontId, lineSpacing, credits, capo }]);
+  return generateSongsPdf(title, [{ title, key, blocks, arrangement, fontId, lineSpacing, credits, capo, printOptions }]);
 }
 
 /**
@@ -127,7 +132,7 @@ async function addSongPages(
   doc: PdfDocument,
   { rgb }: PdfLib,
   fonts: Record<PdfStyle, PDFFont>,
-  { title, key: playedKey, blocks, arrangement, fontId, lineSpacing, credits, capo = 0 }: PdfSong,
+  { title, key: playedKey, blocks, arrangement, fontId, lineSpacing, credits, capo = 0, printOptions }: PdfSong,
 ): Promise<void> {
   const option = getChordFontOption(fontId);
 
@@ -142,7 +147,10 @@ async function addSongPages(
 
   // With a capo, the chords are spelled as the shapes the guitarist plays.
   const key = capoShapeKey(playedKey, capo);
-  const sections = groupIntoSections(buildChartRows(blocks, arrangement, key));
+  const { sections } = chartSections(blocks, arrangement, key, !!printOptions && collapsesVerseChords(printOptions));
+  const paper = printOptions?.paper ?? 'letter';
+  const PAGE_HEIGHT = pt(pageHeightTwips(paper));
+  const scale = printScale(paper);
   // Anything that decides how many lines the chart takes — where lyric lines wrap, the label
   // column's width, how the credits break — is measured the way the on-screen chart (and the Word
   // export) measure it: the browser's text widths include kerning, which the PDF font's don't, so
@@ -223,5 +231,7 @@ async function addSongPages(
       }
       top += item.height;
     });
+    // A half sheet: everything drawn at the letter width, shrunk onto the smaller page.
+    if (scale !== 1) page.scale(scale, scale);
   });
 }

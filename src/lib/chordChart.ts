@@ -123,6 +123,68 @@ export function groupIntoSections(rows: ChartRow[]): DocSection[] {
   return sections;
 }
 
+/** Every chord in a section, in order (with bar lines and beat marks), ignoring where it sits. */
+function chordSequence(section: DocSection): string {
+  return section.lineRows
+    .flatMap((row) => row.tokens.map((t) => t.chordLabel).filter((label): label is string => !!label))
+    .join(' ');
+}
+
+/** A line with its chords taken off: chords with no lyric under them go altogether. */
+function withoutChords(row: ChartLineRow): ChartLineRow {
+  return {
+    ...row,
+    tokens: row.tokens.filter((t) => !t.isSlot).map(({ chordOffset: _offset, ...t }) => ({ ...t, chordLabel: null })),
+  };
+}
+
+export interface CollapsedSections {
+  sections: DocSection[];
+  /** Labels of the later verses whose chords differ from the first verse's. */
+  differing: string[];
+  /** The first verse's label, the one that keeps its chords. */
+  firstVerse: string;
+}
+
+/**
+ * Chords on the first verse only: every later verse prints just its lyrics, to save room on a
+ * half sheet. A verse whose chords aren't the same as the first verse's (in the same order) is
+ * collapsed too, but named in `differing` so the player can be told.
+ */
+export function collapseVerseChords(sections: DocSection[]): CollapsedSections {
+  const first = sections.find((s) => s.type === 'verse' && s.lineRows.length > 0);
+  if (!first) return { sections, differing: [], firstVerse: '' };
+  const firstChords = chordSequence(first);
+  const differing: string[] = [];
+  const collapsed = sections.map((section) => {
+    if (section.type !== 'verse' || section === first) return section;
+    const label = section.label || 'A verse';
+    if (chordSequence(section) !== firstChords && !differing.includes(label)) differing.push(label);
+    // A line that was all chords (a turn) has nothing left to print.
+    return { ...section, lineRows: section.lineRows.map(withoutChords).filter((row) => row.tokens.length > 0) };
+  });
+  return { sections: collapsed, differing, firstVerse: first.label || 'the first verse' };
+}
+
+/** The chart's sections as they print, with the verse chords collapsed when `collapse` is set. */
+export function chartSections(
+  blocks: BlockMap,
+  arrangement: ArrangementEntry[],
+  key: KeyName,
+  collapse = false,
+): CollapsedSections {
+  const sections = groupIntoSections(buildChartRows(blocks, arrangement, key));
+  return collapse ? collapseVerseChords(sections) : { sections, differing: [], firstVerse: '' };
+}
+
+/** What the collapse note says about verses whose chords don't match the first's, or null. */
+export function differingVersesText({ differing, firstVerse }: CollapsedSections): string | null {
+  if (differing.length === 0) return null;
+  const names = differing.length === 1 ? differing[0] : `${differing.slice(0, -1).join(', ')} and ${differing[differing.length - 1]}`;
+  const verb = differing.length === 1 ? 'has' : 'have';
+  return `${names} ${verb} different chords from ${firstVerse}, but only ${firstVerse}'s chords are printed.`;
+}
+
 export interface SectionDisplayRow {
   key: string;
   section: DocSection;
