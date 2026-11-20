@@ -1990,3 +1990,50 @@ button.link-button.publish-view {
 .capo-switch button {
   white-space: nowrap;
 }
+
+/* Chord charts or lyrics only, under a set's songs. */
+.set-view-switch {
+  display: flex;
+  margin: 16px 0 8px;
+}
+
+.set-lyrics-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.set-lyrics-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.set-lyrics-song {
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+  padding-top: 12px;
+}
+
+.set-lyrics-song-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.set-lyrics-song-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.set-lyrics-text {
+  margin: 10px 0 0;
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

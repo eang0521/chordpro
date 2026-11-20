@@ -10,6 +10,8 @@ import { makeId } from '../lib/id';
 import { downloadSetPdf } from '../lib/setPdf';
 import { useAutosave } from '../hooks/useAutosave';
 import { SetCharts } from './SetCharts';
+import { SetLyrics, SetViewSwitch } from './SetLyrics';
+import { useSetView } from '../hooks/useSetView';
 import { CapoChartsSwitch, CapoSelect } from './CapoControls';
 import { PrintOptionsControls } from './PrintOptionsControls';
 import { DEFAULT_PRINT_OPTIONS } from '../lib/pageLayout';
@@ -38,6 +40,7 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
   const [capoCharts, setCapoCharts] = useState(false);
   // Full or half sheet for every song: just for now, so a set always opens on a full sheet.
   const [printOptions, setPrintOptions] = useState(DEFAULT_PRINT_OPTIONS);
+  const [view, setView] = useSetView();
   const save = useCallback((s: SongSet) => setStore.save(s), [setStore]);
   const autosave = useAutosave(set, save);
   // Leaving some other way than Back (the menu, say) still saves the last change.
@@ -332,7 +335,12 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
         </label>
       </div>
 
-      <SetCharts songs={inChartMode(charts, capoCharts)} printOptions={printOptions} />
+      {set.entries.length > 0 && <SetViewSwitch view={view} onChange={setView} />}
+      {view === 'lyrics' ? (
+        <SetLyrics songs={charts} />
+      ) : (
+        <SetCharts songs={inChartMode(charts, capoCharts)} printOptions={printOptions} />
+      )}
     </div>
   );
 }

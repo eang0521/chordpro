@@ -6,6 +6,8 @@ import { inChartMode } from '../lib/setStore';
 import { songKeysOf } from '../lib/chordChart';
 import { SongSheet } from './SongSheet';
 import { SetCharts } from './SetCharts';
+import { SetLyrics, SetViewSwitch } from './SetLyrics';
+import { useSetView } from '../hooks/useSetView';
 import { CapoChartsSwitch, CapoSelect } from './CapoControls';
 import { PrintOptionsControls } from './PrintOptionsControls';
 import { DEFAULT_PRINT_OPTIONS } from '../lib/pageLayout';
@@ -29,6 +31,7 @@ export function SharedSetPage({ store, token }: Props) {
   const [capoCharts, setCapoCharts] = useState(false);
   // Full or half sheet for every song, for this viewer: a set always opens on a full sheet.
   const [printOptions, setPrintOptions] = useState(DEFAULT_PRINT_OPTIONS);
+  const [view, setView] = useSetView();
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +145,12 @@ export function SharedSetPage({ store, token }: Props) {
           ))}
         </ol>
       </div>
-      <SetCharts songs={inChartMode(set.songs, capoCharts)} printOptions={printOptions} />
+      {set.songs.length > 0 && <SetViewSwitch view={view} onChange={setView} />}
+      {view === 'lyrics' ? (
+        <SetLyrics songs={set.songs} />
+      ) : (
+        <SetCharts songs={inChartMode(set.songs, capoCharts)} printOptions={printOptions} />
+      )}
     </div>
   );
 }
