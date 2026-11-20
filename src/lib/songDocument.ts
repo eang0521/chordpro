@@ -35,7 +35,8 @@ export interface SongDocument {
    * song's is its own id), and this version's name ('' for an unnamed one, shown as "Original"). */
   workId: string;
   versionName: string;
-  /** Added in version 4: full or half sheet, and whether a half sheet collapses verse chords. */
+  /** Added in version 4: whether a half sheet collapses verse chords. The paper is always saved
+   * (and read) as a full sheet: a half sheet is chosen each time, for the moment. */
   printOptions: PrintOptions;
 }
 
@@ -109,7 +110,8 @@ function readCredits(raw: unknown): SongCredits {
 
 function readPrintOptions(raw: unknown): PrintOptions {
   if (!isRecord(raw)) return DEFAULT_PRINT_OPTIONS;
-  return { paper: raw.paper === 'half' ? 'half' : 'letter', collapseVerseChords: raw.collapseVerseChords === true };
+  // A song always opens on a full sheet, including one saved on a half sheet before that changed.
+  return { paper: 'letter', collapseVerseChords: raw.collapseVerseChords === true };
 }
 
 /**

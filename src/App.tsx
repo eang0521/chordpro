@@ -3,6 +3,7 @@ import type { ArrangementEntry, Chord, KeyName, SongCredits, Step } from './type
 import type { Section, WordGroup } from './lib/syllables';
 import { parseLyricsToWordGroups, wordGroupsToBlocks } from './lib/syllables';
 import type { BlockMap } from './lib/arrangement';
+import type { PrintOptions } from './lib/pageLayout';
 import { blockIdsOf, deriveFlatSyllables } from './lib/arrangement';
 import { LyricsInput } from './components/LyricsInput';
 import { SyllableEditor } from './components/SyllableEditor';
@@ -161,6 +162,12 @@ function App() {
   const [chartFontId, setChartFontId] = useState<string>(initialDraft.chartFontId);
   const [chartLineSpacing, setChartLineSpacing] = useState(initialDraft.lineSpacing);
   const [printOptions, setPrintOptions] = useState(initialDraft.printOptions);
+  // The paper size is only for the moment: a song is always saved (and so reopens) on a full
+  // sheet, however long it was looked at on a half sheet. Collapsing verse chords is remembered.
+  const savedPrintOptions = useMemo<PrintOptions>(
+    () => ({ paper: 'letter', collapseVerseChords: printOptions.collapseVerseChords }),
+    [printOptions.collapseVerseChords],
+  );
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   // What happened to the earlier chords when the sections were rebuilt from edited lyrics.
   const [carryReport, setCarryReport] = useState<CarryOverReport | null>(null);
@@ -183,9 +190,9 @@ function App() {
       credits,
       workId,
       versionName,
-      printOptions,
+      printOptions: savedPrintOptions,
     }),
-    [songId, step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette, chartFontId, chartLineSpacing, credits, workId, versionName, printOptions],
+    [songId, step, title, key, lyrics, wordGroups, sections, blocks, arrangement, palette, chartFontId, chartLineSpacing, credits, workId, versionName, savedPrintOptions],
   );
 
   const editingLibrarySong = source === 'cloud' && screen === 'editor';
