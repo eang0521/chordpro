@@ -1,7 +1,16 @@
 import type { DocSection } from './chordChart';
 import { isChordOnly, layoutLine } from './chordChart';
 import type { TextMeasure } from './pageLayout';
-import { CHORD_LINE_PT, LYRIC_LINE_PT, SECTION_GAP_PT, TITLE_GAP_PT, TITLE_LINE_PT } from './pageLayout';
+import {
+  CHORD_LINE_PT,
+  LYRIC_LINE_PT,
+  MAX_LINE_SPACING,
+  MIN_LINE_SPACING,
+  SECTION_GAP_PT,
+  TITLE_GAP_PT,
+  TITLE_LINE_PT,
+} from './pageLayout';
+import { fitLineSpacing } from './pagination';
 
 export { TITLE_LINE_PT };
 
@@ -70,4 +79,27 @@ export function layoutChartItems(
   const lastItem = items[items.length - 1];
   if (lastItem.kind === 'row') lastItem.height -= sectionGap;
   return { items, groups };
+}
+
+// Fit to page tries 1 page, then 2, and no more.
+export const FIT_MAX_PAGES = 2;
+// Fit to page aims this far short of a full page. The browser rounds each line's height a hair as
+// it lays the chart out, so the preview can measure a fraction of a point less than the PDF's
+// exact arithmetic; a fit right at the edge could then fit on screen but not in the PDF.
+const FIT_SAFETY_PT = 1.5;
+
+/**
+ * The roomiest line spacing that fits the chart on one page (or two if it must), from its items
+ * laid out at a spacing of 1: every row's height (lines and gaps) scales with the spacing, and
+ * the title's doesn't. The preview, PDF and Word export all fit this way, so they agree. `pages`
+ * is null when even the tightest spacing needs more than FIT_MAX_PAGES pages.
+ */
+export function fitChartSpacing(
+  items: LayoutItem[],
+  groups: number[][],
+  contentHeight: number,
+): { spacing: number; pages: number | null } {
+  const heightsAt = (spacing: number) => items.map((item) => (item.kind === 'title' ? item.height : item.height * spacing));
+  const fit = fitLineSpacing(heightsAt, groups, contentHeight - FIT_SAFETY_PT, FIT_MAX_PAGES, MIN_LINE_SPACING, MAX_LINE_SPACING);
+  return fit ?? { spacing: MIN_LINE_SPACING, pages: null };
 }

@@ -7,6 +7,8 @@ import { songKeysOf } from '../lib/chordChart';
 import { SongSheet } from './SongSheet';
 import { SetCharts } from './SetCharts';
 import { CapoChartsSwitch, CapoSelect } from './CapoControls';
+import { PrintOptionsControls } from './PrintOptionsControls';
+import { DEFAULT_PRINT_OPTIONS } from '../lib/pageLayout';
 
 interface Props {
   store: SetStore;
@@ -25,6 +27,8 @@ export function SharedSetPage({ store, token }: Props) {
   const [open, setOpen] = useState<number | null>(null);
   // Standard charts, or each song with its capo: the set's own to start with, changeable here.
   const [capoCharts, setCapoCharts] = useState(false);
+  // Full or half sheet for every song, for this viewer: a set always opens on a full sheet.
+  const [printOptions, setPrintOptions] = useState(DEFAULT_PRINT_OPTIONS);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +48,7 @@ export function SharedSetPage({ store, token }: Props) {
   async function print(shared: SharedSet) {
     setPrinting(true);
     try {
-      await downloadSetPdf(shared.name, inChartMode(shared.songs, capoCharts));
+      await downloadSetPdf(shared.name, inChartMode(shared.songs, capoCharts), printOptions);
     } catch {
       setError("Couldn't make the PDF. Try again.");
     } finally {
@@ -71,8 +75,12 @@ export function SharedSetPage({ store, token }: Props) {
         onFontIdChange={(chartFontId) => change({ chartFontId })}
         lineSpacing={doc.lineSpacing}
         onLineSpacingChange={(lineSpacing) => change({ lineSpacing })}
-        printOptions={doc.printOptions}
-        onPrintOptionsChange={(printOptions) => change({ printOptions })}
+        // The set's sheet, with this song's own Fit to page (a change to it is just for this viewer).
+        printOptions={{ ...printOptions, fitToPage: doc.printOptions.fitToPage }}
+        onPrintOptionsChange={(next) => {
+          setPrintOptions(next);
+          change({ printOptions: { ...doc.printOptions, fitToPage: next.fitToPage } });
+        }}
         capo={capoCharts ? doc.capo : 0}
         back={
           <button className="secondary" onClick={() => setOpen(null)}>
@@ -100,6 +108,7 @@ export function SharedSetPage({ store, token }: Props) {
           <h2>{set.name.trim() || 'Untitled set'}</h2>
           <div className="library-header-actions">
             <CapoChartsSwitch capoCharts={capoCharts} onChange={setCapoCharts} />
+            <PrintOptionsControls value={printOptions} onChange={setPrintOptions} showFit={false} />
             <button disabled={printing || set.songs.length === 0} onClick={() => void print(set)}>
               {printing ? 'Making PDF…' : 'Download PDF'}
             </button>
@@ -133,7 +142,7 @@ export function SharedSetPage({ store, token }: Props) {
           ))}
         </ol>
       </div>
-      <SetCharts songs={inChartMode(set.songs, capoCharts)} />
+      <SetCharts songs={inChartMode(set.songs, capoCharts)} printOptions={printOptions} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import type { IRunOptions, Paragraph } from 'docx';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from './arrangement';
-import { PAGE_FIT_SLACK_PT, TITLE_LINE_PT, layoutChartItems } from './chartLayout';
+import { PAGE_FIT_SLACK_PT, TITLE_LINE_PT, fitChartSpacing, layoutChartItems } from './chartLayout';
 import { buildChartRows, capoShapeKey, continuedTitle, groupIntoSections, isChordOnly, keyHeaderText, layoutLine } from './chordChart';
 import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
 import { embedFontStyles } from './docxFonts';
@@ -36,7 +36,8 @@ const twips = (pt: number) => Math.round(pt * 20);
 /** Builds a downloadable .docx chord chart laid out like a typical printed worship chart: "Key
  * of X" in the page header, a centered all-caps title, then each section with its label in a
  * left column on the first lyric line and italic chords tight above the bold lyrics.
- * `lineSpacing` scales every line height and gap (1.0 = normal). The writers and copyright go
+ * `lineSpacing` scales every line height and gap (1.0 = normal), unless `fitToPage` picks the
+ * spacing that fits the page, as the preview and PDF do. The writers and copyright go
  * in the footer of every page. */
 export async function generateWordDoc(
   title: string,
@@ -44,9 +45,10 @@ export async function generateWordDoc(
   blocks: BlockMap,
   arrangement: ArrangementEntry[],
   fontId: string,
-  lineSpacing = 1,
+  ownSpacing = 1,
   credits?: SongCredits,
   capo = 0,
+  fitToPage = false,
 ): Promise<Blob> {
   // Loaded on demand — the docx package is sizable and most sessions never export a Word doc.
   const { AlignmentType, Document, Footer, Header, LineRuleType, Packer, PageNumber, Paragraph, Tab, TabStopType, TextRun } = await import('docx');
@@ -61,8 +63,10 @@ export async function generateWordDoc(
   const footer = creditFooter(creditLines(credits), measure);
   // Word paginates the doc itself, but it breaks where the preview does (sections are kept
   // together), so the preview's page count says whether the chart needs page labels at all.
-  const { items, groups } = layoutChartItems(sections, measure, measure, lyricWidthPt, lineSpacing);
   const contentHeightPt = (PAGE_HEIGHT_TWIPS - MARGIN_TOP_TWIPS - footer.marginBottomTwips) / 20;
+  const atOne = fitToPage ? layoutChartItems(sections, measure, measure, lyricWidthPt, 1) : null;
+  const lineSpacing = atOne ? fitChartSpacing(atOne.items, atOne.groups, contentHeightPt).spacing : ownSpacing;
+  const { items, groups } = layoutChartItems(sections, measure, measure, lyricWidthPt, lineSpacing);
   const multiPage = paginateByHeight(items.map((item) => item.height), groups, contentHeightPt + PAGE_FIT_SLACK_PT).length > 1;
 
   const exactLine = (pt: number, afterPt = 0, beforePt = 0) => ({

@@ -28,8 +28,8 @@ import {
   TITLE_KEY_GAP_PT,
   titleSizePt,
 } from '../lib/pageLayout';
-import { PAGE_FIT_SLACK_PT } from '../lib/chartLayout';
-import { fitLineSpacing, paginateByHeight } from '../lib/pagination';
+import { FIT_MAX_PAGES, PAGE_FIT_SLACK_PT, fitChartSpacing, layoutChartItems } from '../lib/chartLayout';
+import { paginateByHeight } from '../lib/pagination';
 import { KeyControl } from './KeyControl';
 import { CapoSelect } from './CapoControls';
 import { PrintOptionsControls } from './PrintOptionsControls';
@@ -66,12 +66,6 @@ interface Props {
   /** Offers a capo picker beside the key, for a capo chart. */
   onCapoChange?: (capo: number) => void;
 }
-
-const FIT_MAX_PAGES = 2;
-// Fit to page aims this far short of a full page. The browser rounds each line's height a hair as
-// it lays the chart out, so the preview can measure a fraction of a point less than the PDF's
-// exact arithmetic; a fit right at the edge could then fit on screen but not in the PDF.
-const FIT_SAFETY_PT = 1.5;
 
 /** Sets the --line-spacing CSS custom property (not a typed React.CSSProperties key). */
 function lineSpacingVar(value: number): Record<string, string> {
@@ -209,7 +203,6 @@ export function ChordChartView({
   const [generating, setGenerating] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pageMode, setPageMode] = useState(inline);
-  const [fitMessage, setFitMessage] = useState<string | null>(null);
   useEscapeKey(inline ? null : (onClose ?? null));
   // On a phone the page-setup controls fold under Options, so the chart isn't pushed off the screen.
   const narrow = useMediaQuery(NARROW_QUERY);
@@ -284,9 +277,29 @@ export function ChordChartView({
   const marginBottomPx = twipsToPreviewPx(footer.marginBottomTwips);
   const contentHeightPx = pageHeightPx - marginTopPx - marginBottomPx;
 
+  // Fit to page: the roomiest line spacing that fits the song on 1 page (or 2 if it must), worked
+  // out as the PDF and Word export work it out, so all three agree. Otherwise the song's own.
+  const fit = useMemo(
+    () => {
+      if (!printOptions.fitToPage) return null;
+      const measure = measureInFont(font.wordFont);
+      const lyricWidth = contentWidthPx - labelColEm * LYRIC_SIZE_PT;
+      const atOne = layoutChartItems(sections, measure, measure, lyricWidth, 1, geometry.titleLinePt + geometry.titleGapPt);
+      return fitChartSpacing(atOne.items, atOne.groups, contentHeightPx);
+    },
+    // fontLoads: as above, measure again once the font has loaded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [printOptions.fitToPage, sections, font.wordFont, fontLoads, contentWidthPx, labelColEm, geometry, contentHeightPx],
+  );
+  const spacing = fit ? fit.spacing : lineSpacing;
+  const fitMessage = !fit
+    ? null
+    : fit.pages
+      ? `Fits on ${fit.pages} ${fit.pages === 1 ? 'page' : 'pages'} at ${fit.spacing.toFixed(2)} spacing`
+      : `Too long for ${FIT_MAX_PAGES} pages even at the tightest spacing`;
+
   // Measure each page item's real rendered height (in a hidden, page-content-width container) so
   // we can greedily pack them into US-Letter pages, matching the margins the Word export uses.
-  const measureRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [pages, setPages] = useState<number[][]>([]);
 
@@ -334,33 +347,12 @@ export function ChordChartView({
     setPages(paginateByHeight(measureHeights(), groups, contentHeightPx + PAGE_FIT_SLACK_PT));
     // measureHeights only reads the DOM rendered from these.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageItems, groups, font.cssFont, lineSpacing, fontLoads, contentHeightPx, contentWidthPx, titleStyle]);
-
-  /** Picks the roomiest line spacing that still fits the song on one page (or two if it must),
-   * by re-measuring the hidden layout at each candidate spacing. */
-  function fitToPage() {
-    const container = measureRef.current;
-    if (!container) return;
-    const measureAt = (spacing: number) => {
-      container.style.setProperty('--line-spacing', String(spacing));
-      return measureHeights();
-    };
-    const fit = fitLineSpacing(measureAt, groups, contentHeightPx - FIT_SAFETY_PT, FIT_MAX_PAGES, MIN_LINE_SPACING, MAX_LINE_SPACING);
-    container.style.setProperty('--line-spacing', String(lineSpacing));
-    if (fit) {
-      onLineSpacingChange(fit.spacing);
-      setFitMessage(`Fits on ${fit.pages} ${fit.pages === 1 ? 'page' : 'pages'} at ${fit.spacing.toFixed(2)} spacing`);
-    } else {
-      onLineSpacingChange(MIN_LINE_SPACING);
-      setFitMessage(`Too long for ${FIT_MAX_PAGES} pages even at the tightest spacing`);
-    }
-    setPageMode(true);
-  }
+  }, [pageItems, groups, font.cssFont, spacing, fontLoads, contentHeightPx, contentWidthPx, titleStyle]);
 
   async function downloadDocx() {
     setGenerating(true);
     try {
-      const blob = await generateWordDoc(title, songKey, blocks, arrangement, fontId, lineSpacing, credits, capo);
+      const blob = await generateWordDoc(title, songKey, blocks, arrangement, fontId, lineSpacing, credits, capo, printOptions.fitToPage);
       downloadBlob(blob, chartFilename(title, playedKeys, 'docx'));
     } finally {
       setGenerating(false);
@@ -421,25 +413,24 @@ export function ChordChartView({
                   </option>
                 ))}
               </select>
-              <label className="chart-line-spacing">
-                <span>Line spacing</span>
-                <input
-                  type="number"
-                  min={MIN_LINE_SPACING}
-                  max={MAX_LINE_SPACING}
-                  step={0.05}
-                  value={lineSpacing}
-                  onChange={(e) => {
-                    const v = Number(e.target.value);
-                    if (!Number.isNaN(v)) onLineSpacingChange(clampLineSpacing(v));
-                    setFitMessage(null);
-                  }}
-                />
-              </label>
-              <button className="secondary" onClick={fitToPage} title="Set the line spacing so the song fits on 1 page, or 2 if it must">
-                Fit to page
-              </button>
-              <PrintOptionsControls value={printOptions} onChange={(value) => { onPrintOptionsChange(value); setFitMessage(null); }} />
+              <PrintOptionsControls value={printOptions} onChange={onPrintOptionsChange} />
+              {/* The song's own spacing, when it isn't fitted to the page. */}
+              {!printOptions.fitToPage && (
+                <label className="chart-line-spacing">
+                  <span>Line spacing</span>
+                  <input
+                    type="number"
+                    min={MIN_LINE_SPACING}
+                    max={MAX_LINE_SPACING}
+                    step={0.05}
+                    value={lineSpacing}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (!Number.isNaN(v)) onLineSpacingChange(clampLineSpacing(v));
+                    }}
+                  />
+                </label>
+              )}
               <button
                 className="secondary"
                 disabled={generating}
@@ -453,17 +444,21 @@ export function ChordChartView({
         </div>
       )}
 
-      {fitMessage && <p className="hint chart-fit-message">{fitMessage}</p>}
-      {collapseWarning && !pagesOnly && <p className="hint chart-collapse-warning" role="alert">{collapseWarning}</p>}
+      {fitMessage && !pagesOnly && <p className="hint chart-fit-message">{fitMessage}</p>}
+      {collapseWarning && (
+        <p className="hint chart-collapse-warning" role="alert">
+          {/* A set shows several songs' charts, so it says which song. */}
+          {pagesOnly ? `${title || 'Untitled'}: ${collapseWarning}` : collapseWarning}
+        </p>
+      )}
 
       {displayRows.length === 0 && <p className="hint">Nothing to show yet &mdash; split some lyrics into syllables first.</p>}
 
       {/* Hidden measurement pass: same width as a page's printable area, so wrapping (and
           therefore each item's true height) matches what page mode will actually show. */}
       <div
-        ref={measureRef}
         className="chart-measure"
-        style={{ fontFamily: font.cssFont, fontSize: LYRIC_SIZE_PT, width: contentWidthPx, ...lineSpacingVar(lineSpacing) }}
+        style={{ fontFamily: font.cssFont, fontSize: LYRIC_SIZE_PT, width: contentWidthPx, ...lineSpacingVar(spacing) }}
       >
         {pageItems.map((item, i) => (
           <div key={i} ref={(el) => { itemRefs.current[i] = el; }}>
@@ -491,7 +486,7 @@ export function ChordChartView({
                     fontFamily: font.cssFont,
                     fontSize: LYRIC_SIZE_PT,
                     padding: `${marginTopPx}px ${MARGIN_SIDE_PX}px ${marginBottomPx}px`,
-                    ...lineSpacingVar(lineSpacing),
+                    ...lineSpacingVar(spacing),
                   }}
                 >
                   {/* Only the first page has the key, like the Word and PDF exports; a multi-page
@@ -536,7 +531,7 @@ export function ChordChartView({
           ))}
         </div>
       ) : (
-        <div className="chord-chart" style={{ fontFamily: font.cssFont, ...lineSpacingVar(lineSpacing) }}>
+        <div className="chord-chart" style={{ fontFamily: font.cssFont, ...lineSpacingVar(spacing) }}>
           <div className="chart-page-header">{keyHeader}</div>
           {/* The key has its own line above in compact view. */}
           {renderTitle(title, { ...titleStyle, keyText: null })}

@@ -11,6 +11,8 @@ import { downloadSetPdf } from '../lib/setPdf';
 import { useAutosave } from '../hooks/useAutosave';
 import { SetCharts } from './SetCharts';
 import { CapoChartsSwitch, CapoSelect } from './CapoControls';
+import { PrintOptionsControls } from './PrintOptionsControls';
+import { DEFAULT_PRINT_OPTIONS } from '../lib/pageLayout';
 
 interface Props {
   setStore: SetStore;
@@ -34,6 +36,8 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
   const [copied, setCopied] = useState(false);
   // Standard charts, or each song with its capo (which is its default for anyone viewing the set).
   const [capoCharts, setCapoCharts] = useState(false);
+  // Full or half sheet for every song: just for now, so a set always opens on a full sheet.
+  const [printOptions, setPrintOptions] = useState(DEFAULT_PRINT_OPTIONS);
   const save = useCallback((s: SongSet) => setStore.save(s), [setStore]);
   const autosave = useAutosave(set, save);
   // Leaving some other way than Back (the menu, say) still saves the last change.
@@ -134,7 +138,7 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
         const doc = docs[i];
         return doc ? [{ ...doc, key: entry.key, capo: entry.capo }] : [];
       });
-      await downloadSetPdf(currentSet.name, inChartMode(inKey, capoCharts));
+      await downloadSetPdf(currentSet.name, inChartMode(inKey, capoCharts), printOptions);
     } catch {
       setError("Couldn't make the PDF. Check your connection and try again.");
     } finally {
@@ -182,6 +186,7 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
           </button>
         )}
         <CapoChartsSwitch capoCharts={capoCharts} onChange={setCapoCharts} />
+        <PrintOptionsControls value={printOptions} onChange={setPrintOptions} showFit={false} />
         <button disabled={printing || set.entries.length === 0} onClick={() => void print(set)}>
           {printing ? 'Making PDF…' : 'Download PDF'}
         </button>
@@ -327,7 +332,7 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
         </label>
       </div>
 
-      <SetCharts songs={inChartMode(charts, capoCharts)} />
+      <SetCharts songs={inChartMode(charts, capoCharts)} printOptions={printOptions} />
     </div>
   );
 }

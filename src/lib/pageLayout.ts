@@ -49,9 +49,14 @@ export interface PrintOptions {
   paper: PaperSize;
   /** On a half sheet: chords on the first verse only, to save room. */
   collapseVerseChords: boolean;
+  /** The line spacing is picked to fit the song on one page (two if it must), rather than the
+   * song's own line spacing. */
+  fitToPage: boolean;
+  /** On a half sheet: two half pages side by side on each landscape letter sheet, to cut. */
+  twoUp: boolean;
 }
 
-export const DEFAULT_PRINT_OPTIONS: PrintOptions = { paper: 'letter', collapseVerseChords: false };
+export const DEFAULT_PRINT_OPTIONS: PrintOptions = { paper: 'letter', collapseVerseChords: false, fitToPage: true, twoUp: true };
 
 /** True when the verse chords really are collapsed: only on a half sheet. */
 export function collapsesVerseChords(options: PrintOptions): boolean {

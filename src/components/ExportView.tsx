@@ -85,7 +85,7 @@ export function ExportView({
   async function downloadDocx() {
     setGeneratingDocx(true);
     try {
-      const blob = await generateWordDoc(song.title, song.key, blocks, arrangement, fontId, lineSpacing, song.credits);
+      const blob = await generateWordDoc(song.title, song.key, blocks, arrangement, fontId, lineSpacing, song.credits, 0, printOptions.fitToPage);
       downloadBlob(blob, filename('docx'));
     } finally {
       setGeneratingDocx(false);
@@ -146,21 +146,24 @@ export function ExportView({
             </option>
           ))}
         </select>
-        <label className="chart-line-spacing">
-          <span>Line spacing</span>
-          <input
-            type="number"
-            min={MIN_LINE_SPACING}
-            max={MAX_LINE_SPACING}
-            step={0.05}
-            value={lineSpacing}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              if (!Number.isNaN(v)) onLineSpacingChange(clampLineSpacing(v));
-            }}
-          />
-        </label>
         <PrintOptionsControls value={printOptions} onChange={onPrintOptionsChange} />
+        {/* The song's own spacing, when it isn't fitted to the page. */}
+        {!printOptions.fitToPage && (
+          <label className="chart-line-spacing">
+            <span>Line spacing</span>
+            <input
+              type="number"
+              min={MIN_LINE_SPACING}
+              max={MAX_LINE_SPACING}
+              step={0.05}
+              value={lineSpacing}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (!Number.isNaN(v)) onLineSpacingChange(clampLineSpacing(v));
+              }}
+            />
+          </label>
+        )}
       </div>
       {collapseWarning && <p className="hint chart-collapse-warning" role="alert">{collapseWarning}</p>}
 

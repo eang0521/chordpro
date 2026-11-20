@@ -1,7 +1,7 @@
 import type { PDFFont } from 'pdf-lib';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from './arrangement';
-import { PAGE_FIT_SLACK_PT, layoutChartItems } from './chartLayout';
+import { PAGE_FIT_SLACK_PT, fitChartSpacing, layoutChartItems } from './chartLayout';
 import { capoShapeKey, chartSections, isChordOnly, keyHeaderText, pageLabelText, withShortLabels } from './chordChart';
 import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
 import { creditLines } from './credits';
@@ -50,12 +50,14 @@ export interface PdfSong {
   blocks: BlockMap;
   arrangement: ArrangementEntry[];
   fontId: string;
+  /** The song's own line spacing, used unless the print options fit it to the page. */
   lineSpacing: number;
   credits?: SongCredits;
   /** A guitarist's capo: the chart shows the chord shapes they play (see keyHeaderText). */
   capo?: number;
-  /** Full or half sheet (each page laid out at the letter width, then shrunk to fit), and
-   * whether a half sheet collapses the verse chords. Full sheet when unset. */
+  /** Full or half sheet (laid out larger, then shrunk to fit), whether a half sheet collapses the
+   * verse chords, fitting to the page, and two half sheets per landscape page. A full sheet at
+   * the song's own spacing when unset. */
   printOptions?: PrintOptions;
 }
 
@@ -85,7 +87,8 @@ export async function generatePdf(
 
 /**
  * Several songs' charts in one PDF (a set), one after another, each starting on a new page and
- * laid out exactly as it would be on its own.
+ * laid out exactly as it would be on its own. On a half sheet printed two-up, the half pages go
+ * two to a landscape letter sheet (see `twoUp`).
  */
 export async function generateSongsPdf(documentTitle: string, songs: PdfSong[]): Promise<Blob> {
   // Loaded on demand, like the docx package — most sessions never export a PDF.
@@ -100,12 +103,47 @@ export async function generateSongsPdf(documentTitle: string, songs: PdfSong[]):
     if (!embedded.has(fontId)) embedded.set(fontId, embedFonts(doc, fontId));
     return embedded.get(fontId)!;
   };
+  const pageCounts: number[] = [];
   for (const song of songs) {
-    await addSongPages(doc, pdfLib, await fontsFor(song.fontId), song);
+    pageCounts.push(await addSongPages(doc, pdfLib, await fontsFor(song.fontId), song));
   }
 
-  const bytes = await doc.save();
+  const twoUpPages = songs.length > 0 && songs.every((s) => s.printOptions?.paper === 'half' && s.printOptions.twoUp);
+  const out = twoUpPages ? await twoUp(pdfLib, doc, pageCounts, documentTitle) : doc;
+  const bytes = await out.save();
   return new Blob([bytes as BlobPart], { type: 'application/pdf' });
+}
+
+// A landscape letter sheet, in points, which takes two 5.5 x 8.5in half pages side by side.
+const SHEET_WIDTH = 11 * 72;
+const SHEET_HEIGHT = 8.5 * 72;
+
+/**
+ * Two half pages to each landscape letter sheet, left then right, to print and cut in half. A
+ * song more than a page long starts on a left half, so its first two pages sit side by side
+ * (leaving the right half of the sheet before it blank).
+ */
+async function twoUp(pdfLib: PdfLib, halves: PdfDocument, pageCounts: number[], title: string): Promise<PdfDocument> {
+  const out = await pdfLib.PDFDocument.create();
+  out.setTitle(title || 'Untitled');
+  // Saved first: subset fonts are only finished when the document is saved, and embedding the
+  // pages before that draws garbled text.
+  const embedded = await out.embedPdf(await halves.save(), halves.getPageIndices());
+  // Each half of each sheet in turn: a half page's index, or null to leave that half blank.
+  const slots: (number | null)[] = [];
+  let next = 0;
+  pageCounts.forEach((count) => {
+    if (count > 1 && slots.length % 2 === 1) slots.push(null);
+    for (let i = 0; i < count; i++) slots.push(next++);
+  });
+  for (let s = 0; s < slots.length; s += 2) {
+    const sheet = out.addPage([SHEET_WIDTH, SHEET_HEIGHT]);
+    [slots[s], slots[s + 1]].forEach((index, side) => {
+      if (index === null || index === undefined) return;
+      sheet.drawPage(embedded[index], { x: (side * SHEET_WIDTH) / 2, y: 0 });
+    });
+  }
+  return out;
 }
 
 async function embedFonts(doc: PdfDocument, fontId: string): Promise<Record<PdfStyle, PDFFont>> {
@@ -119,13 +157,13 @@ async function embedFonts(doc: PdfDocument, fontId: string): Promise<Record<PdfS
   return { '': regular, bold, italic };
 }
 
-/** Lays one song out and adds its pages to the end of `doc`. */
+/** Lays one song out and adds its pages to the end of `doc`. Returns how many it added. */
 async function addSongPages(
   doc: PdfDocument,
   { rgb }: PdfLib,
   fonts: Record<PdfStyle, PDFFont>,
-  { title, key: playedKey, blocks, arrangement, fontId, lineSpacing, credits, capo = 0, printOptions }: PdfSong,
-): Promise<void> {
+  { title, key: playedKey, blocks, arrangement, fontId, lineSpacing: ownSpacing, credits, capo = 0, printOptions }: PdfSong,
+): Promise<number> {
   const option = getChordFontOption(fontId);
 
   // A font only covers some characters (the built-in ones just Western European), so swap
@@ -166,16 +204,13 @@ async function addSongPages(
   const titleSize = titleSizePt(title, pageMeasure, geometry, titleKey ? TITLE_KEY_GAP_PT + pageMeasure(titleKey, KEY_SIZE_PT, 'italic') : 0);
   const contentHeight = PAGE_HEIGHT - MARGIN_TOP - pt(footer.marginBottomTwips);
   const footerTop = PAGE_HEIGHT - pt(CREDIT_BOTTOM_TWIPS) - footer.lines.length * creditLine;
+  const titleHeight = geometry.titleLinePt + geometry.titleGapPt;
+  // Fit to page: the roomiest spacing that fits, worked out the same way as the preview's.
+  const atOne = printOptions?.fitToPage ? layoutChartItems(sections, measure, pageMeasure, lyricWidth, 1, titleHeight) : null;
+  const lineSpacing = atOne ? fitChartSpacing(atOne.items, atOne.groups, contentHeight).spacing : ownSpacing;
   const chordLine = CHORD_LINE_PT * lineSpacing;
   const lyricLine = LYRIC_LINE_PT * lineSpacing;
-  const { items, groups } = layoutChartItems(
-    sections,
-    measure,
-    pageMeasure,
-    lyricWidth,
-    lineSpacing,
-    geometry.titleLinePt + geometry.titleGapPt,
-  );
+  const { items, groups } = layoutChartItems(sections, measure, pageMeasure, lyricWidth, lineSpacing, titleHeight);
 
   const black = rgb(0.1, 0.1, 0.1);
   // Positions are tracked down from the page top; PDF coordinates run up from the bottom.
@@ -247,4 +282,5 @@ async function addSongPages(
     // A half sheet: drawn at the full sheet's sizes, then shrunk onto the smaller page.
     if (scale !== 1) page.scale(scale, scale);
   });
+  return pages.length;
 }

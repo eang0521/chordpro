@@ -3,12 +3,22 @@ import type { PaperSize, PrintOptions } from '../lib/pageLayout';
 interface Props {
   value: PrintOptions;
   onChange: (value: PrintOptions) => void;
+  /** Offers Fit to page (not for a set, where each song keeps its own setting). */
+  showFit?: boolean;
 }
 
-/** Full or half sheet, and on a half sheet whether only the first verse keeps its chords. */
-export function PrintOptionsControls({ value, onChange }: Props) {
+/** Full or half sheet, fitting to the page, and on a half sheet whether only the first verse keeps
+ * its chords and whether two go on each landscape sheet. */
+export function PrintOptionsControls({ value, onChange, showFit = true }: Props) {
+  const check = (label: string, title: string, field: 'fitToPage' | 'collapseVerseChords' | 'twoUp') => (
+    <label className="chart-line-spacing chart-check" title={title}>
+      <input type="checkbox" checked={value[field]} onChange={(e) => onChange({ ...value, [field]: e.target.checked })} />
+      <span>{label}</span>
+    </label>
+  );
   return (
     <>
+      {showFit && check('Fit to page', 'Pick the line spacing that fits the song on 1 page, or 2 if it must', 'fitToPage')}
       <select
         className="chart-font-select"
         aria-label="Paper size"
@@ -20,14 +30,10 @@ export function PrintOptionsControls({ value, onChange }: Props) {
         <option value="half">Half sheet (5.5 &times; 8.5)</option>
       </select>
       {value.paper === 'half' && (
-        <label className="chart-line-spacing chart-check" title="Later verses print just their lyrics, to save room">
-          <input
-            type="checkbox"
-            checked={value.collapseVerseChords}
-            onChange={(e) => onChange({ ...value, collapseVerseChords: e.target.checked })}
-          />
-          <span>Chords on first verse only</span>
-        </label>
+        <>
+          {check('2 per page', 'Two half sheets side by side on each landscape letter page, to cut in half', 'twoUp')}
+          {check('Chords on first verse only', 'Later verses print just their lyrics, to save room', 'collapseVerseChords')}
+        </>
       )}
     </>
   );
