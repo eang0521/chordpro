@@ -88,7 +88,8 @@ export async function generatePdf(
 /**
  * Several songs' charts in one PDF (a set), one after another, each starting on a new page and
  * laid out exactly as it would be on its own. On a half sheet printed two-up, the half pages go
- * two to a landscape letter sheet (see `twoUp`).
+ * two to a landscape letter sheet (see `twoUp`). A set printed double-sided on full sheets gets
+ * blank pages so it opens like a book (see `bookSlots`).
  */
 export async function generateSongsPdf(documentTitle: string, songs: PdfSong[]): Promise<Blob> {
   // Loaded on demand, like the docx package — most sessions never export a PDF.
@@ -109,19 +110,56 @@ export async function generateSongsPdf(documentTitle: string, songs: PdfSong[]):
   }
 
   const twoUpPages = songs.length > 0 && songs.every((s) => s.printOptions?.paper === 'half' && s.printOptions.twoUp);
+  const doubleSided = songs.length > 0 && songs.every((s) => s.printOptions?.paper === 'letter' && s.printOptions.doubleSided);
+  if (doubleSided) {
+    const slots = bookSlots(pageCounts, true);
+    // An even number of pages, so every sheet has a front and a back.
+    if (slots.length % 2 === 1) slots.push(null);
+    // In order, so each blank lands at its final place.
+    slots.forEach((slot, i) => {
+      if (slot === null) doc.insertPage(i, [LETTER_WIDTH, LETTER_HEIGHT]);
+    });
+  }
   const out = twoUpPages ? await twoUp(pdfLib, doc, pageCounts, documentTitle) : doc;
   const bytes = await out.save();
   return new Blob([bytes as BlobPart], { type: 'application/pdf' });
 }
 
-// A landscape letter sheet, in points, which takes two 5.5 x 8.5in half pages side by side.
-const SHEET_WIDTH = 11 * 72;
-const SHEET_HEIGHT = 8.5 * 72;
+// A letter page, in points; turned landscape, it takes two 5.5 x 8.5in half pages side by side.
+const LETTER_WIDTH = 8.5 * 72;
+const LETTER_HEIGHT = 11 * 72;
+const SHEET_WIDTH = LETTER_HEIGHT;
+const SHEET_HEIGHT = LETTER_WIDTH;
+
+/**
+ * Where each page goes when pages are seen two at a time, side by side (an open book, or two half
+ * sheets on one landscape page): a page index, or null for a blank. A song longer than a page
+ * starts on a left-hand page, so all of it is open at once. The blank that takes goes before the
+ * one-page song just before it, when there is one, so that song sits on the right facing the
+ * blank. `firstIsRight`: the first page is on its own on the right, like a book's front page.
+ * Songs A (2 pages), B, C, D (1 each) and E (2) as a book: blank A A B C blank D E E.
+ */
+export function bookSlots(pageCounts: number[], firstIsRight: boolean): (number | null)[] {
+  const slots: (number | null)[] = [];
+  const isRight = (slot: number) => (slot % 2 === 0) === firstIsRight;
+  let next = 0;
+  // Where the song just placed went, when it was a single page.
+  let singleAt = -1;
+  pageCounts.forEach((count) => {
+    if (count > 1 && isRight(slots.length)) {
+      if (singleAt >= 0 && singleAt === slots.length - 1) slots.splice(singleAt, 0, null);
+      else slots.push(null);
+    }
+    singleAt = count === 1 ? slots.length : -1;
+    for (let i = 0; i < count; i++) slots.push(next++);
+  });
+  return slots;
+}
 
 /**
  * Two half pages to each landscape letter sheet, left then right, to print and cut in half. A
- * song more than a page long starts on a left half, so its first two pages sit side by side
- * (leaving the right half of the sheet before it blank).
+ * song more than a page long starts on a left half, so its pages sit side by side (see
+ * bookSlots).
  */
 async function twoUp(pdfLib: PdfLib, halves: PdfDocument, pageCounts: number[], title: string): Promise<PdfDocument> {
   const out = await pdfLib.PDFDocument.create();
@@ -130,12 +168,7 @@ async function twoUp(pdfLib: PdfLib, halves: PdfDocument, pageCounts: number[], 
   // pages before that draws garbled text.
   const embedded = await out.embedPdf(await halves.save(), halves.getPageIndices());
   // Each half of each sheet in turn: a half page's index, or null to leave that half blank.
-  const slots: (number | null)[] = [];
-  let next = 0;
-  pageCounts.forEach((count) => {
-    if (count > 1 && slots.length % 2 === 1) slots.push(null);
-    for (let i = 0; i < count; i++) slots.push(next++);
-  });
+  const slots = bookSlots(pageCounts, false);
   for (let s = 0; s < slots.length; s += 2) {
     const sheet = out.addPage([SHEET_WIDTH, SHEET_HEIGHT]);
     [slots[s], slots[s + 1]].forEach((index, side) => {

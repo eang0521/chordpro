@@ -108,7 +108,7 @@ export function SharedSetPage({ store, token }: Props) {
           <h2>{set.name.trim() || 'Untitled set'}</h2>
           <div className="library-header-actions">
             <CapoChartsSwitch capoCharts={capoCharts} onChange={setCapoCharts} />
-            <PrintOptionsControls value={printOptions} onChange={setPrintOptions} showFit={false} />
+            <PrintOptionsControls value={printOptions} onChange={setPrintOptions} showFit={false} showDoubleSided />
             <button disabled={printing || set.songs.length === 0} onClick={() => void print(set)}>
               {printing ? 'Making PDF…' : 'Download PDF'}
             </button>

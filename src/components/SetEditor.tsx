@@ -186,7 +186,7 @@ export function SetEditor({ setStore, songStore, setId, initialSet, onBack }: Pr
           </button>
         )}
         <CapoChartsSwitch capoCharts={capoCharts} onChange={setCapoCharts} />
-        <PrintOptionsControls value={printOptions} onChange={setPrintOptions} showFit={false} />
+        <PrintOptionsControls value={printOptions} onChange={setPrintOptions} showFit={false} showDoubleSided />
         <button disabled={printing || set.entries.length === 0} onClick={() => void print(set)}>
           {printing ? 'Making PDF…' : 'Download PDF'}
         </button>

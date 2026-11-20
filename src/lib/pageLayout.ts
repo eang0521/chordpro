@@ -54,9 +54,18 @@ export interface PrintOptions {
   fitToPage: boolean;
   /** On a half sheet: two half pages side by side on each landscape letter sheet, to cut. */
   twoUp: boolean;
+  /** A set on full sheets, printed on both sides to open like a book: blank pages are added so
+   * every song longer than a page is open all at once (see bookSlots). */
+  doubleSided: boolean;
 }
 
-export const DEFAULT_PRINT_OPTIONS: PrintOptions = { paper: 'letter', collapseVerseChords: false, fitToPage: true, twoUp: true };
+export const DEFAULT_PRINT_OPTIONS: PrintOptions = {
+  paper: 'letter',
+  collapseVerseChords: false,
+  fitToPage: true,
+  twoUp: true,
+  doubleSided: false,
+};
 
 /** True when the verse chords really are collapsed: only on a half sheet. */
 export function collapsesVerseChords(options: PrintOptions): boolean {
