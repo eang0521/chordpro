@@ -36,12 +36,22 @@ as activity; if it does pause, **Restore** it from the dashboard and nothing is 
    should say *Success. No rows returned*.
 3. Check **Table Editor → songs** exists and is marked **RLS enabled**.
 
-## 3. Sign-in by emailed link
+## 3. Sign-in with email and password
 
-1. **Authentication → Sign In / Providers**: leave **Allow new users to sign up** on (or nobody
-   can make an account), and make sure **Email** is enabled. **Confirm email** can stay on; opening
-   the link confirms the address.
-2. Optional: **Authentication → Emails → Magic Link** to change the email's wording.
+1. **Authentication → Sign In / Providers → Email**: make sure **Email** is enabled and
+   **Allow new users to sign up** is on (or nobody can make an account).
+2. Same page: keep **Confirm email** **on**. This matters: publishing rights (step 6) go by email
+   address, so without confirmation anyone could create an account with a publisher's address and
+   publish as them.
+3. Same page: set **Minimum password length** to `8` (the app asks for 8 too), and turn on
+   **Prevent use of leaked passwords** if your plan offers it.
+4. Optional: **Authentication → Emails** to change the wording of the **Confirm signup** and
+   **Reset Password** emails.
+
+New accounts get one email, to confirm the address; after that people sign in with their
+password. **Forgot password?** emails a link that signs them in and asks for a new password, and
+signs out their other devices once it's saved. Anyone who made their account back when sign-in was
+by emailed link has no password yet: they use **Forgot password?** once to choose one.
 
 Supabase's built-in mailer only sends a few emails an hour and is meant for light use. That's
 fine for you and a few friends; if more people use it, set up your own SMTP under
@@ -59,7 +69,7 @@ fine for you and a few friends; if more people use it, set up your own SMTP unde
   - optionally `https://*-eang0521s-projects.vercel.app/**` to sign in on branch previews (check
     the exact team name in a preview address; Supabase allows the `*` and `**` wildcards)
 
-The app asks to come back to whichever of these it's running on, and Supabase refuses any
+Confirmation and reset links come back to whichever of these the app is running on, and Supabase refuses any
 address not on the list.
 
 ## 5. Connect the app

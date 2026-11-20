@@ -15,6 +15,7 @@ import { KeyControl } from './components/KeyControl';
 import { CopyChordsDialog } from './components/CopyChordsDialog';
 import { SongLibrary } from './components/SongLibrary';
 import { SignInDialog } from './components/SignInDialog';
+import { SetPasswordDialog } from './components/SetPasswordDialog';
 import { CreditsFields } from './components/CreditsFields';
 import { parseChordProText } from './lib/chordproParser';
 import { SONG_SCHEMA_VERSION, emptySongDocument, isBlankSong, newSongId, type SongDocument } from './lib/songDocument';
@@ -45,7 +46,7 @@ import { carryOverBlocks, carryOverWordGroups } from './lib/carryOver';
 import { ThemeSwitch } from './components/ThemeSwitch';
 import { VersionPicker } from './components/VersionPicker';
 import { rememberVersion, type VersionRef } from './lib/lastVersion';
-import { useAuth, signOut } from './hooks/useAuth';
+import { useAuth, signOut, usePasswordRecovery } from './hooks/useAuth';
 import { useAutosave } from './hooks/useAutosave';
 import { useEscapeKey } from './hooks/useEscapeKey';
 import './App.css';
@@ -120,6 +121,7 @@ function parseRoute(hash: string): Route {
 
 function App() {
   const auth = useAuth();
+  const [recoveringPassword, finishPasswordRecovery] = usePasswordRecovery();
   const userId = auth.status === 'signedIn' ? auth.user.id : null;
   // 'local' is the single signed-out draft kept in this browser, 'cloud' a library song.
   const [source, setSource] = useState<'local' | 'cloud'>('local');
@@ -573,6 +575,7 @@ function App() {
         </header>
 
         {showSignIn && auth.status === 'signedOut' && <SignInDialog onClose={() => setShowSignIn(false)} />}
+        {recoveringPassword && auth.status === 'signedIn' && <SetPasswordDialog onDone={finishPasswordRecovery} />}
 
         {draftToUpload && (
           <div className="arrangement-overlay">
