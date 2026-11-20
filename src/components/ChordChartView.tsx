@@ -9,11 +9,12 @@ import { generatePdf } from '../lib/pdfDoc';
 import { chartFilename, downloadBlob } from '../lib/download';
 import { CHORD_FONT_OPTIONS, getChordFontOption, loadChordFont } from '../lib/chordFonts';
 import { creditLines } from '../lib/credits';
-import type { PrintOptions } from '../lib/pageLayout';
+import type { PageGeometry, PrintOptions } from '../lib/pageLayout';
 import {
   CHORD_SIZE_PT,
   CREDIT_BOTTOM_TWIPS,
   KEY_SIZE_PT,
+  LABEL_SIZE_PT,
   LYRIC_SIZE_PT,
   MARGIN_SIDE_PX,
   collapsesVerseChords,
@@ -72,6 +73,16 @@ function lineSpacingVar(value: number): Record<string, string> {
   return { '--line-spacing': String(value) };
 }
 
+/** How much smaller than usual a page draws its chords, section labels and key (a half sheet's
+ * are; see PageGeometry), as CSS variables the chart's styles scale those by. */
+function sizeVars(geometry: PageGeometry): Record<string, string> {
+  return {
+    '--chord-shrink': String(geometry.chordSizePt / CHORD_SIZE_PT),
+    '--label-shrink': String(geometry.labelSizePt / LABEL_SIZE_PT),
+    '--key-shrink': String(geometry.keySizePt / KEY_SIZE_PT),
+  };
+}
+
 // The title header is its own item so it can be measured and paginated exactly like a
 // section row — it only ever lands on page 1, but reusing the same measurement pass keeps the
 // pagination math in one place instead of special-casing the first page's available height.
@@ -89,7 +100,7 @@ function renderLinePair(placed: PlacedLine, key: number): ReactNode {
           &nbsp;
           {chords.map((c, i) => (
             <span className="chart-chord-label" key={i} style={{ left: `${c.offsetPt / CHORD_SIZE_PT}em` }}>
-              {c.label}
+              <span className="chart-chord-text">{c.label}</span>
             </span>
           ))}
         </div>
@@ -104,7 +115,7 @@ function renderLinePair(placed: PlacedLine, key: number): ReactNode {
           {chords.map((c, i) => (
             // The label's own font is the chord size, so its em offset is in chord points.
             <span className="chart-chord-label" key={i} style={{ left: `${c.offsetPt / CHORD_SIZE_PT}em` }}>
-              {c.label}
+              <span className="chart-chord-text">{c.label}</span>
             </span>
           ))}
         </div>
@@ -157,18 +168,19 @@ interface TitleStyle {
   sizePt: number;
   linePt: number;
   gapPt: number;
+  keySizePt: number;
   keyText: string | null;
 }
 
 /** The title at its fitted size, in a line box that stays the usual height, as in the PDF and
  * Word export, with the key after it on a half sheet. */
-function renderTitle(title: string, { sizePt, linePt, gapPt, keyText }: TitleStyle): ReactNode {
+function renderTitle(title: string, { sizePt, linePt, gapPt, keySizePt, keyText }: TitleStyle): ReactNode {
   const style = { fontSize: `${sizePt / LYRIC_SIZE_PT}em`, lineHeight: linePt / sizePt, marginBottom: `${gapPt / sizePt}em` };
   return (
     <div className="chart-doc-title" key="header" style={style}>
       {title || 'Untitled'}
       {keyText && (
-        <span className="chart-title-key" style={{ fontSize: `${KEY_SIZE_PT / sizePt}em`, marginLeft: `${TITLE_KEY_GAP_PT / KEY_SIZE_PT}em` }}>
+        <span className="chart-title-key" style={{ fontSize: `${keySizePt / sizePt}em`, marginLeft: `${TITLE_KEY_GAP_PT / keySizePt}em` }}>
           {keyText}
         </span>
       )}
@@ -262,14 +274,14 @@ export function ChordChartView({
   const titleSize = useMemo(
     () => {
       const measure = measureInFont(font.wordFont);
-      return titleSizePt(title, measure, geometry, titleKey ? TITLE_KEY_GAP_PT + measure(titleKey, KEY_SIZE_PT, 'italic') : 0);
+      return titleSizePt(title, measure, geometry, titleKey ? TITLE_KEY_GAP_PT + measure(titleKey, geometry.keySizePt, 'italic') : 0);
     },
     // fontLoads: as above, measure again once the font has loaded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [title, font.wordFont, fontLoads, geometry, titleKey],
   );
   const titleStyle = useMemo<TitleStyle>(
-    () => ({ sizePt: titleSize, linePt: geometry.titleLinePt, gapPt: geometry.titleGapPt, keyText: titleKey }),
+    () => ({ sizePt: titleSize, linePt: geometry.titleLinePt, gapPt: geometry.titleGapPt, keySizePt: geometry.keySizePt, keyText: titleKey }),
     [titleSize, geometry, titleKey],
   );
   const marginTopPx = twipsToPreviewPx(geometry.marginTopTwips);
@@ -458,7 +470,7 @@ export function ChordChartView({
           therefore each item's true height) matches what page mode will actually show. */}
       <div
         className="chart-measure"
-        style={{ fontFamily: font.cssFont, fontSize: LYRIC_SIZE_PT, width: contentWidthPx, ...lineSpacingVar(spacing) }}
+        style={{ fontFamily: font.cssFont, fontSize: LYRIC_SIZE_PT, width: contentWidthPx, ...lineSpacingVar(spacing), ...sizeVars(geometry) }}
       >
         {pageItems.map((item, i) => (
           <div key={i} ref={(el) => { itemRefs.current[i] = el; }}>
@@ -487,6 +499,7 @@ export function ChordChartView({
                     fontSize: LYRIC_SIZE_PT,
                     padding: `${marginTopPx}px ${MARGIN_SIDE_PX}px ${marginBottomPx}px`,
                     ...lineSpacingVar(spacing),
+                    ...sizeVars(geometry),
                   }}
                 >
                   {/* Only the first page has the key, like the Word and PDF exports; a multi-page
@@ -531,7 +544,7 @@ export function ChordChartView({
           ))}
         </div>
       ) : (
-        <div className="chord-chart" style={{ fontFamily: font.cssFont, ...lineSpacingVar(spacing) }}>
+        <div className="chord-chart" style={{ fontFamily: font.cssFont, ...lineSpacingVar(spacing), ...sizeVars(geometry) }}>
           <div className="chart-page-header">{keyHeader}</div>
           {/* The key has its own line above in compact view. */}
           {renderTitle(title, { ...titleStyle, keyText: null })}

@@ -725,7 +725,7 @@ button.secondary.chart-toggle-active:hover:not(:disabled) {
 }
 
 .chart-page-header {
-  font-size: 0.857em;
+  font-size: calc(0.857em * var(--key-shrink, 1));
   font-style: italic;
   margin-bottom: 0.5em;
 }
@@ -752,7 +752,8 @@ button.secondary.chart-toggle-active:hover:not(:disabled) {
 }
 
 .chart-section-label {
-  font-size: 0.857em;
+  /* Smaller on a half sheet (--label-shrink); likewise chords and the key below. */
+  font-size: calc(0.857em * var(--label-shrink, 1));
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -775,6 +776,11 @@ button.secondary.chart-toggle-active:hover:not(:disabled) {
   top: 0;
   font-style: italic;
   color: var(--paper-chord);
+}
+
+/* The chord itself: shrunk inside its label, so the label's em offset stays in chord points. */
+.chart-chord-text {
+  font-size: calc(1em * var(--chord-shrink, 1));
 }
 
 .chart-syllable {

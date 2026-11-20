@@ -8,10 +8,7 @@ import { creditLines } from './credits';
 import type { PrintOptions, TextMeasure } from './pageLayout';
 import {
   CHORD_LINE_PT,
-  CHORD_SIZE_PT,
   CREDIT_BOTTOM_TWIPS,
-  KEY_SIZE_PT,
-  LABEL_SIZE_PT,
   LYRIC_LINE_PT,
   LYRIC_SIZE_PT,
   MARGIN_SIDE_TWIPS,
@@ -234,7 +231,7 @@ async function addSongPages(
   const keyText = keyHeaderText(sections, key, capo);
   // On a half sheet the key ends the title line, so the title leaves room for it.
   const titleKey = geometry.keyOnTitleLine ? keyText : null;
-  const titleSize = titleSizePt(title, pageMeasure, geometry, titleKey ? TITLE_KEY_GAP_PT + pageMeasure(titleKey, KEY_SIZE_PT, 'italic') : 0);
+  const titleSize = titleSizePt(title, pageMeasure, geometry, titleKey ? TITLE_KEY_GAP_PT + pageMeasure(titleKey, geometry.keySizePt, 'italic') : 0);
   const contentHeight = PAGE_HEIGHT - MARGIN_TOP - pt(footer.marginBottomTwips);
   const footerTop = PAGE_HEIGHT - pt(CREDIT_BOTTOM_TWIPS) - footer.lines.length * creditLine;
   const titleHeight = geometry.titleLinePt + geometry.titleGapPt;
@@ -255,7 +252,10 @@ async function addSongPages(
     groups,
     contentHeight + PAGE_FIT_SLACK_PT,
   );
-  const headerBaseline = pt(geometry.headerTopTwips) + KEY_SIZE_PT * 0.8;
+  const headerBaseline = pt(geometry.headerTopTwips) + geometry.keySizePt * 0.8;
+  const keySize = geometry.keySizePt;
+  const chordSize = geometry.chordSizePt;
+  const labelSize = geometry.labelSizePt;
   pages.forEach((indices, pageIndex) => {
     const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     footer.lines.forEach((line, i) => {
@@ -264,11 +264,11 @@ async function addSongPages(
     });
     // The key header goes on the first page only (unless it's on the title line).
     if (pageIndex === 0 && !titleKey) {
-      draw(page, keyText, MARGIN_SIDE, headerBaseline, KEY_SIZE_PT, 'italic');
+      draw(page, keyText, MARGIN_SIDE, headerBaseline, keySize, 'italic');
     }
     const pageLabel = pageLabelText(title, pageIndex, pages.length);
     if (pageLabel) {
-      draw(page, pageLabel, PAGE_WIDTH - MARGIN_SIDE - measure(pageLabel, KEY_SIZE_PT, 'italic'), headerBaseline, KEY_SIZE_PT, 'italic');
+      draw(page, pageLabel, PAGE_WIDTH - MARGIN_SIDE - measure(pageLabel, keySize, 'italic'), headerBaseline, keySize, 'italic');
     }
 
     let top = MARGIN_TOP;
@@ -277,34 +277,34 @@ async function addSongPages(
       if (item.kind === 'title') {
         const text = (title || 'Untitled').toUpperCase();
         const titleWidth = measure(text, titleSize, 'bold');
-        const keyWidth = titleKey ? TITLE_KEY_GAP_PT + measure(titleKey, KEY_SIZE_PT, 'italic') : 0;
+        const keyWidth = titleKey ? TITLE_KEY_GAP_PT + measure(titleKey, keySize, 'italic') : 0;
         // The title and the key after it are centred together.
         const x = (PAGE_WIDTH - titleWidth - keyWidth) / 2;
         const baseline = baselineIn(top, geometry.titleLinePt, titleSize);
         draw(page, text, x, baseline, titleSize, 'bold');
-        if (titleKey) draw(page, titleKey, x + titleWidth + TITLE_KEY_GAP_PT, baseline, KEY_SIZE_PT, 'italic');
+        if (titleKey) draw(page, titleKey, x + titleWidth + TITLE_KEY_GAP_PT, baseline, keySize, 'italic');
       } else {
         let lineTop = top + item.gapBefore;
         if (item.lines.length === 0 && item.label) {
-          draw(page, item.label.toUpperCase(), MARGIN_SIDE, baselineIn(lineTop, lyricLine, LABEL_SIZE_PT), LABEL_SIZE_PT, 'bold');
+          draw(page, item.label.toUpperCase(), MARGIN_SIDE, baselineIn(lineTop, lyricLine, labelSize), labelSize, 'bold');
         }
         item.lines.forEach((line, li) => {
           if (isChordOnly(line)) {
-            const baseline = baselineIn(lineTop, lyricLine, CHORD_SIZE_PT);
-            line.chords.forEach((c) => draw(page, c.label, MARGIN_SIDE + labelCol + c.offsetPt, baseline, CHORD_SIZE_PT, 'italic'));
+            const baseline = baselineIn(lineTop, lyricLine, chordSize);
+            line.chords.forEach((c) => draw(page, c.label, MARGIN_SIDE + labelCol + c.offsetPt, baseline, chordSize, 'italic'));
             if (li === 0 && item.label) {
-              draw(page, item.label.toUpperCase(), MARGIN_SIDE, baselineIn(lineTop, lyricLine, LABEL_SIZE_PT), LABEL_SIZE_PT, 'bold');
+              draw(page, item.label.toUpperCase(), MARGIN_SIDE, baselineIn(lineTop, lyricLine, labelSize), labelSize, 'bold');
             }
             lineTop += lyricLine;
             return;
           }
           if (line.chords.length > 0) {
-            const baseline = baselineIn(lineTop, chordLine, CHORD_SIZE_PT);
-            line.chords.forEach((c) => draw(page, c.label, MARGIN_SIDE + labelCol + c.offsetPt, baseline, CHORD_SIZE_PT, 'italic'));
+            const baseline = baselineIn(lineTop, chordLine, chordSize);
+            line.chords.forEach((c) => draw(page, c.label, MARGIN_SIDE + labelCol + c.offsetPt, baseline, chordSize, 'italic'));
             lineTop += chordLine;
           }
           if (li === 0 && item.label) {
-            draw(page, item.label.toUpperCase(), MARGIN_SIDE, baselineIn(lineTop, lyricLine, LABEL_SIZE_PT), LABEL_SIZE_PT, 'bold');
+            draw(page, item.label.toUpperCase(), MARGIN_SIDE, baselineIn(lineTop, lyricLine, labelSize), labelSize, 'bold');
           }
           draw(page, line.lyricLine, MARGIN_SIDE + labelCol + (line.indentPt ?? 0), baselineIn(lineTop, lyricLine, LYRIC_SIZE_PT), LYRIC_SIZE_PT, 'bold');
           lineTop += lyricLine;

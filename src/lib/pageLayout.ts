@@ -83,10 +83,13 @@ export const TITLE_LINE_PT = TITLE_SIZE_PT * 1.15;
 // Between the title and the key when the key goes at the end of the title line.
 export const TITLE_KEY_GAP_PT = 10;
 
-// A half sheet is laid out at the full sheet's lyric and chord sizes on a page 1/HALF_SHEET_SCALE
-// times the half sheet's size, then shrunk by this much to print: 14pt lyrics print at 11.2pt and
-// 11pt chords at 8.8pt. The page is narrower than a letter page, so long lines wrap sooner.
-export const HALF_SHEET_SCALE = 0.8;
+// A half sheet is laid out at the full sheet's lyric size on a page 1/HALF_SHEET_SCALE times the
+// half sheet's size, then shrunk by this much to print: 14pt lyrics print at 12pt. The page is
+// narrower than a letter page, so long lines wrap sooner.
+export const HALF_SHEET_SCALE = 12 / LYRIC_SIZE_PT;
+
+/** A half sheet's printed size, in the points the page is laid out in (before it's shrunk). */
+const halfSheetPt = (printedPt: number) => printedPt / HALF_SHEET_SCALE;
 
 /** The page as it's laid out (in twips and points, before it's shrunk by `scale` to print), and
  * the parts of the chart that a half sheet sets more compactly than a full one. */
@@ -101,6 +104,12 @@ export interface PageGeometry {
   titleSizePt: number;
   titleLinePt: number;
   titleGapPt: number;
+  /** The sizes chords, section labels and the key are drawn at. Lines are still laid out (and
+   * chords spaced) at CHORD_SIZE_PT and LABEL_SIZE_PT, which are never smaller, so a half sheet's
+   * smaller chords only leave a little more room around them. */
+  chordSizePt: number;
+  labelSizePt: number;
+  keySizePt: number;
   /** The key goes at the end of the title line instead of in the page header. */
   keyOnTitleLine: boolean;
   /** Section labels are shortened ("V1", "Ch.") and their column is narrower. */
@@ -120,6 +129,9 @@ export const LETTER_GEOMETRY: PageGeometry = {
   titleSizePt: TITLE_SIZE_PT,
   titleLinePt: TITLE_LINE_PT,
   titleGapPt: TITLE_GAP_PT,
+  chordSizePt: CHORD_SIZE_PT,
+  labelSizePt: LABEL_SIZE_PT,
+  keySizePt: KEY_SIZE_PT,
   keyOnTitleLine: false,
   shortLabels: false,
   minLabelColumnTwips: MIN_LABEL_COLUMN_TWIPS,
@@ -128,7 +140,8 @@ export const LETTER_GEOMETRY: PageGeometry = {
 };
 
 const HALF_WIDTH_TWIPS = Math.round((5.5 * 1440) / HALF_SHEET_SCALE);
-const HALF_TITLE_SIZE_PT = 18;
+// Printed sizes: 15pt title, 9pt chords, 10pt section labels and key, 6pt credits.
+const HALF_TITLE_SIZE_PT = halfSheetPt(15);
 const HALF_GEOMETRY: PageGeometry = {
   widthTwips: HALF_WIDTH_TWIPS,
   heightTwips: Math.round((8.5 * 1440) / HALF_SHEET_SCALE),
@@ -141,11 +154,14 @@ const HALF_GEOMETRY: PageGeometry = {
   titleSizePt: HALF_TITLE_SIZE_PT,
   titleLinePt: HALF_TITLE_SIZE_PT * 1.15,
   titleGapPt: 8,
+  chordSizePt: halfSheetPt(9),
+  labelSizePt: halfSheetPt(10),
+  keySizePt: halfSheetPt(10),
   keyOnTitleLine: true,
   shortLabels: true,
   minLabelColumnTwips: 720,
-  creditSizePt: 6.5,
-  creditLinePt: 8,
+  creditSizePt: halfSheetPt(6),
+  creditLinePt: halfSheetPt(7.5),
 };
 
 export function pageGeometry(paper: PaperSize): PageGeometry {
