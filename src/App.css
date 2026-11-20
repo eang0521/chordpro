@@ -712,6 +712,13 @@ button.secondary.chart-toggle-active:hover:not(:disabled) {
 }
 
 /* On a page the title is fitted to one line (shrunk if it's long), as in the PDF. */
+/* The key at the end of a half sheet's title line, set like the page header's key. */
+.chart-title-key {
+  font-weight: 400;
+  font-style: italic;
+  text-transform: none;
+}
+
 .chart-page-content .chart-doc-title,
 .chart-measure .chart-doc-title {
   white-space: nowrap;

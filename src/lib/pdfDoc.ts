@@ -1,40 +1,32 @@
 import type { PDFFont } from 'pdf-lib';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from './arrangement';
-import { PAGE_FIT_SLACK_PT, TITLE_LINE_PT, layoutChartItems } from './chartLayout';
-import { capoShapeKey, chartSections, isChordOnly, keyHeaderText, pageLabelText } from './chordChart';
+import { PAGE_FIT_SLACK_PT, layoutChartItems } from './chartLayout';
+import { capoShapeKey, chartSections, isChordOnly, keyHeaderText, pageLabelText, withShortLabels } from './chordChart';
 import { fetchFontFile, getChordFontOption, loadChordFont } from './chordFonts';
 import { creditLines } from './credits';
 import type { PrintOptions, TextMeasure } from './pageLayout';
 import {
   CHORD_LINE_PT,
   CHORD_SIZE_PT,
-  CONTENT_WIDTH_TWIPS,
   CREDIT_BOTTOM_TWIPS,
-  CREDIT_LINE_PT,
-  CREDIT_SIZE_PT,
-  HEADER_TOP_TWIPS,
   KEY_SIZE_PT,
   LABEL_SIZE_PT,
   LYRIC_LINE_PT,
   LYRIC_SIZE_PT,
   MARGIN_SIDE_TWIPS,
-  MARGIN_TOP_TWIPS,
-  PAGE_WIDTH_TWIPS,
+  TITLE_KEY_GAP_PT,
   collapsesVerseChords,
   creditFooter,
   labelColumnTwips,
   measureInFont,
-  pageHeightTwips,
-  printScale,
+  pageGeometry,
   titleSizePt,
 } from './pageLayout';
 import { paginateByHeight } from './pagination';
 
 const pt = (twips: number) => twips / 20;
-const PAGE_WIDTH = pt(PAGE_WIDTH_TWIPS);
 const MARGIN_SIDE = pt(MARGIN_SIDE_TWIPS);
-const MARGIN_TOP = pt(MARGIN_TOP_TWIPS);
 
 // For the system fonts, the PDF's built-in fonts with the same metrics (Helvetica = Arial,
 // Times = Times New Roman). Consolas has no built-in twin, so it prints in Courier. Bundled fonts
@@ -147,10 +139,16 @@ async function addSongPages(
 
   // With a capo, the chords are spelled as the shapes the guitarist plays.
   const key = capoShapeKey(playedKey, capo);
-  const { sections } = chartSections(blocks, arrangement, key, !!printOptions && collapsesVerseChords(printOptions));
   const paper = printOptions?.paper ?? 'letter';
-  const PAGE_HEIGHT = pt(pageHeightTwips(paper));
-  const scale = printScale(paper);
+  const geometry = pageGeometry(paper);
+  const collapsed = chartSections(blocks, arrangement, key, !!printOptions && collapsesVerseChords(printOptions)).sections;
+  const sections = geometry.shortLabels ? withShortLabels(collapsed) : collapsed;
+  const MARGIN_TOP = pt(geometry.marginTopTwips);
+  const creditSize = geometry.creditSizePt;
+  const creditLine = geometry.creditLinePt;
+  const PAGE_WIDTH = pt(geometry.widthTwips);
+  const PAGE_HEIGHT = pt(geometry.heightTwips);
+  const scale = geometry.scale;
   // Anything that decides how many lines the chart takes — where lyric lines wrap, the label
   // column's width, how the credits break — is measured the way the on-screen chart (and the Word
   // export) measure it: the browser's text widths include kerning, which the PDF font's don't, so
@@ -159,15 +157,25 @@ async function addSongPages(
   // chords and centre the text, so everything lines up with what's drawn.
   await loadChordFont(option);
   const pageMeasure = measureInFont(option.wordFont);
-  const labelCol = pt(labelColumnTwips(sections.map((s) => s.label), pageMeasure));
-  const lyricWidth = pt(CONTENT_WIDTH_TWIPS) - labelCol;
-  const footer = creditFooter(creditLines(credits), pageMeasure);
-  const titleSize = titleSizePt(title, pageMeasure);
+  const labelCol = pt(labelColumnTwips(sections.map((s) => s.label), pageMeasure, geometry.minLabelColumnTwips));
+  const lyricWidth = pt(geometry.contentWidthTwips) - labelCol;
+  const footer = creditFooter(creditLines(credits), pageMeasure, geometry);
+  const keyText = keyHeaderText(sections, key, capo);
+  // On a half sheet the key ends the title line, so the title leaves room for it.
+  const titleKey = geometry.keyOnTitleLine ? keyText : null;
+  const titleSize = titleSizePt(title, pageMeasure, geometry, titleKey ? TITLE_KEY_GAP_PT + pageMeasure(titleKey, KEY_SIZE_PT, 'italic') : 0);
   const contentHeight = PAGE_HEIGHT - MARGIN_TOP - pt(footer.marginBottomTwips);
-  const footerTop = PAGE_HEIGHT - pt(CREDIT_BOTTOM_TWIPS) - footer.lines.length * CREDIT_LINE_PT;
+  const footerTop = PAGE_HEIGHT - pt(CREDIT_BOTTOM_TWIPS) - footer.lines.length * creditLine;
   const chordLine = CHORD_LINE_PT * lineSpacing;
   const lyricLine = LYRIC_LINE_PT * lineSpacing;
-  const { items, groups } = layoutChartItems(sections, measure, pageMeasure, lyricWidth, lineSpacing);
+  const { items, groups } = layoutChartItems(
+    sections,
+    measure,
+    pageMeasure,
+    lyricWidth,
+    lineSpacing,
+    geometry.titleLinePt + geometry.titleGapPt,
+  );
 
   const black = rgb(0.1, 0.1, 0.1);
   // Positions are tracked down from the page top; PDF coordinates run up from the bottom.
@@ -179,16 +187,16 @@ async function addSongPages(
     groups,
     contentHeight + PAGE_FIT_SLACK_PT,
   );
-  const headerBaseline = pt(HEADER_TOP_TWIPS) + KEY_SIZE_PT * 0.8;
+  const headerBaseline = pt(geometry.headerTopTwips) + KEY_SIZE_PT * 0.8;
   pages.forEach((indices, pageIndex) => {
     const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     footer.lines.forEach((line, i) => {
-      const x = (PAGE_WIDTH - measure(line, CREDIT_SIZE_PT, '')) / 2;
-      draw(page, line, x, baselineIn(footerTop + i * CREDIT_LINE_PT, CREDIT_LINE_PT, CREDIT_SIZE_PT), CREDIT_SIZE_PT, '');
+      const x = (PAGE_WIDTH - measure(line, creditSize, '')) / 2;
+      draw(page, line, x, baselineIn(footerTop + i * creditLine, creditLine, creditSize), creditSize, '');
     });
-    // The key header goes on the first page only.
-    if (pageIndex === 0) {
-      draw(page, keyHeaderText(sections, key, capo), MARGIN_SIDE, headerBaseline, KEY_SIZE_PT, 'italic');
+    // The key header goes on the first page only (unless it's on the title line).
+    if (pageIndex === 0 && !titleKey) {
+      draw(page, keyText, MARGIN_SIDE, headerBaseline, KEY_SIZE_PT, 'italic');
     }
     const pageLabel = pageLabelText(title, pageIndex, pages.length);
     if (pageLabel) {
@@ -200,8 +208,13 @@ async function addSongPages(
       const item = items[index];
       if (item.kind === 'title') {
         const text = (title || 'Untitled').toUpperCase();
-        const x = (PAGE_WIDTH - measure(text, titleSize, 'bold')) / 2;
-        draw(page, text, x, baselineIn(top, TITLE_LINE_PT, titleSize), titleSize, 'bold');
+        const titleWidth = measure(text, titleSize, 'bold');
+        const keyWidth = titleKey ? TITLE_KEY_GAP_PT + measure(titleKey, KEY_SIZE_PT, 'italic') : 0;
+        // The title and the key after it are centred together.
+        const x = (PAGE_WIDTH - titleWidth - keyWidth) / 2;
+        const baseline = baselineIn(top, geometry.titleLinePt, titleSize);
+        draw(page, text, x, baseline, titleSize, 'bold');
+        if (titleKey) draw(page, titleKey, x + titleWidth + TITLE_KEY_GAP_PT, baseline, KEY_SIZE_PT, 'italic');
       } else {
         let lineTop = top + item.gapBefore;
         if (item.lines.length === 0 && item.label) {
@@ -231,7 +244,7 @@ async function addSongPages(
       }
       top += item.height;
     });
-    // A half sheet: everything drawn at the letter width, shrunk onto the smaller page.
+    // A half sheet: drawn at the full sheet's sizes, then shrunk onto the smaller page.
     if (scale !== 1) page.scale(scale, scale);
   });
 }

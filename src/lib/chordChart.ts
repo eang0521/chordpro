@@ -185,6 +185,37 @@ export function differingVersesText({ differing, firstVerse }: CollapsedSections
   return `${names} ${verb} different chords from ${firstVerse}, but only ${firstVerse}'s chords are printed.`;
 }
 
+// Short section labels for a half sheet, so the label column takes less of the page.
+const SHORT_LABELS: [RegExp, string][] = [
+  [/^pre[- ]?chorus\b/i, 'Pre-Ch.'],
+  [/^chorus\b/i, 'Ch.'],
+  [/^verse\b/i, 'V'],
+  [/^bridge\b/i, 'Br.'],
+  [/^intro\b/i, 'Int.'],
+  [/^instrumental\b/i, 'Inst.'],
+  [/^interlude\b/i, 'Inter.'],
+  [/^outro\b/i, 'Out.'],
+];
+
+/** "Verse 1" as "V1", "Chorus" as "Ch.", "Bridge 2" as "Br. 2", "Intro" as "Int."; a label it
+ * doesn't know ("Tag") stays as it is. */
+export function shortSectionLabel(label: string): string {
+  const trimmed = label.trim();
+  for (const [pattern, short] of SHORT_LABELS) {
+    const match = pattern.exec(trimmed);
+    if (!match) continue;
+    const rest = trimmed.slice(match[0].length).trim();
+    // A verse's number goes right after the V ("V1"); the others keep a space ("Ch. 2").
+    return short === 'V' ? `V${rest}` : rest ? `${short} ${rest}` : short;
+  }
+  return label;
+}
+
+/** The sections with their labels shortened (see shortSectionLabel). */
+export function withShortLabels(sections: DocSection[]): DocSection[] {
+  return sections.map((s) => (s.label ? { ...s, label: shortSectionLabel(s.label) } : s));
+}
+
 export interface SectionDisplayRow {
   key: string;
   section: DocSection;

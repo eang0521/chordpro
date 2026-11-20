@@ -53,21 +53,6 @@ export interface PrintOptions {
 
 export const DEFAULT_PRINT_OPTIONS: PrintOptions = { paper: 'letter', collapseVerseChords: false };
 
-// A half sheet is laid out as a letter-width page of the same shape (so every size, margin and
-// wrap is the full sheet's) and then shrunk by this much, so it prints as the full chart, smaller.
-export const HALF_SHEET_SCALE = 5.5 / 8.5;
-
-/** How much the laid-out page is shrunk to print: 1 for a full sheet. */
-export function printScale(paper: PaperSize): number {
-  return paper === 'half' ? HALF_SHEET_SCALE : 1;
-}
-
-/** The page's height as laid out (before `printScale`): a half sheet is 8.5in tall at 5.5in wide,
- * so at the letter width it's 8.5in / HALF_SHEET_SCALE (about 13.1in) tall. */
-export function pageHeightTwips(paper: PaperSize): number {
-  return paper === 'half' ? Math.round((8.5 * 1440) / HALF_SHEET_SCALE) : PAGE_HEIGHT_TWIPS;
-}
-
 /** True when the verse chords really are collapsed: only on a half sheet. */
 export function collapsesVerseChords(options: PrintOptions): boolean {
   return options.paper === 'half' && options.collapseVerseChords;
@@ -78,6 +63,81 @@ export const CREDIT_SIZE_PT = 8;
 export const CREDIT_LINE_PT = 10;
 export const CREDIT_BOTTOM_TWIPS = 432; // 0.3in from the page bottom to the footer's last line
 const CREDIT_GAP_TWIPS = 160; // 8pt between the song and the footer
+
+// The title's line: the preview sets it at 1.15 times the size.
+export const TITLE_LINE_PT = TITLE_SIZE_PT * 1.15;
+// Between the title and the key when the key goes at the end of the title line.
+export const TITLE_KEY_GAP_PT = 10;
+
+// A half sheet is laid out at the full sheet's lyric and chord sizes on a page 1/HALF_SHEET_SCALE
+// times the half sheet's size, then shrunk by this much to print: 14pt lyrics print at 11.2pt and
+// 11pt chords at 8.8pt. The page is narrower than a letter page, so long lines wrap sooner.
+export const HALF_SHEET_SCALE = 0.8;
+
+/** The page as it's laid out (in twips and points, before it's shrunk by `scale` to print), and
+ * the parts of the chart that a half sheet sets more compactly than a full one. */
+export interface PageGeometry {
+  widthTwips: number;
+  heightTwips: number;
+  contentWidthTwips: number;
+  scale: number;
+  marginTopTwips: number;
+  /** From the page top to the header line (the key, and "p. 1 of 2"). */
+  headerTopTwips: number;
+  titleSizePt: number;
+  titleLinePt: number;
+  titleGapPt: number;
+  /** The key goes at the end of the title line instead of in the page header. */
+  keyOnTitleLine: boolean;
+  /** Section labels are shortened ("V1", "Ch.") and their column is narrower. */
+  shortLabels: boolean;
+  minLabelColumnTwips: number;
+  creditSizePt: number;
+  creditLinePt: number;
+}
+
+export const LETTER_GEOMETRY: PageGeometry = {
+  widthTwips: PAGE_WIDTH_TWIPS,
+  heightTwips: PAGE_HEIGHT_TWIPS,
+  contentWidthTwips: CONTENT_WIDTH_TWIPS,
+  scale: 1,
+  marginTopTwips: MARGIN_TOP_TWIPS,
+  headerTopTwips: HEADER_TOP_TWIPS,
+  titleSizePt: TITLE_SIZE_PT,
+  titleLinePt: TITLE_LINE_PT,
+  titleGapPt: TITLE_GAP_PT,
+  keyOnTitleLine: false,
+  shortLabels: false,
+  minLabelColumnTwips: MIN_LABEL_COLUMN_TWIPS,
+  creditSizePt: CREDIT_SIZE_PT,
+  creditLinePt: CREDIT_LINE_PT,
+};
+
+const HALF_WIDTH_TWIPS = Math.round((5.5 * 1440) / HALF_SHEET_SCALE);
+const HALF_TITLE_SIZE_PT = 18;
+const HALF_GEOMETRY: PageGeometry = {
+  widthTwips: HALF_WIDTH_TWIPS,
+  heightTwips: Math.round((8.5 * 1440) / HALF_SHEET_SCALE),
+  contentWidthTwips: HALF_WIDTH_TWIPS - 2 * MARGIN_SIDE_TWIPS,
+  scale: HALF_SHEET_SCALE,
+  // With the key on the title line, the header only holds "p. 1 of 2", so it moves up and the
+  // song starts at the side margins' 0.5in.
+  marginTopTwips: MARGIN_SIDE_TWIPS,
+  headerTopTwips: 300,
+  titleSizePt: HALF_TITLE_SIZE_PT,
+  titleLinePt: HALF_TITLE_SIZE_PT * 1.15,
+  titleGapPt: 8,
+  keyOnTitleLine: true,
+  shortLabels: true,
+  minLabelColumnTwips: 720,
+  creditSizePt: 6.5,
+  creditLinePt: 8,
+};
+
+export function pageGeometry(paper: PaperSize): PageGeometry {
+  return paper === 'half' ? HALF_GEOMETRY : LETTER_GEOMETRY;
+}
+
 
 const TWIPS_PER_INCH = 1440;
 // On-screen preview scale — 72px/in means 1pt of text is exactly 1px, so the preview's font
@@ -130,9 +190,9 @@ export function measureInFont(fontFamily: string): TextMeasure {
 }
 
 /** Width of the section-label column for a song: at least 1in, wider if a label needs it. */
-export function labelColumnTwips(labels: string[], measure: TextMeasure): number {
+export function labelColumnTwips(labels: string[], measure: TextMeasure, minTwips = MIN_LABEL_COLUMN_TWIPS): number {
   const widest = Math.max(0, ...labels.map((l) => measure(l.toUpperCase(), LABEL_SIZE_PT, 'bold')));
-  return Math.max(MIN_LABEL_COLUMN_TWIPS, Math.ceil(widest * 20) + LABEL_GAP_TWIPS);
+  return Math.max(minTwips, Math.ceil(widest * 20) + LABEL_GAP_TWIPS);
 }
 
 // A long title is set smaller so it stays on one line, but no smaller than this.
@@ -144,12 +204,14 @@ const TITLE_FIT_SLACK_PT = 6;
 /** The title's size, in points: the usual size, or as much smaller as it takes for the all-caps
  * title to fit on one line across the page. The preview, Word doc and PDF all measure it in the
  * browser, so they pick the same size. */
-export function titleSizePt(title: string, measure: TextMeasure): number {
-  const width = measure((title || 'Untitled').toUpperCase(), TITLE_SIZE_PT, 'bold');
-  const room = CONTENT_WIDTH_TWIPS / 20 - TITLE_FIT_SLACK_PT;
-  if (width <= room) return TITLE_SIZE_PT;
+export function titleSizePt(title: string, measure: TextMeasure, geometry = LETTER_GEOMETRY, reservedPt = 0): number {
+  const size = geometry.titleSizePt;
+  const width = measure((title || 'Untitled').toUpperCase(), size, 'bold');
+  // `reservedPt`: room kept on the line for something else, like the key after the title.
+  const room = geometry.contentWidthTwips / 20 - TITLE_FIT_SLACK_PT - reservedPt;
+  if (width <= room) return size;
   // Rounded down to a quarter point, so the text never ends up a hair too wide.
-  return Math.max(MIN_TITLE_SIZE_PT, Math.floor(((TITLE_SIZE_PT * room) / width) * 4) / 4);
+  return Math.max(Math.min(MIN_TITLE_SIZE_PT, size * 0.67), Math.floor(((size * room) / width) * 4) / 4);
 }
 
 /** Breaks text at spaces so each line fits `widthPt`; a single word wider than that stays whole. */
@@ -172,9 +234,13 @@ export function wrapText(text: string, widthPt: number, sizePt: number, measure:
 /** The credits as printed lines (each credit wrapped to the page width), and the bottom margin
  * that leaves room for them — the same in the preview, the Word doc and the PDF, so all three
  * paginate alike. With no credits the margin is the usual 0.5in. */
-export function creditFooter(credits: string[], measure: TextMeasure): { lines: string[]; marginBottomTwips: number } {
-  const lines = credits.flatMap((c) => wrapText(c, CONTENT_WIDTH_TWIPS / 20, CREDIT_SIZE_PT, measure));
+export function creditFooter(
+  credits: string[],
+  measure: TextMeasure,
+  geometry = LETTER_GEOMETRY,
+): { lines: string[]; marginBottomTwips: number } {
+  const lines = credits.flatMap((c) => wrapText(c, geometry.contentWidthTwips / 20, geometry.creditSizePt, measure));
   if (lines.length === 0) return { lines, marginBottomTwips: MARGIN_BOTTOM_TWIPS };
-  const footerTop = CREDIT_BOTTOM_TWIPS + lines.length * CREDIT_LINE_PT * 20 + CREDIT_GAP_TWIPS;
+  const footerTop = CREDIT_BOTTOM_TWIPS + lines.length * geometry.creditLinePt * 20 + CREDIT_GAP_TWIPS;
   return { lines, marginBottomTwips: Math.max(MARGIN_BOTTOM_TWIPS, footerTop) };
 }

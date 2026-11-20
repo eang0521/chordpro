@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { ArrangementEntry, KeyName, SongCredits } from '../types';
 import type { BlockMap } from '../lib/arrangement';
 import type { PlacedLine, SectionDisplayRow } from '../lib/chordChart';
-import { capoShapeKey, chartSections, differingVersesText, flattenSections, isChordOnly, keyHeaderText, layoutLine, pageLabelText, songKeys } from '../lib/chordChart';
+import { capoShapeKey, chartSections, differingVersesText, flattenSections, isChordOnly, keyHeaderText, layoutLine, pageLabelText, songKeys, withShortLabels } from '../lib/chordChart';
 import { generateWordDoc } from '../lib/wordDoc';
 import { generatePdf } from '../lib/pdfDoc';
 import { chartFilename, downloadBlob } from '../lib/download';
@@ -12,28 +12,23 @@ import { creditLines } from '../lib/credits';
 import type { PrintOptions } from '../lib/pageLayout';
 import {
   CHORD_SIZE_PT,
-  CONTENT_WIDTH_PX,
   CREDIT_BOTTOM_TWIPS,
-  CREDIT_LINE_PT,
-  CREDIT_SIZE_PT,
-  HEADER_TOP_PX,
+  KEY_SIZE_PT,
   LYRIC_SIZE_PT,
   MARGIN_SIDE_PX,
-  MARGIN_TOP_PX,
-  PAGE_WIDTH_PX,
   collapsesVerseChords,
   creditFooter,
-  pageHeightTwips,
+  pageGeometry,
   labelColumnTwips,
   measureInFont,
   twipsToPreviewPx,
   MAX_LINE_SPACING,
   MIN_LINE_SPACING,
   clampLineSpacing,
-  TITLE_GAP_PT,
+  TITLE_KEY_GAP_PT,
   titleSizePt,
 } from '../lib/pageLayout';
-import { PAGE_FIT_SLACK_PT, TITLE_LINE_PT } from '../lib/chartLayout';
+import { PAGE_FIT_SLACK_PT } from '../lib/chartLayout';
 import { fitLineSpacing, paginateByHeight } from '../lib/pagination';
 import { KeyControl } from './KeyControl';
 import { CapoSelect } from './CapoControls';
@@ -132,14 +127,14 @@ function renderLinePair(placed: PlacedLine, key: number): ReactNode {
  * (shown only on the section's first row) sits on the lyric line, below a spacer the height of
  * the chord line. The label column width is in em of the lyric size, so it matches the doc's
  * physical width in page mode (where 1em = the lyric point size) and scales with the compact view. */
-function renderDisplayRow(display: SectionDisplayRow, labelColEm: number, fontFamily: string): ReactNode {
+function renderDisplayRow(display: SectionDisplayRow, labelColEm: number, fontFamily: string, contentWidthPx: number): ReactNode {
   const gapClass = `${display.isLastInSection ? 'chart-gap-section' : 'chart-gap-line'}${
     display.row?.gapBefore && !display.isFirstInSection ? ' chart-gap-before' : ''
   }`;
   // Laid out within the page width beside the label column, wrapping where the PDF and Word
   // export do (1pt = 1px here), so the pages measured for Fit to page match what prints.
   const lines = display.row
-    ? layoutLine(display.row.tokens, measureInFont(fontFamily), CONTENT_WIDTH_PX - labelColEm * LYRIC_SIZE_PT, display.row.repeat)
+    ? layoutLine(display.row.tokens, measureInFont(fontFamily), contentWidthPx - labelColEm * LYRIC_SIZE_PT, display.row.repeat)
     : [];
   // Only lines with lyrics get a chord line above them; a chord-only line draws its chords on the
   // lyric line itself, so the label beside it needs no spacer.
@@ -162,19 +157,33 @@ function renderDisplayRow(display: SectionDisplayRow, labelColEm: number, fontFa
   );
 }
 
-/** The title at its fitted size (`sizePt`), in a line box that stays the usual height, as in the
- * PDF and Word export. */
-function renderTitle(title: string, sizePt: number): ReactNode {
-  const style = { fontSize: `${sizePt / LYRIC_SIZE_PT}em`, lineHeight: TITLE_LINE_PT / sizePt, marginBottom: `${TITLE_GAP_PT / sizePt}em` };
+/** How the title line is set: its fitted size, its line's height and the gap below (all in pt),
+ * and the key when it goes at the end of the title line (a half sheet). */
+interface TitleStyle {
+  sizePt: number;
+  linePt: number;
+  gapPt: number;
+  keyText: string | null;
+}
+
+/** The title at its fitted size, in a line box that stays the usual height, as in the PDF and
+ * Word export, with the key after it on a half sheet. */
+function renderTitle(title: string, { sizePt, linePt, gapPt, keyText }: TitleStyle): ReactNode {
+  const style = { fontSize: `${sizePt / LYRIC_SIZE_PT}em`, lineHeight: linePt / sizePt, marginBottom: `${gapPt / sizePt}em` };
   return (
     <div className="chart-doc-title" key="header" style={style}>
       {title || 'Untitled'}
+      {keyText && (
+        <span className="chart-title-key" style={{ fontSize: `${KEY_SIZE_PT / sizePt}em`, marginLeft: `${TITLE_KEY_GAP_PT / KEY_SIZE_PT}em` }}>
+          {keyText}
+        </span>
+      )}
     </div>
   );
 }
 
-function renderPageItem(item: PageItem, title: string, titleSize: number, labelColEm: number, fontFamily: string): ReactNode {
-  return item.kind === 'header' ? renderTitle(title, titleSize) : renderDisplayRow(item.display, labelColEm, fontFamily);
+function renderPageItem(item: PageItem, title: string, titleStyle: TitleStyle, labelColEm: number, fontFamily: string, contentWidthPx: number): ReactNode {
+  return item.kind === 'header' ? renderTitle(title, titleStyle) : renderDisplayRow(item.display, labelColEm, fontFamily, contentWidthPx);
 }
 
 export function ChordChartView({
@@ -208,11 +217,18 @@ export function ChordChartView({
   const shapeKey = capoShapeKey(songKey, capo);
   const collapse = collapsesVerseChords(printOptions);
   const collapsed = useMemo(() => chartSections(blocks, arrangement, shapeKey, collapse), [blocks, arrangement, shapeKey, collapse]);
-  const sections = collapsed.sections;
   // Verses whose chords don't match the first verse's, which collapsing hides all the same.
   const collapseWarning = differingVersesText(collapsed);
-  // A half sheet is laid out as a taller page of the same width (see pageHeightTwips).
-  const pageHeightPx = twipsToPreviewPx(pageHeightTwips(printOptions.paper));
+  // A half sheet is laid out larger than it prints, then shrunk, and set more compactly (see
+  // pageGeometry): shorter labels, a smaller title with the key after it, smaller credits.
+  const geometry = pageGeometry(printOptions.paper);
+  const sections = useMemo(
+    () => (geometry.shortLabels ? withShortLabels(collapsed.sections) : collapsed.sections),
+    [collapsed, geometry.shortLabels],
+  );
+  const pageWidthPx = twipsToPreviewPx(geometry.widthTwips);
+  const pageHeightPx = twipsToPreviewPx(geometry.heightTwips);
+  const contentWidthPx = twipsToPreviewPx(geometry.contentWidthTwips);
   const displayRows = useMemo(() => flattenSections(sections), [sections]);
   const keyHeader = keyHeaderText(sections, shapeKey, capo);
   // The keys the song is played in (not the capo shapes), for the file names.
@@ -236,26 +252,37 @@ export function ChordChartView({
   }, [font]);
   const labelColEm = useMemo(() => {
     const labels = [...new Set(displayRows.map((d) => d.section.label))];
-    return labelColumnTwips(labels, measureInFont(font.wordFont)) / 20 / LYRIC_SIZE_PT;
+    return labelColumnTwips(labels, measureInFont(font.wordFont), geometry.minLabelColumnTwips) / 20 / LYRIC_SIZE_PT;
     // fontLoads: the same font measures differently once it has actually loaded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayRows, font.wordFont, fontLoads]);
+  }, [displayRows, font.wordFont, fontLoads, geometry.minLabelColumnTwips]);
   // The credits footer, and the page height left for the song above it.
   const footer = useMemo(
-    () => creditFooter(creditLines(credits), measureInFont(font.wordFont)),
+    () => creditFooter(creditLines(credits), measureInFont(font.wordFont), geometry),
     // fontLoads: as above, measure again once the font has loaded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [credits, font.wordFont, fontLoads],
+    [credits, font.wordFont, fontLoads, geometry],
   );
   // Long titles shrink to fit on one line, measured as the PDF and Word export measure them.
+  // On a half sheet the key ends the title line, so the title leaves room for it.
+  const titleKey = geometry.keyOnTitleLine ? keyHeader : null;
   const titleSize = useMemo(
-    () => titleSizePt(title, measureInFont(font.wordFont)),
+    () => {
+      const measure = measureInFont(font.wordFont);
+      return titleSizePt(title, measure, geometry, titleKey ? TITLE_KEY_GAP_PT + measure(titleKey, KEY_SIZE_PT, 'italic') : 0);
+    },
     // fontLoads: as above, measure again once the font has loaded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [title, font.wordFont, fontLoads],
+    [title, font.wordFont, fontLoads, geometry, titleKey],
   );
+  const titleStyle = useMemo<TitleStyle>(
+    () => ({ sizePt: titleSize, linePt: geometry.titleLinePt, gapPt: geometry.titleGapPt, keyText: titleKey }),
+    [titleSize, geometry, titleKey],
+  );
+  const marginTopPx = twipsToPreviewPx(geometry.marginTopTwips);
+  const headerTopPx = twipsToPreviewPx(geometry.headerTopTwips);
   const marginBottomPx = twipsToPreviewPx(footer.marginBottomTwips);
-  const contentHeightPx = pageHeightPx - MARGIN_TOP_PX - marginBottomPx;
+  const contentHeightPx = pageHeightPx - marginTopPx - marginBottomPx;
 
   // Measure each page item's real rendered height (in a hidden, page-content-width container) so
   // we can greedily pack them into US-Letter pages, matching the margins the Word export uses.
@@ -270,12 +297,12 @@ export function ChordChartView({
   useLayoutEffect(() => {
     const el = pagesRef.current;
     if (!el) return;
-    const fit = () => setPageScale(Math.min(1, el.clientWidth / PAGE_WIDTH_PX));
+    const fit = () => setPageScale(Math.min(1, el.clientWidth / pageWidthPx));
     fit();
     const observer = new ResizeObserver(fit);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [pageMode]);
+  }, [pageMode, pageWidthPx]);
 
   // Page items grouped by song section (the title on its own), so a section is never split
   // across pages.
@@ -307,7 +334,7 @@ export function ChordChartView({
     setPages(paginateByHeight(measureHeights(), groups, contentHeightPx + PAGE_FIT_SLACK_PT));
     // measureHeights only reads the DOM rendered from these.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageItems, groups, font.cssFont, lineSpacing, fontLoads, contentHeightPx, titleSize]);
+  }, [pageItems, groups, font.cssFont, lineSpacing, fontLoads, contentHeightPx, contentWidthPx, titleStyle]);
 
   /** Picks the roomiest line spacing that still fits the song on one page (or two if it must),
    * by re-measuring the hidden layout at each candidate spacing. */
@@ -436,11 +463,11 @@ export function ChordChartView({
       <div
         ref={measureRef}
         className="chart-measure"
-        style={{ fontFamily: font.cssFont, fontSize: LYRIC_SIZE_PT, width: CONTENT_WIDTH_PX, ...lineSpacingVar(lineSpacing) }}
+        style={{ fontFamily: font.cssFont, fontSize: LYRIC_SIZE_PT, width: contentWidthPx, ...lineSpacingVar(lineSpacing) }}
       >
         {pageItems.map((item, i) => (
           <div key={i} ref={(el) => { itemRefs.current[i] = el; }}>
-            {renderPageItem(item, title, titleSize, labelColEm, font.wordFont)}
+            {renderPageItem(item, title, titleStyle, labelColEm, font.wordFont, contentWidthPx)}
           </div>
         ))}
       </div>
@@ -449,11 +476,11 @@ export function ChordChartView({
         <div className="chart-pages" ref={pagesRef}>
           {pages.map((indices, pageIndex) => (
             // Takes the shrunk page's size, since a CSS scale leaves the page's layout box full size.
-            <div className="chart-page-frame" style={{ width: PAGE_WIDTH_PX * pageScale, height: pageHeightPx * pageScale }} key={pageIndex}>
+            <div className="chart-page-frame" style={{ width: pageWidthPx * pageScale, height: pageHeightPx * pageScale }} key={pageIndex}>
               <div
                 className="chart-page"
                 style={{
-                  width: PAGE_WIDTH_PX,
+                  width: pageWidthPx,
                   height: pageHeightPx,
                   ...(pageScale < 1 ? { transform: `scale(${pageScale})`, transformOrigin: 'top left' } : {}),
                 }}
@@ -463,26 +490,26 @@ export function ChordChartView({
                   style={{
                     fontFamily: font.cssFont,
                     fontSize: LYRIC_SIZE_PT,
-                    padding: `${MARGIN_TOP_PX}px ${MARGIN_SIDE_PX}px ${marginBottomPx}px`,
+                    padding: `${marginTopPx}px ${MARGIN_SIDE_PX}px ${marginBottomPx}px`,
                     ...lineSpacingVar(lineSpacing),
                   }}
                 >
                   {/* Only the first page has the key, like the Word and PDF exports; a multi-page
                       chart labels every page at the top right, level with it. */}
-                  {pageIndex === 0 && (
-                    <div className="chart-page-header" style={{ top: HEADER_TOP_PX, left: MARGIN_SIDE_PX }}>
+                  {pageIndex === 0 && !titleKey && (
+                    <div className="chart-page-header" style={{ top: headerTopPx, left: MARGIN_SIDE_PX }}>
                       {keyHeader}
                     </div>
                   )}
                   {pages.length > 1 && (
-                    <div className="chart-page-header" style={{ top: HEADER_TOP_PX, right: MARGIN_SIDE_PX }}>
+                    <div className="chart-page-header" style={{ top: headerTopPx, right: MARGIN_SIDE_PX }}>
                       {pageLabelText(title, pageIndex, pages.length)}
                     </div>
                   )}
                   {/* Until it's re-paginated, a chart that just lost rows can have page breaks
                       for rows it no longer has. */}
                   {indices.filter((i) => i < pageItems.length).map((i) => (
-                    <div key={i}>{renderPageItem(pageItems[i], title, titleSize, labelColEm, font.wordFont)}</div>
+                    <div key={i}>{renderPageItem(pageItems[i], title, titleStyle, labelColEm, font.wordFont, contentWidthPx)}</div>
                   ))}
                 </div>
                 {footer.lines.length > 0 && (
@@ -492,8 +519,8 @@ export function ChordChartView({
                     className="chart-page-credits"
                     style={{
                       fontFamily: font.cssFont,
-                      fontSize: CREDIT_SIZE_PT,
-                      lineHeight: `${CREDIT_LINE_PT}px`,
+                      fontSize: geometry.creditSizePt,
+                      lineHeight: `${geometry.creditLinePt}px`,
                       bottom: twipsToPreviewPx(CREDIT_BOTTOM_TWIPS),
                       left: MARGIN_SIDE_PX,
                       right: MARGIN_SIDE_PX,
@@ -511,8 +538,9 @@ export function ChordChartView({
       ) : (
         <div className="chord-chart" style={{ fontFamily: font.cssFont, ...lineSpacingVar(lineSpacing) }}>
           <div className="chart-page-header">{keyHeader}</div>
-          {renderTitle(title, titleSize)}
-          {displayRows.map((display) => renderDisplayRow(display, labelColEm, font.wordFont))}
+          {/* The key has its own line above in compact view. */}
+          {renderTitle(title, { ...titleStyle, keyText: null })}
+          {displayRows.map((display) => renderDisplayRow(display, labelColEm, font.wordFont, contentWidthPx))}
           {footer.lines.length > 0 && (
             <div className="chart-compact-credits">
               {creditLines(credits).map((line) => (

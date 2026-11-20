@@ -1,9 +1,9 @@
 import type { DocSection } from './chordChart';
 import { isChordOnly, layoutLine } from './chordChart';
 import type { TextMeasure } from './pageLayout';
-import { CHORD_LINE_PT, LYRIC_LINE_PT, SECTION_GAP_PT, TITLE_GAP_PT, TITLE_SIZE_PT } from './pageLayout';
+import { CHORD_LINE_PT, LYRIC_LINE_PT, SECTION_GAP_PT, TITLE_GAP_PT, TITLE_LINE_PT } from './pageLayout';
 
-export const TITLE_LINE_PT = TITLE_SIZE_PT * 1.15; // matches the preview's title line-height
+export { TITLE_LINE_PT };
 
 // A point of slack past the page's content area (it lands in the bottom margin, invisibly): the
 // preview measures rounded line heights, which can come out a fraction of a point shorter than
@@ -35,12 +35,14 @@ export function layoutChartItems(
   pageMeasure: TextMeasure,
   lyricWidth: number,
   lineSpacing: number,
+  // The title line and the gap below it (a half sheet's title is smaller).
+  titleHeight = TITLE_LINE_PT + TITLE_GAP_PT,
 ): { items: LayoutItem[]; groups: number[][] } {
   const chordLine = CHORD_LINE_PT * lineSpacing;
   const lyricLine = LYRIC_LINE_PT * lineSpacing;
   const sectionGap = SECTION_GAP_PT * lineSpacing;
 
-  const items: LayoutItem[] = [{ kind: 'title', height: TITLE_LINE_PT + TITLE_GAP_PT }];
+  const items: LayoutItem[] = [{ kind: 'title', height: titleHeight }];
   const groups: number[][] = [[0]];
   sections.forEach((section) => {
     const group: number[] = [];
