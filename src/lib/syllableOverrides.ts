@@ -55,6 +55,10 @@ const COMMON_SUNG_SYLLABLES: Record<string, string[]> = {
   // Often sung as two syllables, sometimes one.
   lion: ['li', 'on'],
   lions: ['li', 'ons'],
+  trial: ['tri', 'al'],
+  trials: ['tri', 'als'],
+  // Often sung as three syllables, sometimes two (glo-rious).
+  glorious: ['glo', 'ri', 'ous'],
 };
 
 const LEARNED_KEY = 'chordpro-syllable-overrides';
